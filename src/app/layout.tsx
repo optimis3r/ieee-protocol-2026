@@ -15,13 +15,13 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IEEE Protocol: The Network",
-  description: "Interactive ARG Progressive Web App for IEEE Network Operatives.",
-  applicationName: "IEEE Protocol",
+  title: "The Protocol // NIT Warangal IEEE Student Branch",
+  description: "An interactive mystery ARG where every player has a role. Enter. Investigate. Decide.",
+  applicationName: "The Protocol",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "IEEE Protocol",
+    title: "The Protocol",
   },
   icons: {
     icon: "/favicon.ico",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1e2030",
+  themeColor: "#0a0f0d",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -46,7 +46,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-cat-mantle text-cat-text selection:bg-cat-sapphire selection:text-cat-crust font-sans">
+      <body className="min-h-full flex flex-col bg-proto-obsidian text-proto-text selection:bg-proto-signal selection:text-proto-obsidian font-sans">
         {children}
       </body>
     </html>

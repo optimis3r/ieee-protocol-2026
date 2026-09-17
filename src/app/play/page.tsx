@@ -30,6 +30,7 @@ function AgentHUD() {
     id: 1,
     status: 'NETWORK_ACTIVE',
     global_broadcast: null,
+    leaderboard_visible: true,
     updated_at: new Date().toISOString(),
   });
   const [nodes, setNodes] = useState<Array<AgentNode & { node: NodeItem }>>([]);
@@ -213,13 +214,24 @@ function AgentHUD() {
             </button>
           </div>
 
-          <button
-            onClick={() => setIsHypothesisOpen(true)}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cat-surface0 hover:bg-cat-surface1 text-cat-green text-xs font-mono-cyber border border-cat-surface1 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            TOPOLOGY DEDUCTION (+400)
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href="/leaderboard"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-proto-surface0 hover:bg-proto-surface1 text-proto-gold text-xs font-mono-cyber border border-proto-gold/30 transition-colors"
+            >
+              <span>🏆 Leaderboard</span>
+            </a>
+
+            <button
+              onClick={() => setIsHypothesisOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-proto-surface0 hover:bg-proto-surface1 text-proto-signal text-xs font-mono-cyber border border-proto-signal/40 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              TOPOLOGY (+400)
+            </button>
+          </div>
         </div>
 
         {/* Dynamic Viewport */}

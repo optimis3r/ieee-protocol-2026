@@ -10,8 +10,11 @@ import {
   Sparkles, 
   CheckCircle2, 
   Clock, 
-  Cpu,
-  ChevronRight
+  ChevronRight,
+  Layers,
+  Activity,
+  Eye,
+  Cpu
 } from 'lucide-react';
 
 interface NodeTerminalProps {
@@ -32,29 +35,75 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
     return true;
   });
 
-  const getNodeIcon = (type: NodeItem['type']) => {
-    switch (type) {
-      case 'PHYSICAL_QR':
-        return <Scan className="w-4 h-4 text-cat-sapphire" />;
-      case 'TERMINAL_DECRYPT':
-        return <Terminal className="w-4 h-4 text-cat-mauve" />;
-      case 'DUAL_HANDSHAKE':
-        return <Users className="w-4 h-4 text-cat-yellow" />;
-      case 'DEDUCTION_HYPOTHESIS':
-        return <Sparkles className="w-4 h-4 text-cat-green" />;
+  const completedCount = nodes.filter((n) => n.is_completed).length;
+
+  const getDomainIcon = (domain?: NodeItem['domain']) => {
+    switch (domain) {
+      case 'LOGIC':
+        return <Layers className="w-4 h-4 text-proto-logic" />;
+      case 'SIGNAL':
+        return <Activity className="w-4 h-4 text-proto-signal" />;
+      case 'OBSERVATION':
+        return <Eye className="w-4 h-4 text-proto-obs" />;
+      case 'SYSTEM':
+        return <Cpu className="w-4 h-4 text-proto-system" />;
+      case 'SOCIAL':
+        return <Users className="w-4 h-4 text-proto-social" />;
+      default:
+        return <Terminal className="w-4 h-4 text-proto-logic" />;
+    }
+  };
+
+  const getDomainBorder = (domain?: NodeItem['domain'], isCompleted?: boolean) => {
+    if (isCompleted) return 'border-proto-signal/60 bg-proto-base/90 hover:border-proto-signal';
+    switch (domain) {
+      case 'LOGIC':
+        return 'border-proto-surface1 hover:border-proto-logic hover:shadow-[0_0_15px_rgba(0,210,255,0.2)]';
+      case 'SIGNAL':
+        return 'border-proto-surface1 hover:border-proto-signal hover:shadow-[0_0_15px_rgba(0,255,136,0.2)]';
+      case 'OBSERVATION':
+        return 'border-proto-surface1 hover:border-proto-obs hover:shadow-[0_0_15px_rgba(191,85,236,0.2)]';
+      case 'SYSTEM':
+        return 'border-proto-surface1 hover:border-proto-system hover:shadow-[0_0_15px_rgba(255,119,0,0.2)]';
+      case 'SOCIAL':
+        return 'border-proto-surface1 hover:border-proto-social hover:shadow-[0_0_15px_rgba(0,240,255,0.2)]';
+      default:
+        return 'border-proto-surface1 hover:border-proto-logic';
     }
   };
 
   return (
     <div className="space-y-5">
+      {/* Top Banner: RECOVERED Status from Poster */}
+      <div className="p-4 rounded-2xl bg-proto-surface0/90 border border-proto-surface1 flex flex-wrap items-center justify-between gap-4 font-mono-cyber">
+        <div className="flex items-center gap-3">
+          <div className="text-left">
+            <span className="text-[10px] text-proto-subtext uppercase tracking-widest block">
+              CIRCUIT RECOVERY TRACKER
+            </span>
+            <span className="text-sm font-black text-proto-logic">
+              RECOVERED: {String(completedCount).padStart(2, '0')} / {String(nodes.length).padStart(2, '0')}
+            </span>
+          </div>
+        </div>
+
+        {/* Segmented Cyan Bars */}
+        <div className="h-3 w-44 bg-proto-obsidian rounded-sm overflow-hidden p-0.5 border border-proto-logic/40">
+          <div 
+            className="h-full progress-segments shadow-[0_0_8px_#00d2ff] transition-all duration-500" 
+            style={{ width: `${Math.max(5, (completedCount / Math.max(1, nodes.length)) * 100)}%` }}
+          />
+        </div>
+      </div>
+
       {/* Tab Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cat-surface0 pb-3">
-        <div className="flex items-center gap-1 p-1 bg-cat-mantle rounded-xl border border-cat-surface0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-proto-surface1 pb-3">
+        <div className="flex items-center gap-1 p-1 bg-proto-base rounded-xl border border-proto-surface1">
           {(
             [
               { id: 'ALL', label: 'All Circuits' },
               { id: 'AVAILABLE', label: 'Available' },
-              { id: 'HANDSHAKE', label: 'Requires Handshake' },
+              { id: 'HANDSHAKE', label: 'Social Handshakes' },
               { id: 'COMPLETED', label: 'Completed' },
             ] as const
           ).map((tab) => (
@@ -63,8 +112,8 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono-cyber transition-all ${
                 activeTab === tab.id
-                  ? 'bg-cat-surface1 text-cat-text font-bold shadow-sm'
-                  : 'text-cat-subtext hover:text-cat-text'
+                  ? 'bg-proto-surface1 text-proto-text font-bold shadow'
+                  : 'text-proto-subtext hover:text-proto-text'
               }`}
             >
               {tab.label}
@@ -72,7 +121,7 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
           ))}
         </div>
 
-        <div className="text-xs font-mono-cyber text-cat-subtext">
+        <div className="text-xs font-mono-cyber text-proto-subtext">
           <span>{filteredNodes.length} CIRCUITS TRACKED</span>
         </div>
       </div>
@@ -88,42 +137,48 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
             <div
               key={node.id}
               onClick={() => onSelectNode(item)}
-              className={`group relative rounded-2xl bg-cat-base border p-5 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-lg flex flex-col justify-between ${
+              className={`group relative rounded-2xl bg-proto-base border p-5 cursor-pointer transition-all duration-200 hover:-translate-y-1 shadow-xl flex flex-col justify-between ${getDomainBorder(
+                node.domain,
                 is_completed
-                  ? 'border-cat-green/40 hover:border-cat-green bg-cat-base/90'
-                  : 'border-cat-surface1 hover:border-cat-sapphire hover:shadow-cat-sapphire/10'
-              }`}
+              )}`}
             >
               <div>
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2 mb-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-cat-surface0 border border-cat-surface1 group-hover:border-cat-sapphire transition-colors">
-                      {getNodeIcon(node.type)}
+                    <div className="p-2 rounded-xl bg-proto-surface0 border border-proto-surface1 group-hover:border-proto-logic transition-colors">
+                      {getDomainIcon(node.domain)}
                     </div>
                     <div>
-                      <span className="font-mono-cyber text-[11px] text-cat-subtext block">
-                        {node.id}
-                      </span>
-                      <h4 className="text-sm font-bold text-cat-text leading-snug group-hover:text-cat-sapphire transition-colors">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono-cyber text-[10px] text-proto-subtext">
+                          {node.id}
+                        </span>
+                        {node.domain && (
+                          <span className="text-[9px] font-mono-cyber font-bold px-1.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
+                            {node.domain}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-proto-text leading-snug group-hover:text-proto-logic transition-colors mt-0.5">
                         {node.title}
                       </h4>
                     </div>
                   </div>
 
                   {is_completed ? (
-                    <span className="shrink-0 p-1 rounded-full bg-cat-green/20 text-cat-green">
+                    <span className="shrink-0 p-1 rounded-full bg-proto-signal/20 text-proto-signal">
                       <CheckCircle2 className="w-4 h-4" />
                     </span>
                   ) : (
-                    <span className="shrink-0 p-1 rounded-full bg-cat-surface0 text-cat-subtext group-hover:text-cat-sapphire transition-colors">
+                    <span className="shrink-0 p-1 rounded-full bg-proto-surface0 text-proto-subtext group-hover:text-proto-logic transition-colors">
                       <ChevronRight className="w-4 h-4" />
                     </span>
                   )}
                 </div>
 
                 {/* Subtitle / Payload teaser */}
-                <div className="text-xs text-cat-subtext font-mono-cyber line-clamp-2 my-2 min-h-[32px]">
+                <div className="text-xs text-proto-subtext font-mono-cyber line-clamp-2 my-2 min-h-[32px]">
                   {node.payload.location ||
                     node.payload.cipher ||
                     node.payload.circuit_name ||
@@ -133,22 +188,22 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
               </div>
 
               {/* Footer */}
-              <div className="pt-3 border-t border-cat-surface0 flex items-center justify-between text-xs font-mono-cyber">
-                <div className="flex items-center gap-1.5 text-cat-subtext text-[11px]">
+              <div className="pt-3 border-t border-proto-surface1 flex items-center justify-between text-xs font-mono-cyber">
+                <div className="flex items-center gap-1.5 text-proto-subtext text-[11px]">
                   <Clock className="w-3 h-3" />
                   <span>{globalSolves} solves</span>
                   {attempts > 0 && !is_completed && (
-                    <span className="text-cat-peach ml-1">({attempts} tries)</span>
+                    <span className="text-proto-crimson ml-1">({attempts} tries)</span>
                   )}
                 </div>
 
                 <div className="font-bold">
                   {is_completed ? (
-                    <span className="text-cat-green">
+                    <span className="text-proto-signal">
                       +{points_earned || node.base_points} PTS
                     </span>
                   ) : (
-                    <span className="text-cat-yellow">
+                    <span className="text-proto-gold">
                       {currentScore} PTS
                     </span>
                   )}

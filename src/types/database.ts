@@ -1,4 +1,14 @@
-export type AgentArchetype = 'CRYPTOGRAPHER' | 'FIELD_OPERATIVE' | 'SIGNAL_ANALYST' | 'ARCHIVIST';
+export type AgentArchetype = 
+  | 'LOGIC' 
+  | 'SIGNAL' 
+  | 'OBSERVATION' 
+  | 'SYSTEM' 
+  | 'SOCIAL'
+  | 'CRYPTOGRAPHER' 
+  | 'FIELD_OPERATIVE' 
+  | 'SIGNAL_ANALYST' 
+  | 'ARCHIVIST';
+
 export type NodeType = 'PHYSICAL_QR' | 'TERMINAL_DECRYPT' | 'DUAL_HANDSHAKE' | 'DEDUCTION_HYPOTHESIS';
 export type CheckInDirection = 'IN' | 'OUT';
 export type GameStatus = 'STANDBY' | 'NETWORK_ACTIVE' | 'NETWORK_LOCKED';
@@ -27,6 +37,7 @@ export interface NodeItem {
   id: string;
   title: string;
   type: NodeType;
+  domain?: 'LOGIC' | 'SIGNAL' | 'OBSERVATION' | 'SYSTEM' | 'SOCIAL';
   base_points: number;
   rarity_decay: number;
   secret_key: string;
@@ -74,5 +85,6 @@ export interface GameState {
   id: number;
   status: GameStatus;
   global_broadcast: string | null;
+  leaderboard_visible: boolean;
   updated_at: string;
 }

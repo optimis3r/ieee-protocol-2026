@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Agent } from '@/types/database';
-import { Shield, Radio, Award, ScanLine, Activity } from 'lucide-react';
+import { Shield, Radio, Award, ScanLine, Activity, Trophy } from 'lucide-react';
 
 interface StatusRibbonProps {
   agent: Agent;
@@ -17,39 +17,45 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
 }) => {
   const getArchetypeBadge = (archetype: Agent['archetype']) => {
     switch (archetype) {
+      case 'LOGIC':
       case 'CRYPTOGRAPHER':
-        return { label: 'CRYPTOGRAPHER', color: 'bg-cat-mauve/20 text-cat-mauve border-cat-mauve/30' };
+        return { label: 'LOGIC', color: 'bg-proto-logic/15 text-proto-logic border-proto-logic shadow-[0_0_10px_rgba(0,210,255,0.2)]' };
+      case 'SIGNAL':
       case 'SIGNAL_ANALYST':
-        return { label: 'SIGNAL ANALYST', color: 'bg-cat-sapphire/20 text-cat-sapphire border-cat-sapphire/30' };
+        return { label: 'SIGNAL', color: 'bg-proto-signal/15 text-proto-signal border-proto-signal shadow-[0_0_10px_rgba(0,255,136,0.2)]' };
+      case 'OBSERVATION':
       case 'FIELD_OPERATIVE':
-        return { label: 'FIELD OPERATIVE', color: 'bg-cat-green/20 text-cat-green border-cat-green/30' };
+        return { label: 'OBSERVATION', color: 'bg-proto-obs/15 text-proto-obs border-proto-obs shadow-[0_0_10px_rgba(191,85,236,0.2)]' };
+      case 'SYSTEM':
       case 'ARCHIVIST':
-        return { label: 'ARCHIVIST', color: 'bg-cat-yellow/20 text-cat-yellow border-cat-yellow/30' };
+        return { label: 'SYSTEM', color: 'bg-proto-system/15 text-proto-system border-proto-system shadow-[0_0_10px_rgba(255,119,0,0.2)]' };
+      case 'SOCIAL':
+        return { label: 'SOCIAL', color: 'bg-proto-social/15 text-proto-social border-proto-social shadow-[0_0_10px_rgba(0,240,255,0.2)]' };
     }
   };
 
   const badge = getArchetypeBadge(agent.archetype);
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-cat-mantle/90 backdrop-blur-md border-b border-cat-surface0">
+    <header className="sticky top-0 z-30 w-full bg-proto-base/95 backdrop-blur-md border-b border-proto-surface1">
       <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         {/* Agent Identity */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-cat-surface0 border border-cat-surface1 flex items-center justify-center text-cat-mauve shadow-inner">
-            <Shield className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-proto-surface0 border border-proto-surface1 flex items-center justify-center text-proto-signal shadow-inner">
+            <div className="font-mono-cyber font-black text-xs">NITW</div>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono-cyber font-bold text-sm tracking-wider text-cat-text">
+              <span className="font-mono-cyber font-bold text-sm tracking-wider text-proto-text">
                 {agent.agent_id}
               </span>
               <span
-                className={`text-[10px] font-mono-cyber font-medium px-2 py-0.5 rounded-full border ${badge.color}`}
+                className={`text-[10px] font-mono-cyber font-black px-2.5 py-0.5 rounded border ${badge.color}`}
               >
-                {badge.label}
+                [{badge.label}]
               </span>
             </div>
-            <p className="text-xs text-cat-subtext truncate max-w-[180px]">
+            <p className="text-xs text-proto-subtext truncate max-w-[180px]">
               {agent.name}
             </p>
           </div>
@@ -57,34 +63,26 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
 
         {/* Telemetry & Score */}
         <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-          {/* Live Network Pulse */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cat-surface0/60 border border-cat-surface1/60 text-xs">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                networkStatus === 'NETWORK_ACTIVE'
-                  ? 'bg-cat-green animate-pulse'
-                  : networkStatus === 'NETWORK_LOCKED'
-                  ? 'bg-cat-red'
-                  : 'bg-cat-yellow'
-              }`}
-            />
-            <span className="font-mono-cyber text-[11px] text-cat-subtext">
-              {networkStatus}
+          {/* Active Agents Badge */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-proto-surface0 border border-proto-system/40 text-xs">
+            <span className="w-2 h-2 rounded-full bg-proto-system animate-pulse" />
+            <span className="font-mono-cyber text-[11px] text-proto-system font-bold">
+              247 DETECTED
             </span>
-            <span className="text-[10px] text-cat-subtext/60 font-mono-cyber pl-1 border-l border-cat-surface1">
+            <span className="text-[10px] text-proto-subtext/80 font-mono-cyber pl-1 border-l border-proto-surface1">
               18ms
             </span>
           </div>
 
           {/* Clearance Score */}
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-cat-surface0 border border-cat-surface1">
-            <Award className="w-4 h-4 text-cat-yellow" />
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-proto-surface0 border border-proto-gold/50 shadow-[0_0_12px_rgba(255,190,59,0.15)]">
+            <Trophy className="w-4 h-4 text-proto-gold" />
             <div className="text-right">
-              <div className="text-[10px] uppercase font-mono-cyber text-cat-subtext leading-none">
-                Clearance
+              <div className="text-[10px] uppercase font-mono-cyber text-proto-subtext leading-none">
+                Score
               </div>
-              <div className="text-base font-mono-cyber font-bold text-cat-yellow leading-tight">
-                {agent.score} <span className="text-[10px] font-normal text-cat-subtext">PTS</span>
+              <div className="text-base font-mono-cyber font-black text-proto-gold leading-tight">
+                {agent.score} <span className="text-[10px] font-normal text-proto-subtext">PTS</span>
               </div>
             </div>
           </div>
@@ -92,7 +90,7 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
           {/* Quick Scanner Launcher */}
           <button
             onClick={onOpenScanner}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cat-sapphire text-cat-crust font-semibold text-xs uppercase tracking-wider hover:bg-cat-sapphire/90 active:scale-95 transition-all shadow-md"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black text-xs uppercase tracking-wider hover:opacity-95 active:scale-95 transition-all shadow-md"
             title="Scan Badge or Node QR"
           >
             <ScanLine className="w-4 h-4" />

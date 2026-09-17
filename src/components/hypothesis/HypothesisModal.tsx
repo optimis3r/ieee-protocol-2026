@@ -12,7 +12,8 @@ import {
   AlertTriangle, 
   Send, 
   FileSearch,
-  ShieldCheck
+  ShieldCheck,
+  Trophy
 } from 'lucide-react';
 
 interface HypothesisModalProps {
@@ -61,26 +62,26 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cat-crust/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-cat-base border border-cat-mauve/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-proto-obsidian/85 backdrop-blur-md animate-in fade-in duration-200 font-mono-cyber">
+      <div className="relative w-full max-w-xl bg-proto-base border-2 border-proto-gold/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-cat-mantle border-b border-cat-surface0">
+        <div className="flex items-center justify-between px-6 py-4 bg-proto-mantle border-b border-proto-surface1">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cat-mauve/20 text-cat-mauve">
-              <Sparkles className="w-5 h-5 animate-pulse" />
+            <div className="p-2.5 rounded-xl bg-proto-gold/20 text-proto-gold">
+              <Trophy className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-cat-text font-mono-cyber">
-                MASTER TOPOLOGY DEDUCTION ENGINE
+              <h3 className="text-base font-black text-proto-text">
+                THE PROTOCOL TOPOLOGY DEDUCTION
               </h3>
-              <p className="text-xs text-cat-subtext font-mono-cyber">
-                Synthesize clues • Deduce the core entity • Grant +400 Flat Points
+              <p className="text-xs text-proto-gold font-bold">
+                Synthesize clues • Deduce the entity • +400 Flat Points
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-cat-subtext hover:text-cat-red hover:bg-cat-surface0 rounded-lg transition-colors"
+            className="p-2 text-proto-subtext hover:text-proto-crimson hover:bg-proto-surface0 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -89,23 +90,23 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
           {/* Parity Explainer */}
-          <div className="p-4 rounded-xl bg-cat-mantle border border-cat-surface0 text-xs font-mono-cyber space-y-2">
-            <div className="flex items-center gap-2 text-cat-yellow font-bold">
-              <FileSearch className="w-4 h-4 text-cat-yellow" />
+          <div className="p-4 rounded-xl bg-proto-surface0 border border-proto-surface1 text-xs space-y-2">
+            <div className="flex items-center gap-2 text-proto-gold font-black">
+              <FileSearch className="w-4 h-4 text-proto-gold" />
               LATE-ENTRY PARITY MECHANISM (+400 PTS)
             </div>
-            <p className="text-cat-subtext leading-relaxed">
-              Operatives who correctly reconstruct the hidden narrative of the IEEE Protocol receive a flat +400 points. Beware poisoned disinformation planted in conflicting intel drops.
+            <p className="text-proto-subtext leading-relaxed font-sans">
+              Operatives who correctly reconstruct the hidden narrative of The Protocol receive a flat +400 points, boosting their chances to win the <strong>Claude Pro Subscription</strong>. Beware poisoned disinformation from rogue telemetry drops!
             </p>
           </div>
 
           {/* Feedback message */}
           {statusMsg && (
             <div
-              className={`p-3.5 rounded-xl border text-xs font-mono-cyber flex items-start gap-2.5 ${
+              className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
                 statusMsg.type === 'success'
-                  ? 'bg-cat-green/15 border-cat-green/40 text-cat-green'
-                  : 'bg-cat-red/15 border-cat-red/40 text-cat-red'
+                  ? 'bg-proto-signal/15 border-proto-signal/40 text-proto-signal'
+                  : 'bg-proto-crimson/15 border-proto-crimson/40 text-proto-crimson'
               }`}
             >
               {statusMsg.type === 'success' ? (
@@ -119,22 +120,22 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
 
           {/* Question 1: System Origin */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-mono-cyber font-bold text-cat-text uppercase">
-              1. What is the true origin and nature of the IEEE Protocol system?
+            <label className="block text-xs font-black text-proto-text uppercase">
+              1. What is the true origin and nature of The Protocol system?
             </label>
             <input
               type="text"
               required
               value={coreOrigin}
               onChange={(e) => setCoreOrigin(e.target.value)}
-              placeholder="e.g. Autonomic AI routing daemon, 1994 legacy network..."
-              className="w-full px-3.5 py-2.5 text-xs font-mono-cyber bg-cat-mantle border border-cat-surface1 rounded-xl text-cat-text focus:outline-none focus:border-cat-mauve placeholder:text-cat-subtext/40"
+              placeholder="e.g. 1994 Autonomic AI routing daemon self-assembling..."
+              className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-gold placeholder:text-proto-subtext/40"
             />
           </div>
 
           {/* Question 2: Evidence Synthesis */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-mono-cyber font-bold text-cat-text uppercase">
+            <label className="block text-xs font-black text-proto-text uppercase">
               2. Evidence Synthesis & Cross-Operative Correlation:
             </label>
             <textarea
@@ -142,8 +143,8 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
               rows={4}
               value={evidence}
               onChange={(e) => setEvidence(e.target.value)}
-              placeholder="Explain how your intel fragments corroborate the central AI simulation and why conflicting rumors (such as satellite uplink or transformer sabotage) are false..."
-              className="w-full px-3.5 py-2.5 text-xs font-mono-cyber bg-cat-mantle border border-cat-surface1 rounded-xl text-cat-text focus:outline-none focus:border-cat-mauve placeholder:text-cat-subtext/40"
+              placeholder="Synthesize intel across Logic, Signal, Observation, System, and Social domains. Explain why false rumors (like satellite or power transformers) were planted..."
+              className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-gold placeholder:text-proto-subtext/40 font-sans"
             />
           </div>
 
@@ -151,7 +152,7 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3 px-4 rounded-xl bg-cat-mauve text-cat-crust font-bold font-mono-cyber text-xs tracking-wider uppercase hover:bg-cat-mauve/90 active:scale-[0.99] transition-all shadow-lg flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-proto-gold to-proto-system text-proto-obsidian font-black text-xs tracking-wider uppercase hover:opacity-95 active:scale-[0.99] transition-all shadow-lg flex items-center justify-center gap-2"
           >
             <Send className="w-4 h-4" />
             SUBMIT TOPOLOGY DEDUCTION (+400 PTS)

@@ -101,15 +101,17 @@ CREATE TABLE IF NOT EXISTS game_state (
     id INT PRIMARY KEY DEFAULT 1,
     status VARCHAR(20) DEFAULT 'NETWORK_ACTIVE',
     global_broadcast TEXT DEFAULT NULL,
+    leaderboard_visible BOOLEAN DEFAULT true,
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- Ensure default game_state row
-INSERT INTO game_state (id, status, global_broadcast)
-VALUES (1, 'NETWORK_ACTIVE', 'SYSTEM ONLINE: IEEE Protocol Operational. All Operatives Report to Nodes.')
+INSERT INTO game_state (id, status, global_broadcast, leaderboard_visible)
+VALUES (1, 'NETWORK_ACTIVE', 'SYSTEM ONLINE: The Protocol Operational. All Operatives Report to Nodes.', true)
 ON CONFLICT (id) DO UPDATE 
 SET status = EXCLUDED.status,
-    global_broadcast = EXCLUDED.global_broadcast;
+    global_broadcast = EXCLUDED.global_broadcast,
+    leaderboard_visible = EXCLUDED.leaderboard_visible;
 
 -- 10. Dynamic Scoring Function
 -- Formula: max(20, (base_points * max(0.6, 1.0 - (global_solves * 0.05))) - (failed_attempts * 10))
