@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { initStore, INITIAL_AGENTS } from '@/lib/store';
+import { Store, initStore, INITIAL_AGENTS } from '@/lib/store';
+import { Agent } from '@/types/database';
 import { 
   ScanLine, 
   ShieldAlert, 
@@ -11,15 +12,33 @@ import {
   Calendar,
   MapPin,
   Trophy,
-  ChevronDown
+  ChevronDown,
+  QrCode,
+  UserPlus,
+  LogIn,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
   const [showDemoAgents, setShowDemoAgents] = useState(false);
+  const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<{ valid: boolean; minutesRemaining: number }>({
+    valid: false,
+    minutesRemaining: 0,
+  });
 
   useEffect(() => {
     initStore();
+    const storedId = localStorage.getItem('ieee_agent_id');
+    if (storedId) {
+      const ag = Store.getAgentById(storedId);
+      if (ag) {
+        setCurrentAgent(ag);
+        setSessionStatus(Store.checkSessionValidity(ag.agent_id));
+      }
+    }
   }, []);
 
   const handleLaunchAgent = (agentId: string) => {
@@ -70,22 +89,22 @@ export default function HomePage() {
       </nav>
 
       {/* Main Hero: Grounded, Clean, Professional */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16 flex-1 flex flex-col items-center text-center justify-center space-y-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-14 flex-1 flex flex-col items-center text-center justify-center space-y-7">
         
         {/* Subtitle / Event Tag */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#16201a] border border-[#23332a] text-[#8ea897] text-xs">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#16201a] border border-[#23332a] text-[#8ea897] text-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-proto-signal" />
-          <span>Interactive ARG • Level 01</span>
+          <span>Campus Alternate Reality Game • Level 01</span>
         </div>
 
         {/* Title */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-[#f3f7f4]">
             THE PROTOCOL
           </h1>
 
           <p className="text-sm sm:text-base text-[#91a89a] max-w-lg mx-auto font-sans leading-relaxed">
-            An interactive campus mystery where every player has a role. Explore physical and digital nodes, cross-examine asymmetric intel, and deduce the core network topology.
+            Every operative is assigned a unique role. Register on your phone, present your personal QR pass to hosts at the gate, and decrypt the campus network.
           </p>
 
           <div className="inline-block px-4 py-1 rounded-md bg-[#16201a] border border-[#23332a] text-[#b8cfc1] text-xs font-semibold tracking-widest uppercase">
@@ -93,24 +112,91 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Primary Action Buttons (Solid, High-Contrast, No Rainbow Gradients) */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm justify-center">
-          <Link
-            href="/play"
-            className="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
-          >
-            <span>Enter Terminal</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+        {/* Dynamic Action Controls */}
+        {currentAgent ? (
+          <div className="w-full max-w-md bg-[#141d17] border border-[#23332a] rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <div className="text-left">
+                <span className="text-[#8ea897] text-[10px] uppercase block">Current Operative</span>
+                <span className="font-bold text-[#eaf2ec]">{currentAgent.name}</span>
+                <span className="text-proto-signal text-[11px] ml-1.5">({currentAgent.agent_id})</span>
+              </div>
+              <div className="text-right">
+                {sessionStatus.valid ? (
+                  <span className="inline-flex items-center gap-1 text-proto-signal text-[11px] bg-proto-signal/15 px-2 py-0.5 rounded border border-proto-signal/30">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{sessionStatus.minutesRemaining}m Active</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-proto-crimson text-[11px] bg-proto-crimson/15 px-2 py-0.5 rounded border border-proto-crimson/30">
+                    <Clock className="w-3 h-3" />
+                    <span>Host Scan Required</span>
+                  </span>
+                )}
+              </div>
+            </div>
 
-          <Link
-            href="/scan-to-enter"
-            className="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl bg-[#16201a] hover:bg-[#1f2d25] border border-[#283b30] text-[#eaf2ec] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
-          >
-            <ScanLine className="w-4 h-4 text-proto-signal" />
-            <span>Scan Badge</span>
-          </Link>
-        </div>
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+              {sessionStatus.valid ? (
+                <Link
+                  href="/play"
+                  className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <span>Enter Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              ) : (
+                <Link
+                  href="/my-badge"
+                  className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>Show QR Pass (Host Scan)</span>
+                </Link>
+              )}
+
+              <Link
+                href="/my-badge"
+                className="w-full sm:w-auto py-3 px-4 rounded-xl bg-[#16201a] hover:bg-[#1f2d25] border border-[#283b30] text-[#cad8ce] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+              >
+                <QrCode className="w-3.5 h-3.5 text-proto-signal" />
+                <span>My Pass</span>
+              </Link>
+
+              <Link
+                href="/login"
+                className="w-full sm:w-auto py-3 px-4 rounded-xl bg-[#16201a] hover:bg-[#1f2d25] border border-[#283b30] text-[#8ea897] hover:text-[#eaf2ec] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center"
+                title="Switch Account"
+              >
+                Switch
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 w-full max-w-sm">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full justify-center">
+              <Link
+                href="/register"
+                className="w-full sm:w-auto flex-1 py-3 px-5 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Register Operative</span>
+              </Link>
+
+              <Link
+                href="/login"
+                className="w-full sm:w-auto flex-1 py-3 px-5 rounded-xl bg-[#16201a] hover:bg-[#1f2d25] border border-[#283b30] text-[#eaf2ec] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4 text-proto-signal" />
+                <span>Log In (Retrieve QR)</span>
+              </Link>
+            </div>
+
+            <p className="text-[11px] text-[#718a7b] font-sans">
+              Personal QR pass is tied to your account. No local storage needed.
+            </p>
+          </div>
+        )}
 
         {/* 5 Domains: Clean, Natural, Minimal */}
         <div className="w-full max-w-md pt-2 space-y-2">

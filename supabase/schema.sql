@@ -27,10 +27,15 @@ CREATE TABLE IF NOT EXISTS agents (
     token TEXT UNIQUE NOT NULL,
     name VARCHAR(100),
     contact VARCHAR(100),
+    auth_identifier VARCHAR(100) UNIQUE,
+    pin VARCHAR(50),
     archetype agent_archetype NOT NULL DEFAULT 'FIELD_OPERATIVE',
     score INT DEFAULT 0,
     is_active BOOLEAN DEFAULT false,
     last_check_in TIMESTAMPTZ,
+    last_host_verified_at TIMESTAMPTZ,
+    last_active_at TIMESTAMPTZ,
+    logged_out_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

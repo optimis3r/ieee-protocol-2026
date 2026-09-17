@@ -47,29 +47,32 @@ export const KioskScanner: React.FC = () => {
         }
       } catch {}
 
-      // Extract regex match
-      const match = badgeId.match(/\b(AGT-[A-Z0-9]{4,8})\b/i);
+      // Extract badge ID from BADGE: prefix or regex
+      if (badgeId.startsWith('BADGE:')) {
+        badgeId = badgeId.replace('BADGE:', '').trim();
+      }
+      const match = badgeId.match(/\b(AGT-[A-Z0-9]{3,12})\b/i);
       if (match) {
         badgeId = match[1].toUpperCase();
       }
 
-      const existingAgent = Store.getAgentById(badgeId);
+      const existingAgent = Store.getAgentById(badgeId) || Store.findAgentByIdentifier(badgeId);
 
       if (existingAgent) {
-        // Decide direction
+        // Decide direction: Default to admission (IN) unless host specifically toggled OUT
         let dir: 'IN' | 'OUT' = 'IN';
-        if (activeDirection === 'AUTO') {
-          dir = existingAgent.is_active ? 'OUT' : 'IN';
+        if (activeDirection === 'OUT') {
+          dir = 'OUT';
         } else {
-          dir = activeDirection;
+          dir = 'IN';
         }
 
-        Store.logAccess(existingAgent.agent_id, dir);
+        const verifyResult = Store.verifyAgentAtGate(existingAgent.agent_id, dir);
         soundEffects.playSuccessChime();
 
         const updated = Store.getAgentById(existingAgent.agent_id);
         setLastScannedAgent(updated);
-        setLastAction(`${dir === 'IN' ? 'CHECK-IN' : 'CHECK-OUT'} RECORDED`);
+        setLastAction(dir === 'IN' ? '15-MIN CLEARANCE GRANTED' : 'CHECKED-OUT');
         refreshLogs();
       } else {
         // Unregistered QR badge

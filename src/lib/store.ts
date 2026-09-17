@@ -161,7 +161,7 @@ export const SEED_INTEL: IntelFragment[] = [
   }
 ];
 
-// 3. Initial Demo Agents with The Protocol Domains
+// 3. Initial Demo Agents with The Protocol Domains & 15-min Gate Timestamps
 export const INITIAL_AGENTS: Agent[] = [
   {
     id: 'agent-uuid-01',
@@ -169,10 +169,13 @@ export const INITIAL_AGENTS: Agent[] = [
     token: 'sec_tok_turing_8841',
     name: 'Alan Turing',
     contact: 'turing@nitw.ieee',
+    auth_identifier: 'turing',
+    pin: '1234',
     archetype: 'LOGIC',
     score: 150,
     is_active: true,
-    last_check_in: new Date(Date.now() - 3600000).toISOString(),
+    last_check_in: new Date(Date.now() - 300000).toISOString(),
+    last_host_verified_at: new Date(Date.now() - 300000).toISOString(), // 5 mins ago (active)
     created_at: new Date(Date.now() - 7200000).toISOString()
   },
   {
@@ -181,10 +184,13 @@ export const INITIAL_AGENTS: Agent[] = [
     token: 'sec_tok_hopper_2931',
     name: 'Grace Hopper',
     contact: 'hopper@nitw.ieee',
+    auth_identifier: 'hopper',
+    pin: '1234',
     archetype: 'SIGNAL',
     score: 180,
     is_active: true,
-    last_check_in: new Date(Date.now() - 1800000).toISOString(),
+    last_check_in: new Date(Date.now() - 600000).toISOString(),
+    last_host_verified_at: new Date(Date.now() - 600000).toISOString(), // 10 mins ago (active)
     created_at: new Date(Date.now() - 7200000).toISOString()
   },
   {
@@ -193,10 +199,13 @@ export const INITIAL_AGENTS: Agent[] = [
     token: 'sec_tok_lovelace_5521',
     name: 'Ada Lovelace',
     contact: 'ada@nitw.ieee',
+    auth_identifier: 'lovelace',
+    pin: '1234',
     archetype: 'OBSERVATION',
     score: 120,
     is_active: true,
-    last_check_in: new Date(Date.now() - 1200000).toISOString(),
+    last_check_in: new Date(Date.now() - 100000).toISOString(),
+    last_host_verified_at: new Date(Date.now() - 100000).toISOString(), // 1.6 mins ago (active)
     created_at: new Date(Date.now() - 7200000).toISOString()
   },
   {
@@ -205,10 +214,13 @@ export const INITIAL_AGENTS: Agent[] = [
     token: 'sec_tok_shannon_9910',
     name: 'Claude Shannon',
     contact: 'shannon@nitw.ieee',
+    auth_identifier: 'shannon',
+    pin: '1234',
     archetype: 'SYSTEM',
     score: 95,
     is_active: false,
     last_check_in: new Date(Date.now() - 5400000).toISOString(),
+    last_host_verified_at: new Date(Date.now() - 5400000).toISOString(), // Expired (>15 mins)
     created_at: new Date(Date.now() - 7200000).toISOString()
   },
   {
@@ -217,10 +229,13 @@ export const INITIAL_AGENTS: Agent[] = [
     token: 'sec_tok_ramanujan_1729',
     name: 'Srinivasa Ramanujan',
     contact: 'ramanujan@nitw.ieee',
+    auth_identifier: 'ramanujan',
+    pin: '1234',
     archetype: 'SOCIAL',
     score: 210,
     is_active: true,
-    last_check_in: new Date(Date.now() - 600000).toISOString(),
+    last_check_in: new Date(Date.now() - 60000).toISOString(),
+    last_host_verified_at: new Date(Date.now() - 60000).toISOString(), // 1 min ago (active)
     created_at: new Date(Date.now() - 7200000).toISOString()
   }
 ];
@@ -258,11 +273,13 @@ function getStored<T>(key: string, fallback: T): T {
   }
 }
 
-function setStored<T>(key: string, value: T): void {
+function setStored<T>(key: string, value: T, notify: boolean = true): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
-    window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: { key } }));
+    if (notify) {
+      window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: { key } }));
+    }
   } catch (err) {
     console.error(`Error setting ${key} in storage:`, err);
   }
@@ -405,6 +422,29 @@ export const Store = {
     return agents.find(a => a.agent_id.toUpperCase() === agentId.toUpperCase()) || null;
   },
 
+  findAgentByIdentifier(identifier: string): Agent | null {
+    const clean = identifier.trim().toLowerCase();
+    const agents = this.getAgents();
+    return agents.find(a => 
+      a.agent_id.toLowerCase() === clean ||
+      (a.auth_identifier && a.auth_identifier.toLowerCase() === clean) ||
+      (a.contact && a.contact.toLowerCase() === clean)
+    ) || null;
+  },
+
+  loginPlayer(identifier: string, pin?: string): { success: boolean; agent?: Agent; message: string } {
+    const agent = this.findAgentByIdentifier(identifier);
+    if (!agent) {
+      return { success: false, message: 'Operative account not found. Please check your Roll No / ID or register.' };
+    }
+    if (agent.pin && agent.pin.trim() !== '') {
+      if (!pin || agent.pin !== pin.trim()) {
+        return { success: false, message: 'Invalid authentication pass-code (PIN).' };
+      }
+    }
+    return { success: true, agent, message: 'Authentication successful.' };
+  },
+
   validateAgent(agentId: string, token?: string): Agent | null {
     const agent = this.getAgentById(agentId);
     if (!agent) return null;
@@ -412,18 +452,128 @@ export const Store = {
     return agent;
   },
 
+  // 15-Minute Inactivity / Gatekeeper Validity Check
+  checkSessionValidity(agentId: string): { 
+    valid: boolean; 
+    minutesRemaining: number; 
+    reason?: 'INITIAL_SCAN_REQUIRED' | 'EXPIRED_15_MIN' | 'CHECKED_OUT' | 'NOT_FOUND' 
+  } {
+    const agent = this.getAgentById(agentId);
+    if (!agent) {
+      return { valid: false, minutesRemaining: 0, reason: 'NOT_FOUND' };
+    }
+
+    // Newly registered player who has never had their QR scanned by a host
+    if (!agent.last_host_verified_at) {
+      return { valid: false, minutesRemaining: 0, reason: 'INITIAL_SCAN_REQUIRED' };
+    }
+
+    const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+    // Check if player was logged out / away from webpage for > 15 mins
+    if (agent.logged_out_at) {
+      const elapsedSinceLogout = Date.now() - new Date(agent.logged_out_at).getTime();
+      if (elapsedSinceLogout > TIMEOUT_MS) {
+        return { valid: false, minutesRemaining: 0, reason: 'EXPIRED_15_MIN' };
+      }
+      const remainingMins = Math.max(1, Math.ceil((TIMEOUT_MS - elapsedSinceLogout) / 60000));
+      return { valid: true, minutesRemaining: remainingMins };
+    }
+
+    // If active or recently active
+    const referenceTime = agent.last_active_at || agent.last_host_verified_at;
+    const elapsedMs = Date.now() - new Date(referenceTime).getTime();
+
+    if (elapsedMs > TIMEOUT_MS) {
+      return { valid: false, minutesRemaining: 0, reason: 'EXPIRED_15_MIN' };
+    }
+
+    const remainingMins = Math.max(1, Math.ceil((TIMEOUT_MS - elapsedMs) / 60000));
+    return { valid: true, minutesRemaining: remainingMins };
+  },
+
+  // Record active heartbeat while player is viewing / interacting with the dashboard
+  recordActivity(agentId: string): void {
+    const agents = this.getAgents();
+    const idx = agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+    if (idx !== -1) {
+      agents[idx].last_active_at = new Date().toISOString();
+      agents[idx].logged_out_at = null;
+      agents[idx].is_active = true;
+      setStored(KEY_AGENTS, agents, false);
+    }
+  },
+
+  // Record when player leaves the webpage (visibilitychange hidden / beforeunload)
+  recordDeparture(agentId: string): void {
+    const agents = this.getAgents();
+    const idx = agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+    if (idx !== -1) {
+      agents[idx].logged_out_at = new Date().toISOString();
+      setStored(KEY_AGENTS, agents, false);
+    }
+  },
+
+  // Player explicitly logs out
+  logoutPlayer(agentId: string): void {
+    const agents = this.getAgents();
+    const idx = agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+    if (idx !== -1) {
+      agents[idx].logged_out_at = new Date().toISOString();
+      agents[idx].is_active = false;
+      setStored(KEY_AGENTS, agents, true);
+    }
+  },
+
+  // Host scans player's phone screen QR code to admit / re-admit them
+  verifyAgentAtGate(agentId: string, direction: 'IN' | 'OUT' = 'IN'): { success: boolean; agent?: Agent; message: string } {
+    const agents = this.getAgents();
+    const idx = agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+    if (idx === -1) {
+      return { success: false, message: `Operative ID ${agentId} not found in Protocol records.` };
+    }
+
+    const timestamp = new Date().toISOString();
+    agents[idx].is_active = (direction === 'IN');
+    agents[idx].last_check_in = timestamp;
+    if (direction === 'IN') {
+      agents[idx].last_host_verified_at = timestamp; // Resets the 15-minute gatekeeper timer!
+      agents[idx].last_active_at = timestamp;
+      agents[idx].logged_out_at = null;
+    } else {
+      agents[idx].logged_out_at = timestamp;
+    }
+    setStored(KEY_AGENTS, agents, true);
+
+    this.logAccess(agents[idx].agent_id, direction);
+
+    return { 
+      success: true, 
+      agent: agents[idx], 
+      message: direction === 'IN' 
+        ? `HOST ADMISSION VERIFIED: 15-min clearance granted to ${agents[idx].name} (${agents[idx].agent_id}).`
+        : `OPERATIVE CHECKED OUT: Terminal access suspended for ${agents[idx].agent_id}.`
+    };
+  },
+
   registerAgent(payload: {
     name: string;
     contact: string;
+    auth_identifier?: string;
+    pin?: string;
     archetype: AgentArchetype;
     customAgentId?: string;
+    isPreVerified?: boolean;
   }): { agent: Agent; token: string } {
     const agents = this.getAgents();
     const cleanId = payload.customAgentId 
       ? payload.customAgentId.trim().toUpperCase()
       : `AGT-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     
-    const existing = agents.find(a => a.agent_id === cleanId);
+    const existing = agents.find(a => 
+      a.agent_id === cleanId || 
+      (payload.auth_identifier && a.auth_identifier && a.auth_identifier.toLowerCase() === payload.auth_identifier.trim().toLowerCase())
+    );
     if (existing) {
       return { agent: existing, token: existing.token };
     }
@@ -435,10 +585,15 @@ export const Store = {
       token,
       name: payload.name,
       contact: payload.contact,
+      auth_identifier: payload.auth_identifier?.trim(),
+      pin: payload.pin?.trim() || '1234',
       archetype: payload.archetype,
       score: 0,
-      is_active: true,
-      last_check_in: new Date().toISOString(),
+      is_active: Boolean(payload.isPreVerified),
+      last_check_in: payload.isPreVerified ? new Date().toISOString() : null,
+      last_host_verified_at: payload.isPreVerified ? new Date().toISOString() : null,
+      last_active_at: payload.isPreVerified ? new Date().toISOString() : null,
+      logged_out_at: null,
       created_at: new Date().toISOString()
     };
 

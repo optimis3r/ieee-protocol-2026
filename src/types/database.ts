@@ -19,10 +19,15 @@ export interface Agent {
   token: string;
   name: string;
   contact: string;
+  auth_identifier?: string; // Roll number, student ID, or email
+  pin?: string;             // Simple pass-code for login recovery
   archetype: AgentArchetype;
   score: number;
   is_active: boolean;
   last_check_in: string | null;
+  last_host_verified_at?: string | null; // Timestamp when host last scanned their QR
+  last_active_at?: string | null;        // Last active on the webpage
+  logged_out_at?: string | null;         // Timestamp when player left or logged out of webpage
   created_at: string;
 }
 

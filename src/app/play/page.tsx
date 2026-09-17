@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, Suspense, useCallback } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Agent, AgentNode, NodeItem, AgentIntel, IntelFragment, GameState } from '@/types/database';
 import { Store, initStore } from '@/lib/store';
@@ -18,7 +19,8 @@ import {
   ScanLine, 
   LogOut, 
   Radio, 
-  AlertCircle 
+  AlertCircle,
+  QrCode
 } from 'lucide-react';
 
 function AgentHUD() {
@@ -66,7 +68,6 @@ function AgentHUD() {
     if (paramAgentId) {
       currentAgent = Store.validateAgent(paramAgentId, paramToken || undefined);
       if (currentAgent) {
-        // Save to localStorage for persistent session
         localStorage.setItem('ieee_agent_id', currentAgent.agent_id);
         localStorage.setItem('ieee_agent_token', currentAgent.token);
       }
@@ -81,19 +82,73 @@ function AgentHUD() {
       }
     }
 
-    // 3. If still not authenticated, redirect to /scan-to-enter
+    // 3. If still not authenticated, redirect to /login
     if (!currentAgent) {
-      router.push('/scan-to-enter');
+      router.push('/login');
       return;
     }
 
+    // 4. Enforce 15-minute Gatekeeper Session Check
+    const validity = Store.checkSessionValidity(currentAgent.agent_id);
+    if (!validity.valid) {
+      // Must be scanned by host to enter/re-enter
+      router.push('/my-badge');
+      return;
+    }
+
+    // Agent is valid - record active presence
+    Store.recordActivity(currentAgent.agent_id);
     setAgent(currentAgent);
     refreshAgentData(currentAgent.agent_id);
+
+    // Heartbeat: update active presence every 20s and re-verify validity
+    const heartbeatInterval = setInterval(() => {
+      if (currentAgent) {
+        Store.recordActivity(currentAgent.agent_id);
+        const check = Store.checkSessionValidity(currentAgent.agent_id);
+        if (!check.valid) {
+          router.push('/my-badge');
+        }
+      }
+    }, 20000);
+
+    // Track departure when tab becomes hidden or window unloads
+    const handleVisibilityChange = () => {
+      if (!currentAgent) return;
+      if (document.visibilityState === 'hidden') {
+        Store.recordDeparture(currentAgent.agent_id);
+      } else if (document.visibilityState === 'visible') {
+        const check = Store.checkSessionValidity(currentAgent.agent_id);
+        if (!check.valid) {
+          router.push('/my-badge');
+        } else {
+          Store.recordActivity(currentAgent.agent_id);
+          refreshAgentData(currentAgent.agent_id);
+        }
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      if (currentAgent) {
+        Store.recordDeparture(currentAgent.agent_id);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     // Cross-tab and live store event listener
     const handleStoreUpdate = () => {
       if (currentAgent) {
-        refreshAgentData(currentAgent.agent_id);
+        const fresh = Store.getAgentById(currentAgent.agent_id);
+        if (fresh) {
+          const check = Store.checkSessionValidity(fresh.agent_id);
+          if (!check.valid) {
+            router.push('/my-badge');
+            return;
+          }
+          refreshAgentData(fresh.agent_id);
+        }
       }
     };
 
@@ -101,6 +156,9 @@ function AgentHUD() {
     window.addEventListener('storage', handleStoreUpdate);
 
     return () => {
+      clearInterval(heartbeatInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('ieee_store_update', handleStoreUpdate);
       window.removeEventListener('storage', handleStoreUpdate);
     };
@@ -138,16 +196,19 @@ function AgentHUD() {
   };
 
   const handleLogout = () => {
+    if (agent) {
+      Store.logoutPlayer(agent.agent_id);
+    }
     localStorage.removeItem('ieee_agent_id');
     localStorage.removeItem('ieee_agent_token');
-    router.push('/scan-to-enter');
+    router.push('/login');
   };
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-cat-mantle flex flex-col items-center justify-center p-4">
-        <div className="w-10 h-10 border-2 border-cat-sapphire border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="font-mono-cyber text-xs text-cat-subtext uppercase tracking-wider">
+      <div className="min-h-screen bg-[#0d120f] flex flex-col items-center justify-center p-4">
+        <div className="w-10 h-10 border-2 border-proto-signal border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="font-mono-cyber text-xs text-[#8ea897] uppercase tracking-wider">
           AUTHENTICATING OPERATIVE CREDENTIALS...
         </p>
       </div>
@@ -155,7 +216,7 @@ function AgentHUD() {
   }
 
   return (
-    <div className="min-h-screen bg-cat-mantle text-cat-text flex flex-col scanlines">
+    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col">
       {/* Top Status Ribbon */}
       <StatusRibbon
         agent={agent}
@@ -215,21 +276,39 @@ function AgentHUD() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              href="/my-badge"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-proto-signal text-xs font-mono-cyber border border-[#23332a] transition-colors"
+              title="View your personal host check-in QR code"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">My QR Pass</span>
+            </Link>
+
             <a
               href="/leaderboard"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-proto-surface0 hover:bg-proto-surface1 text-proto-gold text-xs font-mono-cyber border border-proto-gold/30 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-proto-gold text-xs font-mono-cyber border border-proto-gold/30 transition-colors"
             >
               <span>🏆 Leaderboard</span>
             </a>
 
             <button
               onClick={() => setIsHypothesisOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-proto-surface0 hover:bg-proto-surface1 text-proto-signal text-xs font-mono-cyber border border-proto-signal/40 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-proto-signal text-xs font-mono-cyber border border-proto-signal/40 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
               TOPOLOGY (+400)
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#16201a] hover:bg-proto-crimson/20 text-[#8ea897] hover:text-proto-crimson text-xs font-mono-cyber border border-[#23332a] transition-colors"
+              title="Log Out of this session"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Exit</span>
             </button>
           </div>
         </div>
