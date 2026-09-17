@@ -1,0 +1,206 @@
+# System Specification: IEEE Protocol - The Network (Interactive ARG PWA)
+
+## 1. Project Overview & Context
+Build a full-stack, mobile-first Progressive Web App (PWA) for an alternate reality game (ARG) titled **"IEEE Protocol: The Network"**. 
+- **Core Design Philosophy:** *"Everyone knows something, but no one knows everything."*
+- **Event Mechanics:** Agents (participants) explore physical and digital Nodes, exchange asymmetric intel fragments, make verified connections, and deduce the core network topology.
+- **Event Window:** Operates over a scheduled multi-hour window with flexible entry/exit times where agents retain their progress throughout.
+
+### UI/UX Theme: Catppuccin Macchiato
+Implement a high-contrast, cybersecurity/terminal aesthetic using the **Catppuccin Macchiato** palette:
+* **Base Layer:**
+  * Base: `#24273a`
+  * Mantle: `#1e2030`
+  * Crust: `#181926`
+* **Surfaces & Borders:**
+  * Surface 0: `#363a4f`
+  * Surface 1: `#494d64`
+  * Surface 2: `#5b6078`
+* **Typography:**
+  * Text: `#cad3f5`
+  * Subtext: `#a5adcb`
+  * Display/Terminal: Monospace (`JetBrains Mono` or `Fira Code`) for IDs, payloads, and telemetry.
+  * Interface: Clean sans-serif (`Inter`) for body copy and general layout.
+* **Status & Accent Tokens:**
+  * Sapphire / Blue (`#8aadf4`): Interactive states, node links, operational circuits.
+  * Mauve / Purple (`#c6a0f6`): Agent IDs, archetypes, high-value lore drops.
+  * Green (`#a6da95`): Verified connections, completed nodes, authorized status.
+  * Red / Peach (`#ed8796` / `#f5a97f`): Lockouts, compromised nodes, poisoned disinformation warnings.
+  * Yellow (`#eed49f`): Pending synchronizations, handshakes, system warnings.
+
+---
+
+## 2. Tech Stack & Infrastructure Requirements
+* **Framework:** Next.js (App Router, React 19, TypeScript).
+* **Styling:** Tailwind CSS with custom Catppuccin color extensions + Lucide React icons.
+* **Backend & DB:** Supabase (PostgreSQL 15+, Row Level Security, Realtime subscriptions).
+* **Hardware / Sensor Integration:** `@zxing/library` or `html5-qrcode` embedded for client-side zero-install camera scanning[cite: 1].
+* **State & Session Persistence:** Dual-layer auth using cryptographically signed query parameters (`token`) synced to `localStorage` and Supabase Auth / Session Tokens[cite: 1].
+
+---
+
+## 3. User Roles, Portals & Workflows
+
+### A. Admin / Operations Portal (`/admin`)
+* **Access Control:** Protected route guarded by admin credentials / secret environment bearer token[cite: 1].
+* **Kiosk Check-In & Entry Scanner:**
+  * Continuous camera feed for scanning physical wristbands / badge QR codes[cite: 1].
+  * *Unregistered QR:* Prompts a rapid modal for `Name`, `Contact`, and `Archetype`, automatically seeds the agent's node graph, and activates their profile[cite: 1].
+  * *Existing QR:* Logs an `entry` or `exit` event with precise timestamps, increments attendance logs, and displays current score, completed nodes, and active session status without resetting data[cite: 1].
+* **Master Operations Dashboard:**
+  * Real-time telemetry showing active agents, node completion distribution, disinformation flags, and live score leaderboards[cite: 1].
+  * System state switches: `STANDBY`, `NETWORK_ACTIVE`, `NETWORK_LOCKED` (freezes all point-bearing submissions)[cite: 1].
+  * Real-time broadcast dispatcher to push urgent terminal alerts to all active agents simultaneously[cite: 1].
+
+### B. Agent Portal (`/play?agent_id=...&token=...`)
+* **Frictionless Entry & Recovery:**
+  * Instant authentication on QR scan via signed URL parameters (`agent_id` + `token`)[cite: 1].
+  * State is written directly to `localStorage` (`ieee_agent_token`), surviving tab closures and browser crashes[cite: 1].
+  * Re-scanning the physical badge from any mobile browser automatically restores full session state[cite: 1].
+* **Agent Heads-Up Display (HUD):**
+  * *Status Ribbon:* Displays Agent ID, assigned Archetype, Security Clearance score, and network latency/status[cite: 1].
+  * *Node Terminal:* Dynamic grid showing available nodes (`Available`, `Requires Handshake`, `Compromised`, `Completed`)[cite: 1].
+  * *Node Interaction Modal:* Submission inputs for decodes, dual-agent verification fields, and hypothesis drafting[cite: 1].
+  * *Intel Locker:* Private decrypted clues, physical coordinates, and network topology snippets assigned to this operative[cite: 1].
+  * *In-App Camera Scanner:* Integrated camera viewfinder for scanning node tags or other agents' badges without leaving the app[cite: 1].
+
+---
+
+## 4. Database Schema (PostgreSQL / Supabase DDL)
+
+```sql
+-- Enums
+CREATE TYPE agent_archetype AS ENUM ('CRYPTOGRAPHER', 'FIELD_OPERATIVE', 'SIGNAL_ANALYST', 'ARCHIVIST');
+CREATE TYPE node_type AS ENUM ('PHYSICAL_QR', 'TERMINAL_DECRYPT', 'DUAL_HANDSHAKE', 'DEDUCTION_HYPOTHESIS');
+CREATE TYPE check_in_direction AS ENUM ('IN', 'OUT');
+
+-- Agents Table
+CREATE TABLE agents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id VARCHAR(16) UNIQUE NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    name VARCHAR(100),
+    contact VARCHAR(100),
+    archetype agent_archetype NOT NULL DEFAULT 'FIELD_OPERATIVE',
+    score INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT false,
+    last_check_in TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Check-in / Access History Log
+CREATE TABLE access_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id VARCHAR(16) REFERENCES agents(agent_id) ON DELETE CASCADE,
+    direction check_in_direction NOT NULL,
+    timestamp TIMESTAMPTZ DEFAULT now()
+);
+
+-- Nodes Master Table
+CREATE TABLE nodes (
+    id VARCHAR(32) PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    type node_type NOT NULL,
+    base_points INT DEFAULT 100,
+    rarity_decay FLOAT DEFAULT 1.0,
+    secret_key TEXT NOT NULL,
+    payload JSONB DEFAULT '{}'::jsonb
+);
+
+-- Agent Node Progress & State
+CREATE TABLE agent_nodes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id VARCHAR(16) REFERENCES agents(agent_id) ON DELETE CASCADE,
+    node_id VARCHAR(32) REFERENCES nodes(id) ON DELETE CASCADE,
+    is_unlocked BOOLEAN DEFAULT false,
+    is_completed BOOLEAN DEFAULT false,
+    completed_at TIMESTAMPTZ,
+    attempts INT DEFAULT 0,
+    UNIQUE(agent_id, node_id)
+);
+
+-- Intel Fragment Pool
+CREATE TABLE intel_fragments (
+    id VARCHAR(32) PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    is_disinformation BOOLEAN DEFAULT false,
+    required_archetype agent_archetype
+);
+
+-- Agent Intel Assignment
+CREATE TABLE agent_intel (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id VARCHAR(16) REFERENCES agents(agent_id) ON DELETE CASCADE,
+    intel_id VARCHAR(32) REFERENCES intel_fragments(id) ON DELETE CASCADE,
+    revealed_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(agent_id, intel_id)
+);
+
+-- Connections & Handshakes (Social / Multi-Agent Submissions)
+CREATE TABLE network_connections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_agent_id VARCHAR(16) REFERENCES agents(agent_id),
+    target_agent_id VARCHAR(16) REFERENCES agents(agent_id),
+    node_id VARCHAR(32) REFERENCES nodes(id),
+    connection_type VARCHAR(50),
+    verified BOOLEAN DEFAULT false,
+    points_awarded INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Global System Config
+CREATE TABLE game_state (
+    id INT PRIMARY KEY DEFAULT 1,
+    status VARCHAR(20) DEFAULT 'NETWORK_ACTIVE',
+    global_broadcast TEXT DEFAULT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+## 5. Core Game Mechanics & Rules Engine
+
+### Balanced Graph Seeding on Registration
+* When an agent is registered at the admin desk, trigger an atomic database function:
+  * Allocate **3 initial nodes** based on their archetype[cite: 1].
+  * Allocate **2 authentic intel fragments**[cite: 1].
+  * Allocate **1 poisoned/conflicting fragment** (marked `is_disinformation = true` internally, invisible to user)[cite: 1].
+
+### Multi-Agent Handshake Nodes
+* Nodes marked `DUAL_HANDSHAKE` cannot be completed alone[cite: 1].
+* Two agents of compatible archetypes must scan or enter each other’s `Agent ID` simultaneously[cite: 1].
+* Both records in `agent_nodes` are marked completed at that timestamp, granting both operatives points[cite: 1].
+
+### Anti-Grind Dynamic Scoring
+$$\text{Points Awarded} = \max\Big(20,\, \big(\text{Base Points} \times \max(0.6,\, 1.0 - (\text{Global Solves} \times 0.05))\big) - (\text{Failed Attempts} \times 10)\Big)$$[cite: 1]
+
+* **Hypothesis Deduction Engine:** Operatives can submit a final Network Topology Hypothesis at any point[cite: 1]. Correct identification of the overarching network narrative grants a flat **+400 points**, allowing late-entering agents (e.g., entering at 6:30 PM) to achieve parity through deduction rather than brute-force completion[cite: 1].
+
+---
+
+## 6. Implementation Checklist & Engineering Deliverables
+
+1. **Theme Configuration:**
+   * Extend `tailwind.config.ts` with complete Catppuccin Macchiato semantics[cite: 1].
+   * Define custom scrollbars, monospace telemetry inputs, and scanline utility overlays.
+
+2. **Authentication & QR Route Guard:**
+   * `/play`: Middleware checks query parameters `agent_id` and `token`[cite: 1].
+   * If parameters exist, validate against `agents` table and write to `localStorage`[cite: 1].
+   * If absent, fall back to `localStorage` token[cite: 1]. If neither exists, route to `/scan-to-enter`[cite: 1].
+
+3. **QR Scanner Module (`QRScannerModal.tsx`):**
+   * Integrated HTML5 in-browser video element with autofocus, torch toggle, and audio/haptic click feedback[cite: 1].
+   * Regex parsing logic to automatically distinguish between:
+     * Badge tokens: `AGT-[A-Z0-9]{4,8}`[cite: 1]
+     * Node endpoints: `/node/[a-zA-Z0-9_-]+`[cite: 1]
+
+4. **Admin Desk Portal (`/admin`):**
+   * Continuous camera view for rapid check-ins[cite: 1].
+   * Registration modal overlay for unallocated agent IDs[cite: 1].
+   * Live check-in feed and one-click game-state broadcast triggers[cite: 1].
+
+5. **Supabase Realtime Subscriptions:**
+   * `game_state`: Triggers system lockouts or alert banners on agent HUDs instantly[cite: 1].
+   * `agents`: Updates client clearance score and unlocked node list without requiring manual refreshes[cite: 1].
+
+Produce complete, strictly typed TypeScript code across components, API routes, and database migration helpers[cite: 1].
