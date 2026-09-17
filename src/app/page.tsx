@@ -1,30 +1,22 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { initStore, INITIAL_AGENTS } from '@/lib/store';
 import { 
-  Terminal, 
   ScanLine, 
   ShieldAlert, 
-  Radio, 
-  Cpu, 
-  Users, 
-  Sparkles, 
   ArrowRight,
   Calendar,
-  Clock,
   MapPin,
   Trophy,
-  AlertTriangle,
-  Eye,
-  Activity,
-  Layers
+  ChevronDown
 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
+  const [showDemoAgents, setShowDemoAgents] = useState(false);
 
   useEffect(() => {
     initStore();
@@ -40,244 +32,173 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-proto-obsidian text-proto-text flex flex-col justify-between scanlines selection:bg-proto-signal selection:text-proto-obsidian">
-      {/* Top Banner: NIT Warangal IEEE Student Branch */}
-      <header className="w-full bg-proto-base/90 backdrop-blur-md border-b border-proto-surface1 px-4 sm:px-6 py-3.5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col justify-between font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
+      {/* Refined Minimal Navbar */}
+      <nav className="w-full border-b border-[#1b2620] px-4 sm:px-8 py-4 bg-[#0d120f]/80 backdrop-blur-md">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-proto-surface0 border border-proto-signal/40 flex items-center justify-center text-proto-signal shadow-[0_0_12px_rgba(0,255,136,0.25)]">
-              {/* Cog / IEEE Student Branch Symbol */}
-              <div className="font-mono-cyber font-black text-xs tracking-tighter">NITW</div>
+            <div className="w-8 h-8 rounded-lg bg-[#16201a] border border-[#23332a] flex items-center justify-center text-proto-signal font-bold text-xs">
+              NW
             </div>
             <div>
-              <div className="font-mono-cyber font-black text-xs tracking-wider text-proto-text uppercase flex items-center gap-2">
+              <div className="font-bold text-xs text-[#eaf2ec] tracking-wider">
                 NIT WARANGAL
-                <span className="text-[10px] text-proto-signal border border-proto-signal/40 px-1.5 py-0.2 rounded font-normal">
-                  IEEE STUDENT BRANCH
-                </span>
               </div>
-              <div className="text-[10px] font-mono-cyber text-proto-subtext tracking-widest uppercase">
-                CONFIDENTIAL // LEVEL 01
+              <div className="text-[10px] text-[#7d9787] tracking-wider uppercase">
+                IEEE Student Branch
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 text-xs">
             <Link
               href="/leaderboard"
-              className="px-3.5 py-1.5 rounded-lg bg-proto-surface0 hover:bg-proto-surface1 text-proto-gold hover:text-proto-gold text-xs font-mono-cyber transition-all border border-proto-gold/40 flex items-center gap-1.5 shadow-[0_0_8px_rgba(255,190,59,0.15)]"
+              className="px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-[#d4af37] border border-[#d4af37]/30 transition-colors flex items-center gap-1.5"
             >
-              <Trophy className="w-3.5 h-3.5 text-proto-gold" />
+              <Trophy className="w-3.5 h-3.5" />
               <span>Leaderboard</span>
             </Link>
             <Link
               href="/admin"
-              className="px-3.5 py-1.5 rounded-lg bg-proto-surface0 hover:bg-proto-surface1 text-proto-subtext hover:text-proto-text text-xs font-mono-cyber transition-all border border-proto-surface1 flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-[#96af9f] hover:text-[#eaf2ec] border border-[#23332a] transition-colors flex items-center gap-1.5"
             >
-              <ShieldAlert className="w-3.5 h-3.5 text-proto-system" />
+              <ShieldAlert className="w-3.5 h-3.5 text-[#ff7700]" />
               <span className="hidden sm:inline">Operations</span>
             </Link>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Hero & Fortress Poster Section */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 flex-1 flex flex-col items-center text-center justify-center space-y-7">
+      {/* Main Hero: Grounded, Clean, Professional */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-16 flex-1 flex flex-col items-center text-center justify-center space-y-8">
         
-        {/* Pillar Header / Tag */}
-        <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-proto-surface0/90 border border-proto-signal/40 text-proto-signal text-xs font-mono-cyber shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-proto-signal animate-ping" />
-          <span>LEARN • BUILD • CREATE • TOGETHER</span>
+        {/* Subtitle / Event Tag */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#16201a] border border-[#23332a] text-[#8ea897] text-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-proto-signal" />
+          <span>Interactive ARG • Level 01</span>
         </div>
 
-        {/* Poster Epic Title: THE PROTOCOL */}
-        <div className="space-y-3 max-w-3xl">
-          <div className="text-xs sm:text-sm font-mono-cyber font-black tracking-[0.35em] text-proto-subtext uppercase">
-            AN INTERACTIVE MYSTERY WHERE EVERY PLAYER HAS A ROLE
-          </div>
-
-          <h1 className="text-5xl sm:text-7xl font-black font-mono-cyber tracking-tight text-proto-text drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
-            THE{' '}
-            <span className="bg-gradient-to-b from-[#ffeaa7] via-[#fdcb6e] to-[#e17055] bg-clip-text text-transparent drop-shadow-[0_4px_12px_rgba(253,203,110,0.4)]">
-              PROTOCOL
-            </span>
+        {/* Title */}
+        <div className="space-y-4">
+          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-[#f3f7f4]">
+            THE PROTOCOL
           </h1>
 
-          {/* Wooden / Stone Inscription Plaque */}
-          <div className="inline-block px-6 py-2 rounded-xl bg-gradient-to-r from-[#2d2219] via-[#433422] to-[#2d2219] border-2 border-[#8c6d48] text-[#f5e6cb] font-mono-cyber font-black text-xs sm:text-sm tracking-[0.2em] shadow-xl uppercase">
-            ENTER. INVESTIGATE. DECIDE.
+          <p className="text-sm sm:text-base text-[#91a89a] max-w-lg mx-auto font-sans leading-relaxed">
+            An interactive campus mystery where every player has a role. Explore physical and digital nodes, cross-examine asymmetric intel, and deduce the core network topology.
+          </p>
+
+          <div className="inline-block px-4 py-1 rounded-md bg-[#16201a] border border-[#23332a] text-[#b8cfc1] text-xs font-semibold tracking-widest uppercase">
+            ENTER • INVESTIGATE • DECIDE
           </div>
         </div>
 
-        {/* The 5 Glowing Domains from the Poster */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 max-w-2xl py-2">
-          <div className="px-3.5 py-1.5 rounded-lg bg-proto-base border border-proto-logic text-proto-logic text-xs font-mono-cyber font-bold flex items-center gap-2 shadow-[0_0_12px_rgba(0,210,255,0.25)]">
-            <Layers className="w-3.5 h-3.5" /> LOGIC
-          </div>
-          <div className="px-3.5 py-1.5 rounded-lg bg-proto-base border border-proto-signal text-proto-signal text-xs font-mono-cyber font-bold flex items-center gap-2 shadow-[0_0_12px_rgba(0,255,136,0.25)]">
-            <Activity className="w-3.5 h-3.5" /> SIGNAL
-          </div>
-          <div className="px-3.5 py-1.5 rounded-lg bg-proto-base border border-proto-obs text-proto-obs text-xs font-mono-cyber font-bold flex items-center gap-2 shadow-[0_0_12px_rgba(191,85,236,0.25)]">
-            <Eye className="w-3.5 h-3.5" /> OBSERVATION
-          </div>
-          <div className="px-3.5 py-1.5 rounded-lg bg-proto-base border border-proto-system text-proto-system text-xs font-mono-cyber font-bold flex items-center gap-2 shadow-[0_0_12px_rgba(255,119,0,0.25)]">
-            <Cpu className="w-3.5 h-3.5" /> SYSTEM
-          </div>
-          <div className="px-3.5 py-1.5 rounded-lg bg-proto-base border border-proto-social text-proto-social text-xs font-mono-cyber font-bold flex items-center gap-2 shadow-[0_0_12px_rgba(0,240,255,0.25)]">
-            <Users className="w-3.5 h-3.5" /> SOCIAL
-          </div>
-        </div>
-
-        {/* Central Glowing Beacon & Recovered Status Widgets */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
-          {/* Central Beacon */}
-          <div className="p-3.5 rounded-xl bg-proto-base/90 border-2 border-proto-system glow-system flex items-center justify-center gap-3 font-mono-cyber text-center">
-            <div>
-              <div className="text-xs font-black text-proto-system tracking-wider animate-pulse">
-                PROTOCOL ACTIVE
-              </div>
-              <div className="text-xs text-proto-text mt-0.5">
-                247 AGENTS DETECTED
-              </div>
-            </div>
-          </div>
-
-          {/* Recovered Fragments Widget */}
-          <div className="p-3.5 rounded-xl bg-proto-base/90 border-2 border-proto-logic glow-logic flex flex-col justify-center text-left font-mono-cyber">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-proto-logic font-bold">RECOVERED: 07 / 15</span>
-              <span className="text-[10px] text-proto-subtext">TELEMETRY</span>
-            </div>
-            {/* Segmented Cyan Bars */}
-            <div className="h-3 w-full bg-proto-obsidian rounded-sm overflow-hidden p-0.5 border border-proto-logic/40">
-              <div className="h-full w-[47%] progress-segments shadow-[0_0_10px_#00d2ff]" />
-            </div>
-          </div>
-        </div>
-
-        {/* Claude Pro Prize Banner */}
-        <div className="w-full max-w-xl p-4 rounded-2xl bg-gradient-to-r from-proto-base via-proto-surface0 to-proto-base border-2 border-proto-gold glow-gold flex items-center justify-between gap-4 font-mono-cyber">
-          <div className="flex items-center gap-3 text-left">
-            <div className="p-2.5 rounded-xl bg-proto-gold/20 text-proto-gold">
-              <Trophy className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[10px] text-proto-gold uppercase tracking-widest block font-bold">
-                WINNER GETS
-              </span>
-              <span className="text-lg font-black text-proto-text tracking-wide flex items-center gap-2">
-                Claude Pro
-                <span className="text-xs text-proto-subtext font-normal uppercase">
-                  Subscription
-                </span>
-              </span>
-            </div>
-          </div>
-          <div className="hidden sm:block text-right text-[11px] text-proto-subtext">
-            IDEAS.<br />INVESTIGATE FURTHER.
-          </div>
-        </div>
-
-        {/* Warning Banner: TRUST NO ONE */}
-        <div className="w-full max-w-xl p-3.5 rounded-xl bg-proto-base border-2 border-proto-crimson glow-crimson flex items-center justify-center gap-3 text-center font-mono-cyber">
-          <AlertTriangle className="w-5 h-5 text-proto-crimson shrink-0 animate-pulse" />
-          <div className="text-xs">
-            <span className="font-black text-proto-crimson tracking-wider mr-2">
-              TRUST NO ONE.
-            </span>
-            <span className="text-proto-text/90">
-              Some agents have other objectives.
-            </span>
-          </div>
-        </div>
-
-        {/* Primary CTAs */}
-        <div className="flex flex-col sm:flex-row items-center gap-3.5 w-full max-w-md justify-center pt-2">
+        {/* Primary Action Buttons (Solid, High-Contrast, No Rainbow Gradients) */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm justify-center">
           <Link
             href="/play"
-            className="w-full sm:w-auto flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black font-mono-cyber text-xs uppercase tracking-wider hover:opacity-95 transition-all shadow-[0_0_20px_rgba(0,255,136,0.3)] flex items-center justify-center gap-2"
+            className="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-            <span>ENTER PROTOCOL</span>
+            <span>Enter Terminal</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
           <Link
             href="/scan-to-enter"
-            className="w-full sm:w-auto flex-1 py-3.5 px-6 rounded-xl bg-proto-surface0 border border-proto-surface2 text-proto-text font-bold font-mono-cyber text-xs uppercase tracking-wider hover:bg-proto-surface1 transition-all shadow-md flex items-center justify-center gap-2"
+            className="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl bg-[#16201a] hover:bg-[#1f2d25] border border-[#283b30] text-[#eaf2ec] font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
           >
             <ScanLine className="w-4 h-4 text-proto-signal" />
-            <span>SCAN BADGE</span>
+            <span>Scan Badge</span>
           </Link>
         </div>
 
-        {/* Event Date, Time & Venue Bar */}
-        <div className="w-full max-w-2xl p-3 rounded-xl bg-proto-surface0/70 border border-proto-surface1 flex flex-wrap items-center justify-around gap-4 text-xs font-mono-cyber text-proto-subtext">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-proto-logic" />
-            <span>DATE: <strong className="text-proto-text">24th Sep</strong></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-proto-signal" />
-            <span>TIME: <strong className="text-proto-text">[TIME TBD]</strong></span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-proto-obs" />
-            <span>VENUE: <strong className="text-proto-text">NIT Warangal Campus</strong></span>
+        {/* 5 Domains: Clean, Natural, Minimal */}
+        <div className="w-full max-w-md pt-2 space-y-2">
+          <span className="text-[11px] text-[#718a7b] uppercase tracking-wider block">
+            Operative Roles
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[
+              { label: 'Logic', color: 'bg-[#00d2ff]' },
+              { label: 'Signal', color: 'bg-[#00ff88]' },
+              { label: 'Observation', color: 'bg-[#bf55ec]' },
+              { label: 'System', color: 'bg-[#ff7700]' },
+              { label: 'Social', color: 'bg-[#00f0ff]' },
+            ].map((d) => (
+              <span
+                key={d.label}
+                className="px-3 py-1 rounded-lg bg-[#141d17] border border-[#223027] text-xs text-[#cad8ce] flex items-center gap-1.5"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${d.color}`} />
+                {d.label}
+              </span>
+            ))}
           </div>
         </div>
 
-        {/* Instant Demo Operatives Switcher */}
-        <div className="w-full max-w-3xl pt-4 border-t border-proto-surface0 space-y-3">
-          <div className="flex items-center justify-between text-xs font-mono-cyber text-proto-subtext">
-            <span>NO PRIOR EXPERIENCE REQUIRED • ALL YEARS • ALL BRANCHES • SOLO FRIENDLY</span>
+        {/* Clean Event Logistics Strip */}
+        <div className="w-full max-w-md p-4 rounded-xl bg-[#141d17] border border-[#223027] grid grid-cols-3 gap-2 text-xs text-left">
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-[#718a7b] uppercase block">Date</span>
+            <span className="font-semibold text-[#eaf2ec]">24th Sep</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-            {INITIAL_AGENTS.map((demo) => {
-              const borderColors: Record<string, string> = {
-                LOGIC: 'border-proto-logic text-proto-logic',
-                SIGNAL: 'border-proto-signal text-proto-signal',
-                OBSERVATION: 'border-proto-obs text-proto-obs',
-                SYSTEM: 'border-proto-system text-proto-system',
-                SOCIAL: 'border-proto-social text-proto-social',
-              };
-              return (
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-[#718a7b] uppercase block">Venue</span>
+            <span className="font-semibold text-[#eaf2ec] truncate block">NIT Warangal</span>
+          </div>
+
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-[#d4af37] uppercase block">Grand Prize</span>
+            <span className="font-semibold text-[#eaf2ec] truncate block">Claude Pro</span>
+          </div>
+        </div>
+
+        {/* Subtle Objective Note */}
+        <p className="text-xs text-[#718a7b] font-sans italic">
+          Trust no one. Some agents have other objectives.
+        </p>
+
+        {/* Minimal Demo Operatives Toggle for Testing */}
+        <div className="w-full max-w-md pt-2 border-t border-[#1b2620]">
+          <button
+            onClick={() => setShowDemoAgents(!showDemoAgents)}
+            className="text-xs text-[#718a7b] hover:text-[#cad8ce] inline-flex items-center gap-1 transition-colors"
+          >
+            <span>Test with Demo Operative</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDemoAgents ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showDemoAgents && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3">
+              {INITIAL_AGENTS.map((demo) => (
                 <button
                   key={demo.agent_id}
                   onClick={() => handleLaunchAgent(demo.agent_id)}
-                  className={`p-3 rounded-xl bg-proto-base border text-left transition-all hover:-translate-y-1 shadow-lg ${
-                    borderColors[demo.archetype] || 'border-proto-surface1'
-                  }`}
+                  className="p-2 rounded-lg bg-[#16201a] border border-[#23332a] hover:border-proto-signal text-left text-xs transition-colors"
                 >
-                  <div className="font-mono-cyber text-xs font-bold text-proto-text truncate">
-                    {demo.name}
-                  </div>
-                  <div className="text-[10px] font-mono-cyber font-bold opacity-90 mt-0.5">
-                    [{demo.archetype}]
-                  </div>
-                  <div className="text-[10px] font-mono-cyber text-proto-subtext mt-1">
-                    {demo.score} PTS
-                  </div>
+                  <div className="font-bold text-[#eaf2ec] truncate">{demo.name}</div>
+                  <div className="text-[10px] text-[#8ea897]">{demo.archetype}</div>
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Footer with Poster Slogans */}
-      <footer className="w-full bg-proto-base border-t border-proto-surface0 px-6 py-4 text-center text-xs font-mono-cyber text-proto-subtext flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-2">
-        <div className="text-left">
-          <span className="text-proto-text font-bold block">
-            EVERYONE HAS A ROLE. NOT EVERYONE HAS THE SAME OBJECTIVE.
-          </span>
-          <span className="text-[11px] opacity-75">
-            NIT Warangal IEEE Student Branch // The Protocol
-          </span>
-        </div>
-        <div className="text-right text-[11px] text-proto-subtext">
-          <span>COME FOR THE GAME.</span><br />
-          <span className="text-proto-signal font-bold">STAY FOR WHAT YOU DISCOVER.</span>
+      {/* Clean, Understated Footer */}
+      <footer className="w-full border-t border-[#1b2620] px-6 py-4 text-xs text-[#718a7b] max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <span>NIT Warangal IEEE Student Branch</span>
+        <div className="flex items-center gap-4 text-[11px]">
+          <Link href="/leaderboard" className="hover:text-[#eaf2ec] transition-colors">
+            Leaderboard
+          </Link>
+          <Link href="/scan-to-enter" className="hover:text-[#eaf2ec] transition-colors">
+            Badge Scanner
+          </Link>
+          <Link href="/admin" className="hover:text-[#eaf2ec] transition-colors">
+            Operations
+          </Link>
         </div>
       </footer>
     </div>

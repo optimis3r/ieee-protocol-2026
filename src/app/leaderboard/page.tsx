@@ -85,7 +85,7 @@ export default function LeaderboardPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/play"
-              className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian text-xs font-black uppercase transition-all shadow-[0_0_10px_rgba(0,255,136,0.25)]"
+              className="px-3.5 py-1.5 rounded-lg bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] text-xs font-bold uppercase transition-colors"
             >
               Enter HUD
             </Link>
@@ -94,46 +94,43 @@ export default function LeaderboardPage() {
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 flex-1 flex flex-col justify-center space-y-6">
+      <main className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 flex-1 flex flex-col justify-center space-y-6">
         {/* IF LEADERBOARD IS HIDDEN BY OPERATIONS: SUSPENSE BLACKOUT SCREEN */}
         {!gameState.leaderboard_visible ? (
-          <div className="max-w-2xl w-full mx-auto bg-proto-base border-2 border-proto-crimson glow-crimson rounded-2xl p-8 shadow-2xl text-center space-y-6 animate-in fade-in duration-300">
-            {/* Pulsing Lock Beacon */}
-            <div className="w-20 h-20 rounded-3xl bg-proto-crimson/15 border-2 border-proto-crimson/60 flex items-center justify-center mx-auto text-proto-crimson shadow-[0_0_30px_rgba(255,51,68,0.4)] animate-pulse">
-              <EyeOff className="w-10 h-10" />
+          <div className="max-w-xl w-full mx-auto bg-[#141d17] border border-proto-crimson/50 rounded-2xl p-8 text-center space-y-5 animate-in fade-in duration-300">
+            {/* Lock Icon */}
+            <div className="w-16 h-16 rounded-2xl bg-proto-crimson/15 border border-proto-crimson/40 flex items-center justify-center mx-auto text-proto-crimson">
+              <EyeOff className="w-8 h-8" />
             </div>
 
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-proto-crimson/20 border border-proto-crimson/50 text-proto-crimson text-xs font-black tracking-widest">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-proto-crimson/20 border border-proto-crimson/40 text-proto-crimson text-xs font-bold tracking-wider">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                TELEMETRY BLACKOUT ENGAGED
+                TELEMETRY BLACKOUT
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-proto-text">
+              <h1 className="text-2xl font-bold tracking-tight text-[#eaf2ec]">
                 STANDINGS CONCEALED
               </h1>
-              <p className="text-xs sm:text-sm text-proto-gold font-bold tracking-wider">
-                THE FINAL BATTLE ENTERS THE ZERO HOUR
+              <p className="text-xs text-[#8ea897]">
+                The competition enters the final phase.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-proto-surface0/90 border border-proto-surface1 text-xs text-proto-subtext font-sans leading-relaxed text-left space-y-2">
+            <div className="p-4 rounded-xl bg-[#101713] border border-[#223027] text-xs text-[#8ea897] font-sans leading-relaxed text-left space-y-2">
               <p>
-                Operations Command has placed the master leaderboard under total cryptographic blackout.
+                Operations Command has placed the public leaderboard under cryptographic blackout.
               </p>
-              <p className="text-proto-text font-mono-cyber font-bold">
-                ⚠️ No operative knows where they rank. Scores continue to accumulate silently in the background.
-              </p>
-              <p>
-                Every solve, every physical QR tag, and every hypothesis deduction counts. The winner of the <strong>Claude Pro Subscription</strong> will be unsealed at the closing ceremony!
+              <p className="text-[#eaf2ec] font-mono-cyber">
+                Scores continue to calculate silently in the background. The winner of the <strong>Claude Pro Subscription</strong> will be announced at the closing ceremony.
               </p>
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="pt-2">
               <Link
                 href="/play"
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black text-xs tracking-wider uppercase shadow-lg hover:opacity-95 transition-all"
+                className="inline-block px-6 py-2.5 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors"
               >
-                RETURN TO OPERATIVE TERMINAL
+                Return to Terminal
               </Link>
             </div>
           </div>
@@ -141,27 +138,27 @@ export default function LeaderboardPage() {
           /* IF LEADERBOARD IS VISIBLE: LIVE GLOBAL RANKINGS */
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Prize Callout Banner */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-proto-base via-proto-surface0 to-proto-base border-2 border-proto-gold glow-gold flex flex-wrap items-center justify-between gap-4">
+            <div className="p-4 rounded-xl bg-[#141d17] border border-[#d4af37]/40 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-proto-gold/20 text-proto-gold">
-                  <Trophy className="w-6 h-6" />
+                <div className="p-2.5 rounded-lg bg-[#d4af37]/15 text-[#d4af37]">
+                  <Trophy className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] text-proto-gold font-black uppercase tracking-widest block">
-                    GRAND PRIZE
+                  <span className="text-[10px] text-[#d4af37] font-bold uppercase tracking-wider block">
+                    Grand Prize
                   </span>
-                  <span className="text-lg font-black text-proto-text">
+                  <span className="text-base font-bold text-[#eaf2ec]">
                     Claude Pro Subscription
                   </span>
-                  <span className="text-xs text-proto-subtext block font-sans">
+                  <span className="text-xs text-[#8ea897] block font-sans">
                     Awarded to the top operative on final verification.
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-proto-signal">
-                <Flame className="w-4 h-4 animate-bounce" />
-                <span className="font-bold">LIVE TELEMETRY ACTIVE</span>
+              <div className="flex items-center gap-1.5 text-xs text-proto-signal font-semibold">
+                <span className="w-2 h-2 rounded-full bg-proto-signal" />
+                <span>Live Telemetry</span>
               </div>
             </div>
 
