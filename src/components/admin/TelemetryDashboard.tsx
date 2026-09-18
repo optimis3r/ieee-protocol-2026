@@ -42,7 +42,8 @@ import {
   Search,
   QrCode,
   LogOut,
-  Zap
+  Zap,
+  AlertTriangle
 } from 'lucide-react';
 
 interface TelemetryDashboardProps {
@@ -78,6 +79,11 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
   const [previewAgent, setPreviewAgent] = useState<Agent | null>(null);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
+  // THE GREAT RESET Modal State
+  const [isGreatResetModalOpen, setIsGreatResetModalOpen] = useState(false);
+  const [greatResetConfirmInput, setGreatResetConfirmInput] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
   // Cutoff Time Editing
   const [cutoffTimeInput, setCutoffTimeInput] = useState(gameState.submission_cutoff_time || '20:00');
   const [isEditingCutoff, setIsEditingCutoff] = useState(false);
@@ -110,6 +116,47 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
     soundEffects.playScanChirp();
     setActionNotice('WHATSAPP DISPATCH LOGS CLEARED');
     setTimeout(() => setActionNotice(null), 3000);
+  };
+
+  const handleExecuteGreatReset = async () => {
+    if (greatResetConfirmInput.trim().toUpperCase() !== 'RESET') {
+      alert('Please type RESET to execute THE GREAT RESET.');
+      return;
+    }
+
+    setIsResetting(true);
+    soundEffects.playScanChirp();
+
+    try {
+      // 1. Wipe local store (agents, node progress, intel, logs, session tokens)
+      Store.greatReset();
+
+      // 2. Clear central WhatsApp logs
+      await clearCentralWhatsAppLogs();
+
+      // 3. Trigger server-side purge via participants API
+      await fetch('/api/participants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'great_reset' })
+      });
+
+      // 4. Update UI states
+      setAgents([]);
+      setWaLogs([]);
+      setTelemetry(Store.getTelemetry());
+      setIsGreatResetModalOpen(false);
+      setGreatResetConfirmInput('');
+
+      soundEffects.playSuccessChime();
+      setActionNotice('⚠️ THE GREAT RESET COMPLETED: ALL USERS & PARTICIPANT DATA PURGED.');
+      setTimeout(() => setActionNotice(null), 5000);
+    } catch (err) {
+      console.error('Error during THE GREAT RESET:', err);
+      alert('Error executing reset. Please check console.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const checkGateway = useCallback(async () => {
@@ -929,6 +976,16 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
               <Download className="w-4 h-4 text-proto-gold" />
               <span>Export CSV</span>
             </button>
+
+            {/* THE GREAT RESET Button */}
+            <button
+              onClick={() => setIsGreatResetModalOpen(true)}
+              title="PURGE ALL USERS AND PARTICIPANT DATA"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-600 hover:text-black border border-red-500/60 text-red-400 hover:text-black font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(239,68,68,0.2)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)] cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>THE GREAT RESET</span>
+            </button>
           </div>
         </div>
 
@@ -1285,6 +1342,94 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
           }
         }}
       />
+
+      {/* THE GREAT RESET Security Confirmation Modal */}
+      {isGreatResetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="w-full max-w-lg bg-[#0f0b0b] border-2 border-red-600/70 rounded-2xl p-6 shadow-[0_0_50px_rgba(239,68,68,0.35)] space-y-5 text-[#f3f7f4] font-mono-cyber selection:bg-red-600 selection:text-black"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-red-900/50 pb-4">
+              <div className="flex items-center gap-2 text-red-500">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+                <h3 className="text-base sm:text-lg font-black uppercase tracking-wider text-red-400">
+                  EMERGENCY PROTOCOL: THE GREAT RESET
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsGreatResetModalOpen(false);
+                  setGreatResetConfirmInput('');
+                }}
+                className="text-gray-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-[#d5caca] font-sans">
+              <p className="font-bold text-red-300">
+                This action will wipe ALL participant data across the entire system.
+              </p>
+
+              <div className="p-3.5 rounded-xl bg-red-950/30 border border-red-900/60 space-y-2">
+                <div className="text-[11px] font-black uppercase tracking-wider text-red-400 font-mono">
+                  DATA THAT WILL BE PURGED:
+                </div>
+                <ul className="list-disc pl-4 space-y-1 text-[11px] text-red-200/90 font-mono">
+                  <li>All enrolled participant profiles (names, IDs, phones, PINs)</li>
+                  <li>All station question unlocks, attempts, and solves</li>
+                  <li>All participant scores, rankings, and active timers</li>
+                  <li>All WhatsApp dispatch transmission history</li>
+                  <li>All access logs and session tokens</li>
+                </ul>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#141b16] border border-emerald-900/50 text-[11px] text-emerald-300 font-mono">
+                ✅ <strong>PROTECTED:</strong> System files, questions, clues, hints, and configurations are NOT deleted.
+              </div>
+
+              <div className="space-y-1.5 pt-2 font-mono">
+                <label className="block text-[11px] text-red-400 font-bold uppercase">
+                  Type <span className="underline font-black text-white">RESET</span> to confirm destruction:
+                </label>
+                <input
+                  type="text"
+                  value={greatResetConfirmInput}
+                  onChange={(e) => setGreatResetConfirmInput(e.target.value)}
+                  placeholder="Type RESET"
+                  className="w-full px-3.5 py-2.5 bg-black border border-red-600/60 rounded-xl text-red-400 font-black tracking-widest text-center uppercase focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 text-sm"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-900/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsGreatResetModalOpen(false);
+                  setGreatResetConfirmInput('');
+                }}
+                className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-bold text-xs uppercase cursor-pointer"
+              >
+                Abort / Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteGreatReset}
+                disabled={greatResetConfirmInput.trim().toUpperCase() !== 'RESET' || isResetting}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-35 disabled:cursor-not-allowed text-black font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(239,68,68,0.5)] cursor-pointer flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isResetting ? 'EXECUTING PURGE...' : 'CONFIRM THE GREAT RESET'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

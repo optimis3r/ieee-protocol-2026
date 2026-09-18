@@ -476,5 +476,24 @@ export const ServerStore = {
       }
     });
     saveServerData(data);
+  },
+
+  greatReset(): void {
+    const now = new Date().toISOString();
+    const data: ServerStoreData = {
+      agents: [],
+      agent_nodes: [],
+      wa_logs: [],
+      game_state: {
+        id: 1,
+        status: 'STANDBY',
+        global_broadcast: '',
+        leaderboard_visible: true,
+        submission_cutoff_time: '20:00',
+        updated_at: now
+      },
+      updated_at: now
+    };
+    saveServerData(data);
   }
 };

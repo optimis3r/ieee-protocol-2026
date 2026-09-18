@@ -116,6 +116,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true });
       }
 
+      case 'great_reset': {
+        ServerStore.greatReset();
+        return NextResponse.json({
+          success: true,
+          message: 'THE GREAT RESET executed. All participant records and logs purged successfully.'
+        });
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }

@@ -1514,24 +1514,35 @@ export const Store = {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.agents)) {
-          const localAgents = this.getAgents();
-          const merged = [...localAgents];
-          data.agents.forEach((remoteAg: Agent) => {
-            const idx = merged.findIndex(a => a.agent_id.toUpperCase() === remoteAg.agent_id.toUpperCase());
-            if (idx >= 0) {
-              merged[idx] = { ...merged[idx], ...remoteAg };
-            } else {
-              merged.push(remoteAg);
-            }
-          });
-          setStored(KEY_AGENTS, merged, false);
-          return merged;
+          if (data.agents.length === 0) {
+            setStored(KEY_AGENTS, [], false);
+            return [];
+          }
+          setStored(KEY_AGENTS, data.agents, false);
+          return data.agents;
         }
       }
     } catch (e) {
       console.warn('Sync with server failed, fallback to local store:', e);
     }
     return this.getAgents();
+  },
+
+  greatReset(): void {
+    setStored(KEY_AGENTS, [], true);
+    setStored(KEY_AGENT_NODES, [], true);
+    setStored(KEY_AGENT_INTEL, [], true);
+    setStored(KEY_ACCESS_LOGS, [], true);
+    setStored(KEY_CONNECTIONS, [], true);
+    setStored(KEY_WA_LOGS, [], true);
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('ieee_agent_id');
+      localStorage.removeItem('ieee_agent_token');
+      window.dispatchEvent(new CustomEvent('ieee_wa_dispatch', { detail: {} }));
+    }
+
+    notifyServer({ action: 'great_reset' });
   }
 };
 
