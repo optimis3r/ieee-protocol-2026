@@ -7,17 +7,14 @@ import { Store, initStore } from '@/lib/store';
 import { Agent, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
 import { 
-  Terminal, 
   Clock, 
   ShieldAlert, 
   CheckCircle2, 
   MessageSquare, 
-  ExternalLink,
-  LogOut,
-  Sparkles,
-  Play,
-  QrCode,
-  Smartphone
+  LogOut, 
+  Sparkles, 
+  QrCode, 
+  Smartphone 
 } from 'lucide-react';
 
 // Target launch date: September 24, 2026 at 09:00:00 AM IST
@@ -25,15 +22,27 @@ const TARGET_LAUNCH_DATE = new Date('2026-09-24T09:00:00+05:30').getTime();
 
 export default function StandbyWaitingPage() {
   const router = useRouter();
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number }>({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0
+  const [agent] = useState<Agent | null>(() => {
+    if (typeof window === 'undefined') return null;
+    initStore();
+    const storedId = localStorage.getItem('ieee_agent_id');
+    return storedId ? Store.getAgentById(storedId) : null;
+  });
+  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number }>(() => {
+    const now = Date.now();
+    const diff = Math.max(0, TARGET_LAUNCH_DATE - now);
+    return {
+      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+      hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+      minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+      seconds: Math.floor((diff % (1000 * 60)) / 1000)
+    };
   });
   const [isLiveLaunching, setIsLiveLaunching] = useState(false);
-  const [waGroupLink, setWaGroupLink] = useState<string>('');
+  const [waGroupLink] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return Store.getWhatsAppConfig().groupLink;
+  });
 
   // Calculate remaining time
   const updateCountdown = useCallback(() => {
@@ -50,20 +59,7 @@ export default function StandbyWaitingPage() {
 
   useEffect(() => {
     initStore();
-    updateCountdown();
     const timer = setInterval(updateCountdown, 1000);
-
-    // Retrieve active logged in agent
-    const storedId = localStorage.getItem('ieee_agent_id');
-    if (storedId) {
-      const currentAgent = Store.getAgentById(storedId);
-      if (currentAgent) {
-        setAgent(currentAgent);
-      }
-    }
-
-    const waConf = Store.getWhatsAppConfig();
-    setWaGroupLink(waConf.groupLink);
 
     // Real-Time Event State Checker
     // If the admin opens the event (status === 'NETWORK_ACTIVE'), automatically launch into HUD

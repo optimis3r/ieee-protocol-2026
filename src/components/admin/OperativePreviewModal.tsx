@@ -91,7 +91,6 @@ export const OperativePreviewModal: React.FC<OperativePreviewModalProps> = ({
 
   const isActive = agent.check_in_status === 'ACTIVE';
   const isPaused = agent.check_in_status === 'PAUSED';
-  const isPending = !isActive && !isPaused;
 
   const currentStation = currentQuestionData.currentNode;
   const currentPayload = currentStation?.node.payload || {};

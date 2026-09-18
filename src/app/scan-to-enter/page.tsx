@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { QRScannerModal, ScanResult } from '@/components/scanner/QRScannerModal';
-import { Store, initStore, INITIAL_AGENTS } from '@/lib/store';
+import { Store, initStore } from '@/lib/store';
 import { 
   ScanLine, 
   Terminal, 
@@ -53,18 +53,6 @@ export default function ScanToEnterPage() {
       router.push(destination);
     } else {
       setErrorMsg(`Operative ${manualId.toUpperCase()} not found in Protocol directory.`);
-    }
-  };
-
-  const handleQuickSelect = (agentId: string) => {
-    const agent = Store.getAgentById(agentId);
-    if (agent) {
-      localStorage.setItem('ieee_agent_id', agent.agent_id);
-      localStorage.setItem('ieee_agent_token', agent.token);
-      const destination = Store.isEventActive()
-        ? `/play?agent_id=${agent.agent_id}&token=${agent.token}`
-        : '/standby';
-      router.push(destination);
     }
   };
 
@@ -139,38 +127,12 @@ export default function ScanToEnterPage() {
           </div>
         </form>
 
-        {/* Demo Fast-Switch Operatives across 5 domains */}
-        <div className="pt-2 border-t border-proto-surface1 space-y-2">
-          <span className="text-[11px] uppercase text-proto-subtext block">
-            Instant Demo Operatives (5 Domains):
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            {INITIAL_AGENTS.map((demo) => {
-              const borderColors: Record<string, string> = {
-                LOGIC: 'hover:border-proto-logic text-proto-logic',
-                SIGNAL: 'hover:border-proto-signal text-proto-signal',
-                OBSERVATION: 'hover:border-proto-obs text-proto-obs',
-                SYSTEM: 'hover:border-proto-system text-proto-system',
-                SOCIAL: 'hover:border-proto-social text-proto-social',
-              };
-              return (
-                <button
-                  key={demo.agent_id}
-                  onClick={() => handleQuickSelect(demo.agent_id)}
-                  className={`p-2.5 rounded-xl bg-proto-surface0 border border-proto-surface1 text-left transition-colors flex flex-col justify-between ${
-                    borderColors[demo.archetype] || ''
-                  }`}
-                >
-                  <div className="text-xs font-bold text-proto-text">
-                    {demo.agent_id}
-                  </div>
-                  <div className="text-[10px] font-bold opacity-90 mt-0.5">
-                    [{demo.archetype}]
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        {/* Operative Registration Link */}
+        <div className="pt-2 border-t border-proto-surface1 text-center">
+          <span className="text-xs text-proto-subtext">Not registered in The Protocol yet? </span>
+          <a href="/register" className="text-xs text-proto-signal hover:underline font-bold">
+            Register for operative clearance →
+          </a>
         </div>
       </main>
 

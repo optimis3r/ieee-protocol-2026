@@ -9,6 +9,7 @@ import {
   NodeItem,
   PrimaryDomain 
 } from '@/types/database';
+import { WhatsAppDispatchRecord } from './whatsapp';
 
 // 1. Initial Seed Nodes with Workstations & Cross-Domain Connections
 export const SEED_NODES: NodeItem[] = [
@@ -269,124 +270,9 @@ export const SEED_INTEL: IntelFragment[] = [
   }
 ];
 
-// 3. Initial Demo Agents with The Protocol Domains & Active-Play Timers
-export const INITIAL_AGENTS: Agent[] = [
-  {
-    id: 'agent-uuid-01',
-    agent_id: 'AGT-047',
-    wristband_id: 'AGT-047',
-    agent_number: 'Agent 047',
-    token: 'sec_tok_047_8841',
-    name: 'Alan Turing',
-    contact: '+91 98480 11223',
-    auth_identifier: '23CSB01',
-    pin: '1234',
-    archetype: 'LOGIC',
-    score: 320,
-    is_active: true,
-    check_in_status: 'ACTIVE',
-    total_active_seconds: 2530, // ~42m 10s
-    session_start_time: new Date(Date.now() - 300000).toISOString(),
-    initial_check_in_at: new Date(Date.now() - 7200000).toISOString(),
-    last_check_in: new Date(Date.now() - 300000).toISOString(),
-    last_host_verified_at: new Date(Date.now() - 300000).toISOString(),
-    last_active_at: new Date().toISOString(),
-    logged_out_at: null,
-    created_at: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'agent-uuid-02',
-    agent_id: 'AGT-012',
-    wristband_id: 'AGT-012',
-    agent_number: 'Agent 012',
-    token: 'sec_tok_012_2931',
-    name: 'Grace Hopper',
-    contact: '+91 98480 44556',
-    auth_identifier: '23ECB15',
-    pin: '1234',
-    archetype: 'SIGNAL',
-    score: 280,
-    is_active: true,
-    check_in_status: 'ACTIVE',
-    total_active_seconds: 3120, // ~52m
-    session_start_time: new Date(Date.now() - 600000).toISOString(),
-    initial_check_in_at: new Date(Date.now() - 7200000).toISOString(),
-    last_check_in: new Date(Date.now() - 600000).toISOString(),
-    last_host_verified_at: new Date(Date.now() - 600000).toISOString(),
-    last_active_at: new Date().toISOString(),
-    logged_out_at: null,
-    created_at: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'agent-uuid-03',
-    agent_id: 'AGT-089',
-    wristband_id: 'AGT-089',
-    agent_number: 'Agent 089',
-    token: 'sec_tok_089_5521',
-    name: 'Ada Lovelace',
-    contact: '+91 98480 77889',
-    auth_identifier: '23EEB22',
-    pin: '1234',
-    archetype: 'OBSERVATION',
-    score: 210,
-    is_active: false,
-    check_in_status: 'PAUSED',
-    total_active_seconds: 1840, // ~30m 40s (frozen)
-    session_start_time: null,
-    initial_check_in_at: new Date(Date.now() - 7200000).toISOString(),
-    last_check_in: new Date(Date.now() - 1800000).toISOString(),
-    last_host_verified_at: new Date(Date.now() - 1800000).toISOString(),
-    last_active_at: new Date(Date.now() - 1800000).toISOString(),
-    logged_out_at: new Date(Date.now() - 1800000).toISOString(),
-    created_at: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'agent-uuid-04',
-    agent_id: 'AGT-003',
-    wristband_id: 'AGT-003',
-    agent_number: 'Agent 003',
-    token: 'sec_tok_003_9910',
-    name: 'Claude Shannon',
-    contact: '+91 98480 99001',
-    auth_identifier: '23CSB44',
-    pin: '1234',
-    archetype: 'SYSTEM',
-    score: 195,
-    is_active: true,
-    check_in_status: 'ACTIVE',
-    total_active_seconds: 2100,
-    session_start_time: new Date(Date.now() - 120000).toISOString(),
-    initial_check_in_at: new Date(Date.now() - 7200000).toISOString(),
-    last_check_in: new Date(Date.now() - 120000).toISOString(),
-    last_host_verified_at: new Date(Date.now() - 120000).toISOString(),
-    last_active_at: new Date().toISOString(),
-    logged_out_at: null,
-    created_at: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'agent-uuid-05',
-    agent_id: 'AGT-104',
-    wristband_id: 'AGT-104',
-    agent_number: 'Agent 104',
-    token: 'sec_tok_104_1729',
-    name: 'Srinivasa Ramanujan',
-    contact: '+91 98480 33445',
-    auth_identifier: '23MMB08',
-    pin: '1234',
-    archetype: 'SOCIAL',
-    score: 240,
-    is_active: true,
-    check_in_status: 'ACTIVE',
-    total_active_seconds: 2750,
-    session_start_time: new Date(Date.now() - 60000).toISOString(),
-    initial_check_in_at: new Date(Date.now() - 7200000).toISOString(),
-    last_check_in: new Date(Date.now() - 60000).toISOString(),
-    last_host_verified_at: new Date(Date.now() - 60000).toISOString(),
-    last_active_at: new Date().toISOString(),
-    logged_out_at: null,
-    created_at: new Date(Date.now() - 7200000).toISOString()
-  }
-];
+// 3. Initial Agents - Initialized empty for real participants
+export const INITIAL_AGENTS: Agent[] = [];
+
 
 // LocalStorage Keys
 const STORAGE_PREFIX = 'the_protocol_nitw_v2_';
@@ -486,11 +372,15 @@ function setStored<T>(key: string, value: T, notify: boolean = true): void {
   }
 }
 
-function notifyServer(payload: any): void {
+function notifyServer(payload: Record<string, unknown>): void {
   if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+    const adminToken = sessionStorage.getItem('ieee_admin_token') || '';
     fetch('/api/participants', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(adminToken ? { 'x-admin-token': adminToken } : {})
+      },
       body: JSON.stringify(payload)
     }).catch(() => {});
   }
@@ -513,76 +403,19 @@ export function initStore(): void {
   }
 
   if (!localStorage.getItem(KEY_AGENTS)) {
-    setStored(KEY_AGENTS, INITIAL_AGENTS);
+    setStored(KEY_AGENTS, []);
   }
 
   if (!localStorage.getItem(KEY_AGENT_NODES)) {
-    const agentNodes: AgentNode[] = [];
-    INITIAL_AGENTS.forEach(ag => {
-      const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
-      // Assign initial 3 nodes + hypothesis
-      candidateNodes.slice(0, 3).forEach((n, idx) => {
-        agentNodes.push({
-          id: `seed-an-${ag.agent_id}-${n.id}`,
-          agent_id: ag.agent_id,
-          node_id: n.id,
-          is_unlocked: true,
-          is_completed: idx === 0,
-          completed_at: idx === 0 ? new Date().toISOString() : null,
-          attempts: idx === 0 ? 0 : 1,
-          points_earned: idx === 0 ? n.base_points : 0,
-          first_accessed_at: new Date().toISOString()
-        });
-      });
-      agentNodes.push({
-        id: `seed-an-${ag.agent_id}-NODE-OMEGA-HYPOTHESIS`,
-        agent_id: ag.agent_id,
-        node_id: 'NODE-OMEGA-HYPOTHESIS',
-        is_unlocked: true,
-        is_completed: false,
-        completed_at: null,
-        attempts: 0,
-        points_earned: 0,
-        first_accessed_at: null
-      });
-    });
-    setStored(KEY_AGENT_NODES, agentNodes);
+    setStored(KEY_AGENT_NODES, []);
   }
 
   if (!localStorage.getItem(KEY_AGENT_INTEL)) {
-    const agentIntel: AgentIntel[] = [];
-    INITIAL_AGENTS.forEach(ag => {
-      const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
-      authentic.slice(0, 2).forEach(i => {
-        agentIntel.push({
-          id: `seed-ai-${ag.agent_id}-${i.id}`,
-          agent_id: ag.agent_id,
-          intel_id: i.id,
-          revealed_at: new Date().toISOString()
-        });
-      });
-      const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
-      if (disinfo.length > 0) {
-        agentIntel.push({
-          id: `seed-ai-${ag.agent_id}-${disinfo[0].id}`,
-          agent_id: ag.agent_id,
-          intel_id: disinfo[0].id,
-          revealed_at: new Date().toISOString()
-        });
-      }
-    });
-    setStored(KEY_AGENT_INTEL, agentIntel);
+    setStored(KEY_AGENT_INTEL, []);
   }
 
   if (!localStorage.getItem(KEY_ACCESS_LOGS)) {
-    const logs: AccessLog[] = INITIAL_AGENTS.map(ag => ({
-      id: `seed-log-${ag.agent_id}`,
-      agent_id: ag.agent_id,
-      direction: 'IN',
-      timestamp: ag.last_check_in || new Date().toISOString(),
-      notes: 'Initial venue admission'
-    }));
-    setStored(KEY_ACCESS_LOGS, logs);
+    setStored(KEY_ACCESS_LOGS, []);
   }
 
   if (!localStorage.getItem(KEY_CONNECTIONS)) {
@@ -1426,11 +1259,11 @@ export const Store = {
     };
   },
 
-  getWhatsAppLogs(): any[] {
-    return getStored<any[]>(KEY_WA_LOGS, []);
+  getWhatsAppLogs(): WhatsAppDispatchRecord[] {
+    return getStored<WhatsAppDispatchRecord[]>(KEY_WA_LOGS, []);
   },
 
-  addWhatsAppLog(record: any): void {
+  addWhatsAppLog(record: WhatsAppDispatchRecord): void {
     const logs = this.getWhatsAppLogs();
     logs.unshift(record);
     setStored(KEY_WA_LOGS, logs.slice(0, 100), true);
@@ -1439,7 +1272,7 @@ export const Store = {
   getWhatsAppConfig(): { groupLink: string; provider: string } {
     return getStored(KEY_WA_CONFIG, {
       groupLink: 'https://chat.whatsapp.com/IEEE-Protocol-NITW-2026',
-      provider: 'SIMULATED'
+      provider: 'BAILEYS'
     });
   },
 

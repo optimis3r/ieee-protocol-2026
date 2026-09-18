@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Agent, AgentNode, GameState, NodeItem } from '@/types/database';
-import { SEED_NODES, INITIAL_AGENTS, getAgentActiveSeconds } from './store';
+import { SEED_NODES, getAgentActiveSeconds } from './store';
 import { WhatsAppDispatchRecord } from './whatsapp';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
@@ -19,45 +19,16 @@ interface ServerStoreData {
 let memoryState: ServerStoreData | null = null;
 
 function getInitialServerData(): ServerStoreData {
-  const agentNodes: AgentNode[] = [];
   const now = new Date().toISOString();
 
-  INITIAL_AGENTS.forEach(ag => {
-    const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
-    candidateNodes.slice(0, 3).forEach((n, idx) => {
-      agentNodes.push({
-        id: `srv-an-${ag.agent_id}-${n.id}`,
-        agent_id: ag.agent_id,
-        node_id: n.id,
-        is_unlocked: true,
-        is_completed: idx === 0,
-        completed_at: idx === 0 ? now : null,
-        attempts: idx === 0 ? 0 : 1,
-        points_earned: idx === 0 ? n.base_points : 0,
-        first_accessed_at: now
-      });
-    });
-    agentNodes.push({
-      id: `srv-an-${ag.agent_id}-NODE-OMEGA-HYPOTHESIS`,
-      agent_id: ag.agent_id,
-      node_id: 'NODE-OMEGA-HYPOTHESIS',
-      is_unlocked: true,
-      is_completed: false,
-      completed_at: null,
-      attempts: 0,
-      points_earned: 0,
-      first_accessed_at: null
-    });
-  });
-
   return {
-    agents: [...INITIAL_AGENTS],
-    agent_nodes: agentNodes,
+    agents: [],
+    agent_nodes: [],
     wa_logs: [],
     game_state: {
       id: 1,
-      status: 'NETWORK_ACTIVE',
-      global_broadcast: 'PROTOCOL ACTIVE: OPERATIVES DEPLOYED // TRUST NO ONE',
+      status: 'STANDBY',
+      global_broadcast: '',
       leaderboard_visible: true,
       submission_cutoff_time: '20:00',
       updated_at: now
@@ -91,17 +62,45 @@ function loadServerData(): ServerStoreData {
   return memoryState;
 }
 
-function saveServerData(data: ServerStoreData): void {
-  data.updated_at = new Date().toISOString();
-  memoryState = data;
+let saveTimer: NodeJS.Timeout | null = null;
+
+function flushToDisk(): void {
+  if (!memoryState) return;
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    const tmpFile = `${STORE_FILE}.tmp.${Date.now()}`;
+    fs.writeFileSync(tmpFile, JSON.stringify(memoryState, null, 2), 'utf-8');
+    fs.renameSync(tmpFile, STORE_FILE);
   } catch (err) {
     console.warn('[ServerStore] Failed to persist data to disk:', err);
   }
+}
+
+function saveServerData(data: ServerStoreData, immediate: boolean = false): void {
+  data.updated_at = new Date().toISOString();
+  memoryState = data;
+
+  if (immediate) {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    flushToDisk();
+    return;
+  }
+
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    flushToDisk();
+  }, 200);
+}
+
+// Flush pending disk writes on process exit
+if (typeof process !== 'undefined') {
+  process.on('beforeExit', () => flushToDisk());
 }
 
 export const ServerStore = {
@@ -448,7 +447,7 @@ export const ServerStore = {
 
   getEnrichedAgents(): Array<Agent & {
     activeSeconds: number;
-    currentQuestion: any;
+    currentQuestion: (AgentNode & { node: NodeItem }) | null;
     solvedCount: number;
     totalNodes: number;
   }> {
@@ -494,6 +493,6 @@ export const ServerStore = {
       },
       updated_at: now
     };
-    saveServerData(data);
+    saveServerData(data, true);
   }
 };

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ServerStore } from '@/lib/server-store';
+import { verifyAdminRequest, checkRateLimit, getClientIp } from '@/lib/admin-auth';
 
 export async function GET(request: Request) {
   try {
@@ -7,12 +8,13 @@ export async function GET(request: Request) {
     const agentId = searchParams.get('agentId');
 
     if (agentId) {
-      const agent = ServerStore.getAgentById(agentId);
+      const sanitizedId = agentId.slice(0, 40);
+      const agent = ServerStore.getAgentById(sanitizedId);
       if (!agent) {
         return NextResponse.json({ error: 'Operative not found' }, { status: 404 });
       }
-      const nodes = ServerStore.getAgentNodes(agentId);
-      const questionData = ServerStore.getAgentCurrentQuestion(agentId);
+      const nodes = ServerStore.getAgentNodes(sanitizedId);
+      const questionData = ServerStore.getAgentCurrentQuestion(sanitizedId);
 
       return NextResponse.json({
         success: true,
@@ -41,16 +43,40 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { action } = body;
 
     switch (action) {
       case 'register': {
-        const { agent } = body;
-        if (!agent) {
-          return NextResponse.json({ error: 'Agent payload required' }, { status: 400 });
+        const ip = getClientIp(request);
+        const rateLimit = checkRateLimit(`register:${ip}`, 15, 60 * 1000);
+        if (!rateLimit.allowed) {
+          return NextResponse.json(
+            { success: false, error: 'Registration rate limit reached. Please wait 60 seconds.' },
+            { status: 429 }
+          );
         }
-        const savedAgent = ServerStore.registerAgent(agent);
+
+        const { agent } = body;
+        if (!agent || typeof agent !== 'object') {
+          return NextResponse.json({ error: 'Valid agent payload required' }, { status: 400 });
+        }
+
+        // Sanitize registration payload
+        const sanitizedAgent = {
+          ...agent,
+          name: typeof agent.name === 'string' ? agent.name.trim().slice(0, 80) : '',
+          agent_id: typeof agent.agent_id === 'string' ? agent.agent_id.trim().toUpperCase().slice(0, 30) : '',
+          agent_number: typeof agent.agent_number === 'string' ? agent.agent_number.trim().slice(0, 30) : '',
+          contact: typeof agent.contact === 'string' ? agent.contact.replace(/\D/g, '').slice(0, 15) : '',
+          roll_number: typeof agent.roll_number === 'string' ? agent.roll_number.trim().slice(0, 30) : undefined
+        };
+
+        if (!sanitizedAgent.agent_id) {
+          return NextResponse.json({ error: 'agent_id is required' }, { status: 400 });
+        }
+
+        const savedAgent = ServerStore.registerAgent(sanitizedAgent);
         return NextResponse.json({ success: true, agent: savedAgent });
       }
 
@@ -59,7 +85,7 @@ export async function POST(request: Request) {
         if (!agentId || !status) {
           return NextResponse.json({ error: 'agentId and status are required' }, { status: 400 });
         }
-        const updated = ServerStore.updateAgentStatus(agentId, status);
+        const updated = ServerStore.updateAgentStatus(String(agentId).slice(0, 40), status);
         return NextResponse.json({ success: Boolean(updated), agent: updated });
       }
 
@@ -68,7 +94,7 @@ export async function POST(request: Request) {
         if (!agentId || !nodeId) {
           return NextResponse.json({ error: 'agentId and nodeId are required' }, { status: 400 });
         }
-        const record = ServerStore.recordNodeAccess(agentId, nodeId);
+        const record = ServerStore.recordNodeAccess(String(agentId).slice(0, 40), String(nodeId).slice(0, 50));
         return NextResponse.json({ success: true, record });
       }
 
@@ -77,34 +103,44 @@ export async function POST(request: Request) {
         if (!agentId || !nodeId) {
           return NextResponse.json({ error: 'agentId and nodeId are required' }, { status: 400 });
         }
-        const result = ServerStore.completeNode(agentId, nodeId, pointsEarned || 100);
+        const safePoints = typeof pointsEarned === 'number' && pointsEarned > 0 ? Math.min(pointsEarned, 500) : 100;
+        const result = ServerStore.completeNode(String(agentId).slice(0, 40), String(nodeId).slice(0, 50), safePoints);
         return NextResponse.json({ success: true, ...result });
       }
 
       case 'adjust_score': {
+        if (!verifyAdminRequest(request)) {
+          return NextResponse.json({ error: 'Unauthorized: Administrator privileges required' }, { status: 401 });
+        }
         const { agentId, delta } = body;
         if (!agentId || typeof delta !== 'number') {
           return NextResponse.json({ error: 'agentId and numeric delta are required' }, { status: 400 });
         }
-        const updated = ServerStore.adjustScore(agentId, delta);
+        const updated = ServerStore.adjustScore(String(agentId).slice(0, 40), delta);
         return NextResponse.json({ success: Boolean(updated), agent: updated });
       }
 
       case 'reset_agent': {
+        if (!verifyAdminRequest(request)) {
+          return NextResponse.json({ error: 'Unauthorized: Administrator privileges required' }, { status: 401 });
+        }
         const { agentId } = body;
         if (!agentId) {
           return NextResponse.json({ error: 'agentId required' }, { status: 400 });
         }
-        const reset = ServerStore.resetAgent(agentId);
+        const reset = ServerStore.resetAgent(String(agentId).slice(0, 40));
         return NextResponse.json({ success: Boolean(reset), agent: reset });
       }
 
       case 'delete_agent': {
+        if (!verifyAdminRequest(request)) {
+          return NextResponse.json({ error: 'Unauthorized: Administrator privileges required' }, { status: 401 });
+        }
         const { agentId } = body;
         if (!agentId) {
           return NextResponse.json({ error: 'agentId required' }, { status: 400 });
         }
-        const deleted = ServerStore.deleteAgent(agentId);
+        const deleted = ServerStore.deleteAgent(String(agentId).slice(0, 40));
         return NextResponse.json({ success: deleted });
       }
 
@@ -117,6 +153,9 @@ export async function POST(request: Request) {
       }
 
       case 'great_reset': {
+        if (!verifyAdminRequest(request)) {
+          return NextResponse.json({ error: 'Unauthorized: Administrator privileges required for THE GREAT RESET' }, { status: 401 });
+        }
         ServerStore.greatReset();
         return NextResponse.json({
           success: true,

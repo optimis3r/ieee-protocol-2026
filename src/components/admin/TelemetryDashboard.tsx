@@ -10,7 +10,8 @@ import {
   unlinkWhatsAppGateway,
   fetchCentralWhatsAppLogs,
   clearCentralWhatsAppLogs,
-  WhatsAppGatewayStatus 
+  WhatsAppGatewayStatus,
+  WhatsAppDispatchRecord
 } from '@/lib/whatsapp';
 import { RegisterModal } from './RegisterModal';
 import { OperativePreviewModal } from './OperativePreviewModal';
@@ -20,11 +21,9 @@ import {
   Radio, 
   ShieldAlert, 
   Send, 
-  BarChart3, 
   Lock, 
   Play, 
   Pause, 
-  Trophy, 
   Download, 
   Ticket, 
   Clock, 
@@ -43,6 +42,7 @@ import {
   QrCode,
   LogOut,
   Zap,
+  Globe,
   AlertTriangle
 } from 'lucide-react';
 
@@ -50,7 +50,7 @@ interface TelemetryDashboardProps {
   defaultSection?: 'CONTROLS' | 'WHATSAPP';
 }
 
-export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultSection = 'CONTROLS' }) => {
+export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   const [gameState, setGameState] = useState<GameState>(() => Store.getGameState());
   const [agents, setAgents] = useState<Agent[]>(() => Store.getAgents());
   const [telemetry, setTelemetry] = useState(() => Store.getTelemetry());
@@ -61,11 +61,9 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
 
   // WhatsApp Hub State
   const [waConfig, setWaConfig] = useState(() => Store.getWhatsAppConfig());
-  const [waLogs, setWaLogs] = useState<any[]>(() => Store.getWhatsAppLogs());
+  const [waLogs, setWaLogs] = useState<WhatsAppDispatchRecord[]>(() => Store.getWhatsAppLogs());
   const [groupLinkInput, setGroupLinkInput] = useState(waConfig.groupLink);
-  const [testPhone, setTestPhone] = useState('');
   const [isSendingWa, setIsSendingWa] = useState(false);
-  const [activeSection, setActiveSection] = useState<'CONTROLS' | 'WHATSAPP'>(defaultSection);
 
   // Score Adjustment Modal State
   const [adjustTarget, setAdjustTarget] = useState<Agent | null>(null);
@@ -135,9 +133,13 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
       await clearCentralWhatsAppLogs();
 
       // 3. Trigger server-side purge via participants API
+      const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
       await fetch('/api/participants', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminToken ? { 'x-admin-token': adminToken } : {})
+        },
         body: JSON.stringify({ action: 'great_reset' })
       });
 
@@ -165,11 +167,16 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
   }, []);
 
   useEffect(() => {
-    checkGateway();
+    const initTimer = setTimeout(() => {
+      checkGateway();
+    }, 0);
     // Poll faster (every 2.5s) if waiting for QR scan so UI updates instantly on link
     const pollIntervalMs = gatewayInfo?.status === 'QR_READY' ? 2500 : 8000;
     const gwInterval = setInterval(checkGateway, pollIntervalMs);
-    return () => clearInterval(gwInterval);
+    return () => {
+      clearTimeout(initTimer);
+      clearInterval(gwInterval);
+    };
   }, [checkGateway, gatewayInfo?.status]);
 
   const handleUnlinkWhatsApp = async () => {
@@ -197,10 +204,6 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
   };
 
   useEffect(() => {
-    setActiveSection(defaultSection);
-  }, [defaultSection]);
-
-  useEffect(() => {
     const handleUpdate = () => {
       refreshDashboard();
     };
@@ -209,13 +212,16 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('ieee_wa_dispatch', handleUpdate);
 
-    refreshDashboard();
+    const initTimer = setTimeout(() => {
+      refreshDashboard();
+    }, 0);
     // 3.5s periodic ticker to poll server for new participants & central WhatsApp logs
     const interval = setInterval(() => {
       refreshDashboard();
     }, 3500);
 
     return () => {
+      clearTimeout(initTimer);
       window.removeEventListener('ieee_store_update', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
       window.removeEventListener('ieee_wa_dispatch', handleUpdate);
@@ -307,7 +313,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
     soundEffects.playScanChirp();
 
     try {
-      const res = await sendRegistrationWhatsAppMessages({
+      await sendRegistrationWhatsAppMessages({
         recipientPhone: agent.contact,
         agentName: agent.name,
         agentId: agent.agent_id,
@@ -325,40 +331,6 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
       console.error(err);
       soundEffects.playLockoutBuzz();
       setActionNotice(`WhatsApp dispatch error for ${agent.name}`);
-    } finally {
-      setIsSendingWa(false);
-      setTimeout(() => setActionNotice(null), 4500);
-    }
-  };
-
-  // Test WhatsApp Dispatcher
-  const handleTestWhatsAppDispatch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!testPhone.trim()) return;
-
-    setIsSendingWa(true);
-    soundEffects.playScanChirp();
-
-    try {
-      const res = await sendRegistrationWhatsAppMessages({
-        recipientPhone: testPhone.trim(),
-        agentName: 'Test Operative (Admin Test)',
-        agentId: 'AGT-TEST-999',
-        agentNumber: 'Agent 999',
-        token: 'test_token_verified',
-        groupLink: waConfig.groupLink
-      });
-
-      soundEffects.playSuccessChime();
-      setActionNotice(
-        `📱 TEST DISPATCH DELIVERED TO ${testPhone.trim()}: (1) Group Link + (2) Personal QR Pass [QR]/[Agent Name]`
-      );
-      setTestPhone('');
-      refreshDashboard();
-    } catch (err) {
-      console.error(err);
-      soundEffects.playLockoutBuzz();
-      setActionNotice('Test dispatch encountered an error.');
     } finally {
       setIsSendingWa(false);
       setTimeout(() => setActionNotice(null), 4500);
@@ -690,7 +662,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
                   ? `BAILEYS GATEWAY: LIVE (${gatewayInfo.connectedUser || 'LINKED'})`
                   : gatewayInfo?.status === 'QR_READY'
                   ? 'GATEWAY: SCAN QR BELOW'
-                  : 'GATEWAY: OFFLINE (SIMULATION FALLBACK)'}
+                  : 'GATEWAY: OFFLINE (START npm run wa:gateway)'}
               </span>
             </span>
 
@@ -737,6 +709,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
             <div className="flex flex-col md:flex-row items-center justify-center gap-8 py-3">
               {/* Visual QR Code Image */}
               <div className="flex flex-col items-center bg-white p-4 rounded-2xl shadow-2xl border-4 border-proto-gold/40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={gatewayInfo.qrDataUrl}
                   alt="WhatsApp Web Pairing QR Code"
@@ -773,15 +746,15 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* WhatsApp Group Link Configuration */}
-          <div className="lg:col-span-6 bg-proto-surface0/60 border border-proto-surface1 rounded-xl p-4 space-y-3">
+          {/* Group Link Configuration */}
+          <div className="lg:col-span-12 bg-proto-surface0/60 border border-proto-surface1 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-proto-text uppercase flex items-center gap-1.5">
-                <ExternalLink className="w-3.5 h-3.5 text-proto-signal" />
-                <span>Message 1 Group Invite Link:</span>
+                <Globe className="w-3.5 h-3.5 text-proto-signal" />
+                <span>Official WhatsApp Community Group Invite URL:</span>
               </label>
               <a
-                href={waConfig.groupLink}
+                href={groupLinkInput}
                 target="_blank"
                 rel="noreferrer"
                 className="text-[10px] text-proto-signal hover:underline"
@@ -810,36 +783,6 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
               Every participant will receive this link automatically as Message 1 upon registration.
             </p>
           </div>
-
-          {/* Test WhatsApp Message Dispatcher */}
-          <div className="lg:col-span-6 bg-proto-surface0/60 border border-proto-surface1 rounded-xl p-4 space-y-3">
-            <label className="text-xs font-bold text-proto-text uppercase flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-proto-gold" />
-              <span>Test 2-Message WhatsApp Dispatch:</span>
-            </label>
-
-            <form onSubmit={handleTestWhatsAppDispatch} className="flex gap-2">
-              <input
-                type="text"
-                required
-                value={testPhone}
-                onChange={(e) => setTestPhone(e.target.value)}
-                placeholder="Enter test phone number (e.g. +91 98480 11223)..."
-                className="flex-1 px-3 py-2 text-xs bg-proto-base border border-proto-surface1 rounded-lg text-proto-text focus:outline-none focus:border-proto-gold"
-              />
-              <button
-                type="submit"
-                disabled={isSendingWa}
-                className="px-3.5 py-2 bg-proto-gold text-[#070b09] font-bold text-xs rounded-lg uppercase tracking-wider hover:opacity-90 transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
-              >
-                {isSendingWa ? <Activity className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                <span>Send Test</span>
-              </button>
-            </form>
-            <p className="text-[10px] text-proto-subtext">
-              Dispatches Message 1 (Group Link) and Message 2 (Personal QR Card [QR] / [Agent Name]) immediately.
-            </p>
-          </div>
         </div>
 
         {/* Live WhatsApp Dispatch Log */}
@@ -865,7 +808,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
                 No WhatsApp messages dispatched yet. Automatic registration dispatches and manual messages will appear here.
               </div>
             ) : (
-              waLogs.slice(0, 15).map((log: any) => {
+              waLogs.slice(0, 15).map((log: WhatsAppDispatchRecord) => {
                 const isDelivered = log.status === 'DELIVERED';
                 const isFailed = log.status === 'FAILED';
 

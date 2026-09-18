@@ -26,24 +26,28 @@ export default function AdminPage() {
 
   useEffect(() => {
     initStore();
-    if (typeof window !== 'undefined') {
-      const isAuth = sessionStorage.getItem('ieee_admin_auth') === 'true';
-      const storedAgent = sessionStorage.getItem('ieee_admin_agent') || 'ieee-protocol-admin';
-      
-      if (!isAuth) {
-        setIsAuthenticated(false);
-        router.push('/admin/login');
-      } else {
-        setIsAuthenticated(true);
-        setAdminAgentName(storedAgent);
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const isAuth = sessionStorage.getItem('ieee_admin_auth') === 'true';
+        const storedAgent = sessionStorage.getItem('ieee_admin_agent') || 'ieee-protocol-admin';
+        
+        if (!isAuth) {
+          setIsAuthenticated(false);
+          router.push('/admin/login');
+        } else {
+          setIsAuthenticated(true);
+          setAdminAgentName(storedAgent);
+        }
       }
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [router]);
 
   const handleLogout = () => {
     soundEffects.playScanChirp();
     sessionStorage.removeItem('ieee_admin_auth');
     sessionStorage.removeItem('ieee_admin_agent');
+    sessionStorage.removeItem('ieee_admin_token');
     setIsAuthenticated(false);
     router.push('/admin/login');
   };

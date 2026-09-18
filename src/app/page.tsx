@@ -2,14 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Store, initStore, INITIAL_AGENTS } from '@/lib/store';
+import { Store, initStore } from '@/lib/store';
 import { Agent } from '@/types/database';
 import { 
   ShieldAlert, 
   ArrowRight,
   Trophy,
-  ChevronDown,
   QrCode,
   UserPlus,
   LogIn,
@@ -18,8 +16,6 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
-  const router = useRouter();
-  const [showDemoAgents, setShowDemoAgents] = useState(false);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [sessionStatus, setSessionStatus] = useState<{ canPlay: boolean; status: string; activeSeconds: number }>({
     canPlay: false,
@@ -40,15 +36,6 @@ export default function HomePage() {
       }
     }
   }, []);
-
-  const handleLaunchAgent = (agentId: string) => {
-    const demo = INITIAL_AGENTS.find((a) => a.agent_id === agentId);
-    if (demo) {
-      localStorage.setItem('ieee_agent_id', demo.agent_id);
-      localStorage.setItem('ieee_agent_token', demo.token);
-      router.push(`/play?agent_id=${demo.agent_id}&token=${demo.token}`);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col justify-between font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
@@ -252,32 +239,6 @@ export default function HomePage() {
         <p className="text-xs text-[#718a7b] font-sans italic">
           Trust no one. Some agents have other objectives.
         </p>
-
-        {/* Minimal Demo Operatives Toggle for Testing */}
-        <div className="w-full max-w-md pt-2 border-t border-[#1b2620]">
-          <button
-            onClick={() => setShowDemoAgents(!showDemoAgents)}
-            className="text-xs text-[#718a7b] hover:text-[#cad8ce] inline-flex items-center gap-1 transition-colors"
-          >
-            <span>Test with Demo Operative</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDemoAgents ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showDemoAgents && (
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3">
-              {INITIAL_AGENTS.map((demo) => (
-                <button
-                  key={demo.agent_id}
-                  onClick={() => handleLaunchAgent(demo.agent_id)}
-                  className="p-2 rounded-lg bg-[#16201a] border border-[#23332a] hover:border-proto-signal text-left text-xs transition-colors"
-                >
-                  <div className="font-bold text-[#eaf2ec] truncate">{demo.name}</div>
-                  <div className="text-[10px] text-[#8ea897]">{demo.archetype}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </main>
 
       {/* Clean, Understated Footer */}

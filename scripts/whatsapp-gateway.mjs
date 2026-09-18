@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable react-hooks/rules-of-hooks, @typescript-eslint/no-unused-vars */
 /**
  * IEEE NIT Warangal - The Protocol
  * Standalone Zero-Cost WhatsApp Gateway powered by Baileys
@@ -176,6 +177,38 @@ async function startWhatsApp() {
 // Helper to delay between sequential messages
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// FIFO queue for safe burst dispatching to prevent WhatsApp rate-limiting / anti-spam blocks
+const dispatchQueue = [];
+let isProcessingQueue = false;
+
+async function processDispatchQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+
+  while (dispatchQueue.length > 0) {
+    const item = dispatchQueue.shift();
+    try {
+      const result = await handleSend(item.reqBody);
+      item.resolve(result);
+    } catch (err) {
+      item.reject(err);
+    }
+    // Respectful 850ms spacing between distinct recipient bursts
+    if (dispatchQueue.length > 0) {
+      await sleep(850);
+    }
+  }
+
+  isProcessingQueue = false;
+}
+
+function queueSend(reqBody) {
+  return new Promise((resolve, reject) => {
+    dispatchQueue.push({ reqBody, resolve, reject });
+    processDispatchQueue();
+  });
+}
+
 // Send dispatch helper
 async function handleSend(reqBody) {
   if (!isConnected || !sock) {
@@ -318,11 +351,23 @@ const server = http.createServer(async (req, res) => {
   // Send Message Endpoint
   if (req.method === 'POST' && (url.pathname === '/send' || url.pathname === '/messages')) {
     let bodyData = '';
-    req.on('data', (chunk) => { bodyData += chunk; });
+    let isTooLarge = false;
+
+    req.on('data', (chunk) => {
+      bodyData += chunk;
+      if (bodyData.length > 5 * 1024 * 1024) { // 5MB limit
+        isTooLarge = true;
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Payload exceeds 5MB limit' }));
+        req.destroy();
+      }
+    });
+
     req.on('end', async () => {
+      if (isTooLarge) return;
       try {
         const payload = JSON.parse(bodyData || '{}');
-        const result = await handleSend(payload);
+        const result = await queueSend(payload);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (err) {

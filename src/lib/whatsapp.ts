@@ -1,7 +1,7 @@
 import { generateAgentQRBadgeDataUrl } from './qr-image';
 
 export interface WhatsAppConfig {
-  provider: 'SIMULATED' | 'META_CLOUD' | 'ULTRAMSG' | 'GREEN_API' | 'TWILIO' | 'CUSTOM' | 'BAILEYS';
+  provider: 'META_CLOUD' | 'ULTRAMSG' | 'GREEN_API' | 'TWILIO' | 'CUSTOM' | 'BAILEYS';
   groupLink: string;
   apiToken?: string;
   phoneNumberId?: string;
@@ -18,7 +18,7 @@ export interface WhatsAppDispatchRecord {
   agentId: string;
   agentName: string;
   type: 'GROUP_INVITE' | 'QR_BADGE_IMAGE';
-  status: 'DELIVERED' | 'SIMULATED' | 'FAILED';
+  status: 'DELIVERED' | 'FAILED';
   previewText: string;
   mediaUrl?: string;
   error?: string;
@@ -136,9 +136,9 @@ export async function sendRegistrationWhatsAppMessages(options: {
     agentNumber: options.agentNumber
   });
 
-  // Dispatch via server API route (supports Baileys gateway, live APIs, and simulation fallback)
-  let apiStatus: 'DELIVERED' | 'SIMULATED' | 'FAILED' = 'SIMULATED';
-  let apiErrorMessage: string | undefined;
+  // Dispatch via server API route
+  let apiStatus: 'DELIVERED' | 'FAILED' = 'FAILED';
+  let apiErrorMessage: string | undefined = 'WhatsApp Gateway offline';
 
   if (typeof fetch !== 'undefined') {
     try {
@@ -158,17 +158,17 @@ export async function sendRegistrationWhatsAppMessages(options: {
       });
 
       const data = await response.json().catch(() => ({}));
-      if (response.ok && data.success && data.provider !== 'SIMULATED') {
+      if (response.ok && data.success) {
         apiStatus = 'DELIVERED';
-      } else if (data.simulated || data.provider === 'SIMULATED') {
-        apiStatus = 'SIMULATED';
+        apiErrorMessage = undefined;
       } else {
         apiStatus = 'FAILED';
-        apiErrorMessage = data.error;
+        apiErrorMessage = data.error || 'Gateway dispatch failed';
       }
-    } catch (apiErr: any) {
-      console.warn('WhatsApp API server unreachable, logging local simulation:', apiErr);
-      apiStatus = 'SIMULATED';
+    } catch (apiErr: unknown) {
+      console.warn('WhatsApp API server unreachable:', apiErr);
+      apiStatus = 'FAILED';
+      apiErrorMessage = 'WhatsApp service unreachable';
     }
   }
 
@@ -287,9 +287,13 @@ export async function fetchCentralWhatsAppLogs(): Promise<WhatsAppDispatchRecord
 export async function clearCentralWhatsAppLogs(): Promise<boolean> {
   if (typeof fetch === 'undefined') return false;
   try {
-    const res = await fetch('/api/whatsapp/send?action=clear_logs', { method: 'DELETE' });
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
+    const res = await fetch('/api/whatsapp/send?action=clear_logs', { 
+      method: 'DELETE',
+      headers: token ? { 'x-admin-token': token } : {}
+    });
     return res.ok;
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn('Failed to clear central WhatsApp logs:', err);
     return false;
   }
@@ -301,11 +305,16 @@ export async function clearCentralWhatsAppLogs(): Promise<boolean> {
 export async function unlinkWhatsAppGateway(): Promise<{ success: boolean; message?: string; error?: string }> {
   if (typeof fetch === 'undefined') return { success: false, error: 'No browser fetch available' };
   try {
-    const res = await fetch('/api/whatsapp/send', { method: 'DELETE' });
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
+    const res = await fetch('/api/whatsapp/send', { 
+      method: 'DELETE',
+      headers: token ? { 'x-admin-token': token } : {}
+    });
     const data = await res.json().catch(() => ({}));
     return { success: res.ok, ...data };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to unlink device' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to unlink device';
+    return { success: false, error: msg };
   }
 }
 

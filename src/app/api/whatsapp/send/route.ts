@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ServerStore } from '@/lib/server-store';
 import { WhatsAppDispatchRecord } from '@/lib/whatsapp';
+import { verifyAdminRequest, checkRateLimit, getClientIp } from '@/lib/admin-auth';
 
 function recordServerLogs(options: {
   recipient: string;
@@ -8,7 +9,7 @@ function recordServerLogs(options: {
   agentName?: string;
   agentNumber?: string;
   groupLink?: string;
-  status: 'DELIVERED' | 'SIMULATED' | 'FAILED';
+  status: 'DELIVERED' | 'FAILED';
   badgeDataUrl?: string;
   error?: string;
 }) {
@@ -49,23 +50,42 @@ function recordServerLogs(options: {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const ip = getClientIp(request);
+    const rateLimit = checkRateLimit(`wa-send:${ip}`, 12, 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Transmission rate limit exceeded. Please wait a moment.' },
+        { status: 429 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
     const {
-      recipient,
-      agentId,
-      agentName,
-      agentNumber,
-      groupLink,
+      recipient: rawRecipient,
+      agentId: rawAgentId,
+      agentName: rawAgentName,
+      agentNumber: rawAgentNumber,
+      groupLink: rawGroupLink,
       message1Body,
       message2Caption,
       badgeDataUrl
     } = body;
 
-    if (!recipient) {
+    if (!rawRecipient) {
       return NextResponse.json({ error: 'Recipient phone number is required' }, { status: 400 });
     }
 
-    const provider = process.env.WHATSAPP_PROVIDER || 'SIMULATED';
+    const recipient = String(rawRecipient).replace(/\D/g, '').slice(0, 15);
+    if (recipient.length < 8) {
+      return NextResponse.json({ error: 'Valid phone number is required (min 8 digits)' }, { status: 400 });
+    }
+
+    const agentName = rawAgentName ? String(rawAgentName).slice(0, 80) : undefined;
+    const agentId = rawAgentId ? String(rawAgentId).slice(0, 30) : undefined;
+    const agentNumber = rawAgentNumber ? String(rawAgentNumber).slice(0, 30) : undefined;
+    const groupLink = rawGroupLink ? String(rawGroupLink).slice(0, 200) : undefined;
+
+    const provider = process.env.WHATSAPP_PROVIDER || 'BAILEYS';
     const apiToken = process.env.WHATSAPP_API_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -272,46 +292,39 @@ export async function POST(request: Request) {
           agentName,
           agentNumber,
           groupLink,
-          status: 'SIMULATED',
+          status: 'FAILED',
           badgeDataUrl,
-          error: 'Gateway offline. Logged simulated dispatch.'
+          error: 'WhatsApp Gateway offline. Start via `npm run wa:gateway` or link WhatsApp in Admin.'
         });
 
         return NextResponse.json({
           success: false,
-          provider: 'SIMULATED',
+          provider: 'BAILEYS_GATEWAY',
           records: [record1, record2],
-          error: 'WhatsApp Gateway is offline. Run `npm run wa:gateway` in a separate terminal to link WhatsApp.',
-          simulated: true,
-          dispatched: {
-            message1: { type: 'GROUP_INVITE', to: recipient, content: message1Body },
-            message2: { type: 'QR_BADGE_IMAGE', to: recipient, caption: message2Caption }
-          }
-        });
+          error: 'WhatsApp Gateway is offline. Run `npm run wa:gateway` or scan QR code in Admin Dashboard to link WhatsApp.'
+        }, { status: 503 });
       }
     }
 
-    // Default: Local Simulated Mode (Always succeeds, safe for dev/demo)
+    // Provider not connected or gateway offline
+    const notConfiguredError = `WhatsApp provider [${provider}] is offline or not configured.`;
     const { record1, record2 } = recordServerLogs({
       recipient,
       agentId,
       agentName,
       agentNumber,
       groupLink,
-      status: 'SIMULATED',
-      badgeDataUrl
+      status: 'FAILED',
+      badgeDataUrl,
+      error: notConfiguredError
     });
 
     return NextResponse.json({
-      success: true,
-      provider: 'SIMULATED',
+      success: false,
+      provider,
       records: [record1, record2],
-      message: `2 WhatsApp transmissions successfully simulated for ${recipient}. Start WhatsApp Gateway (npm run wa:gateway) for live transmissions.`,
-      dispatched: {
-        message1: { type: 'GROUP_INVITE', to: recipient, content: message1Body },
-        message2: { type: 'QR_BADGE_IMAGE', to: recipient, caption: message2Caption }
-      }
-    });
+      error: 'WhatsApp Gateway is offline. Link WhatsApp via Admin Dashboard or run `npm run wa:gateway`.'
+    }, { status: 503 });
 
   } catch (error: unknown) {
     console.error('[WhatsApp API] Error processing dispatch:', error);
@@ -338,7 +351,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const provider = process.env.WHATSAPP_PROVIDER || 'CUSTOM';
+  const provider = process.env.WHATSAPP_PROVIDER || 'BAILEYS';
   const webhookUrl = process.env.CUSTOM_WHATSAPP_WEBHOOK_URL || 'http://localhost:5005/send';
   const statusUrl = webhookUrl.replace(/\/send$/, '/status');
 
@@ -374,6 +387,13 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!verifyAdminRequest(request)) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized: Administrator privileges required' },
+      { status: 401 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
@@ -385,7 +405,7 @@ export async function DELETE(request: Request) {
     });
   }
 
-  const provider = process.env.WHATSAPP_PROVIDER || 'CUSTOM';
+  const provider = process.env.WHATSAPP_PROVIDER || 'BAILEYS';
   const webhookUrl = process.env.CUSTOM_WHATSAPP_WEBHOOK_URL || 'http://localhost:5005/send';
   const unlinkUrl = webhookUrl.replace(/\/send$/, '/unlink');
 
@@ -400,5 +420,5 @@ export async function DELETE(request: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, message: 'Reset simulated session.' });
+  return NextResponse.json({ success: true, message: 'Unlink action completed.' });
 }

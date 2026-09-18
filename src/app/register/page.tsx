@@ -19,8 +19,7 @@ import {
   ShieldAlert, 
   Sparkles, 
   Ticket,
-  MessageSquare,
-  CheckCircle2
+  MessageSquare
 } from 'lucide-react';
 
 const DOMAIN_ICONS: Record<PrimaryDomain, React.ComponentType<{ className?: string }>> = {

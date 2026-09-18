@@ -16,9 +16,6 @@ import {
 } from 'lucide-react';
 import { soundEffects } from '@/lib/audio';
 
-const REQUIRED_AGENT_NAME = 'ieee-protocol-admin';
-const REQUIRED_PASSWORD = 'protocol2026';
-
 export default function AdminLoginPage() {
   const router = useRouter();
   const [agentName, setAgentName] = useState('');
@@ -40,21 +37,32 @@ export default function AdminLoginPage() {
 
     setIsSubmitting(true);
 
-    // Verify exact admin credentials
-    if (
-      cleanAgent.toLowerCase() === REQUIRED_AGENT_NAME.toLowerCase() &&
-      cleanPass === REQUIRED_PASSWORD
-    ) {
-      soundEffects.playSuccessChime();
-      sessionStorage.setItem('ieee_admin_auth', 'true');
-      sessionStorage.setItem('ieee_admin_agent', REQUIRED_AGENT_NAME);
-      
-      setTimeout(() => {
-        router.push('/admin');
-      }, 300);
-    } else {
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentName: cleanAgent, password: cleanPass })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success && data.token) {
+        soundEffects.playSuccessChime();
+        sessionStorage.setItem('ieee_admin_auth', 'true');
+        sessionStorage.setItem('ieee_admin_agent', data.agentName || cleanAgent);
+        sessionStorage.setItem('ieee_admin_token', data.token);
+
+        setTimeout(() => {
+          router.push('/admin');
+        }, 300);
+      } else {
+        soundEffects.playLockoutBuzz();
+        setErrorMsg(data.error || 'AUTHENTICATION REJECTED: Invalid credentials.');
+        setIsSubmitting(false);
+      }
+    } catch {
       soundEffects.playLockoutBuzz();
-      setErrorMsg('AUTHENTICATION REJECTED: Invalid Agent-Name or Password.');
+      setErrorMsg('NETWORK ERROR: Failed to reach security service.');
       setIsSubmitting(false);
     }
   };
