@@ -8,9 +8,12 @@ import {
   sendRegistrationWhatsAppMessages, 
   checkWhatsAppGatewayStatus, 
   unlinkWhatsAppGateway,
+  fetchCentralWhatsAppLogs,
+  clearCentralWhatsAppLogs,
   WhatsAppGatewayStatus 
 } from '@/lib/whatsapp';
 import { RegisterModal } from './RegisterModal';
+import { OperativePreviewModal } from './OperativePreviewModal';
 import { 
   Activity, 
   Users, 
@@ -38,7 +41,8 @@ import {
   ExternalLink, 
   Search,
   QrCode,
-  LogOut
+  LogOut,
+  Zap
 } from 'lucide-react';
 
 interface TelemetryDashboardProps {
@@ -70,6 +74,10 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
   // Add Operative Modal
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
+  // Operative Detail Preview Modal
+  const [previewAgent, setPreviewAgent] = useState<Agent | null>(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+
   // Cutoff Time Editing
   const [cutoffTimeInput, setCutoffTimeInput] = useState(gameState.submission_cutoff_time || '20:00');
   const [isEditingCutoff, setIsEditingCutoff] = useState(false);
@@ -78,13 +86,31 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
   const [gatewayInfo, setGatewayInfo] = useState<WhatsAppGatewayStatus | null>(null);
   const [isUnlinkingWa, setIsUnlinkingWa] = useState(false);
 
-  const refreshDashboard = useCallback(() => {
+  const refreshDashboard = useCallback(async () => {
     setGameState(Store.getGameState());
-    setAgents(Store.getAgents());
+    const syncedAgents = await Store.syncWithServer();
+    setAgents(syncedAgents);
     setTelemetry(Store.getTelemetry());
-    setWaLogs(Store.getWhatsAppLogs());
+
+    // Fetch central WhatsApp logs so all automatic registrations from phones appear
+    const centralLogs = await fetchCentralWhatsAppLogs();
+    if (centralLogs && centralLogs.length > 0) {
+      setWaLogs(centralLogs);
+    } else {
+      setWaLogs(Store.getWhatsAppLogs());
+    }
+
     setWaConfig(Store.getWhatsAppConfig());
   }, []);
+
+  const handleClearWhatsAppLogs = async () => {
+    if (!confirm('Are you sure you want to clear all central WhatsApp transmission logs?')) return;
+    await clearCentralWhatsAppLogs();
+    setWaLogs([]);
+    soundEffects.playScanChirp();
+    setActionNotice('WHATSAPP DISPATCH LOGS CLEARED');
+    setTimeout(() => setActionNotice(null), 3000);
+  };
 
   const checkGateway = useCallback(async () => {
     const info = await checkWhatsAppGatewayStatus();
@@ -136,10 +162,11 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
     window.addEventListener('storage', handleUpdate);
     window.addEventListener('ieee_wa_dispatch', handleUpdate);
 
-    // 2-second ticker to update active play times
+    refreshDashboard();
+    // 3.5s periodic ticker to poll server for new participants & central WhatsApp logs
     const interval = setInterval(() => {
-      setAgents(Store.getAgents());
-    }, 2000);
+      refreshDashboard();
+    }, 3500);
 
     return () => {
       window.removeEventListener('ieee_store_update', handleUpdate);
@@ -771,41 +798,58 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
         {/* Live WhatsApp Dispatch Log */}
         <div className="space-y-2 pt-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-proto-text uppercase">RECENT WHATSAPP DISPATCH ACTIVITY LOG</span>
-            <span className="text-[10px] text-proto-subtext">{waLogs.length} messages logged</span>
+            <span className="font-bold text-proto-text uppercase">CENTRALIZED WHATSAPP TRANSMISSION LOGS</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-proto-subtext">{waLogs.length} transmissions logged</span>
+              {waLogs.length > 0 && (
+                <button
+                  onClick={handleClearWhatsAppLogs}
+                  className="text-[10px] text-proto-crimson hover:underline cursor-pointer"
+                >
+                  Clear Logs
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="max-h-48 overflow-y-auto border border-proto-surface1 rounded-xl bg-proto-surface0/40 divide-y divide-proto-surface1/60">
             {waLogs.length === 0 ? (
               <div className="p-4 text-center text-xs text-proto-subtext">
-                No WhatsApp messages dispatched yet. Register an operative to trigger automatic dispatch.
+                No WhatsApp messages dispatched yet. Automatic registration dispatches and manual messages will appear here.
               </div>
             ) : (
-              waLogs.slice(0, 10).map((log: any) => (
-                <div key={log.id} className="p-2.5 text-xs flex flex-wrap items-center justify-between gap-2 hover:bg-proto-surface0/80 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      log.type === 'GROUP_INVITE' 
-                        ? 'bg-proto-logic/20 text-proto-logic border border-proto-logic/40' 
-                        : 'bg-proto-signal/20 text-proto-signal border border-proto-signal/40'
-                    }`}>
-                      {log.type === 'GROUP_INVITE' ? 'MSG 1: GROUP LINK' : 'MSG 2: QR PASS'}
-                    </span>
-                    <span className="font-mono text-proto-text">{log.recipient}</span>
-                    <span className="text-proto-subtext">({log.agentName || log.agentId})</span>
-                  </div>
+              waLogs.slice(0, 15).map((log: any) => {
+                const isDelivered = log.status === 'DELIVERED';
+                const isFailed = log.status === 'FAILED';
 
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="text-proto-subtext font-mono">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                    <span className="text-proto-signal font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>{log.status}</span>
-                    </span>
+                return (
+                  <div key={log.id} className="p-2.5 text-xs flex flex-wrap items-center justify-between gap-2 hover:bg-proto-surface0/80 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        log.type === 'GROUP_INVITE' 
+                          ? 'bg-proto-logic/20 text-proto-logic border border-proto-logic/40' 
+                          : 'bg-proto-signal/20 text-proto-signal border border-proto-signal/40'
+                      }`}>
+                        {log.type === 'GROUP_INVITE' ? 'MSG 1: GROUP LINK' : 'MSG 2: QR PASS'}
+                      </span>
+                      <span className="font-mono text-proto-text">{log.recipient}</span>
+                      <span className="text-proto-subtext">({log.agentName || log.agentId})</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="text-proto-subtext font-mono">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                      <span className={`font-bold flex items-center gap-1 ${
+                        isDelivered ? 'text-proto-signal' : isFailed ? 'text-proto-crimson' : 'text-proto-gold'
+                      }`}>
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{log.status}</span>
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -938,6 +982,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
                 const activeSecs = getAgentActiveSeconds(ag);
                 const isActive = ag.check_in_status === 'ACTIVE';
                 const isPaused = ag.check_in_status === 'PAUSED';
+                const qData = Store.getAgentCurrentQuestion(ag.agent_id);
 
                 return (
                   <tr key={ag.id} className="hover:bg-proto-surface0/40 transition-colors">
@@ -946,14 +991,30 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
                     </td>
 
                     <td className="py-3 px-3">
-                      <div className="font-bold text-proto-text">
-                        {ag.agent_number || ag.agent_id}
-                      </div>
-                      <div className="text-[11px] text-proto-subtext">{ag.name}</div>
-                      <div className="text-[10px] text-proto-gold flex items-center gap-1 mt-0.5">
-                        <Ticket className="w-3 h-3" />
-                        <span>Band: {ag.wristband_id || ag.agent_id}</span>
-                      </div>
+                      <button
+                        onClick={() => {
+                          setPreviewAgent(ag);
+                          setIsPreviewModalOpen(true);
+                        }}
+                        className="text-left group/op block cursor-pointer"
+                        title="Click to preview operative details"
+                      >
+                        <div className="font-bold text-proto-text group-hover/op:text-proto-signal transition-colors flex items-center gap-1">
+                          <span>{ag.agent_number || ag.agent_id}</span>
+                          <Eye className="w-3 h-3 opacity-0 group-hover/op:opacity-100 text-proto-signal transition-opacity" />
+                        </div>
+                        <div className="text-[11px] text-proto-subtext">{ag.name}</div>
+                        <div className="text-[10px] text-proto-gold flex items-center gap-1 mt-0.5">
+                          <Ticket className="w-3 h-3" />
+                          <span>Band: {ag.wristband_id || ag.agent_id}</span>
+                        </div>
+                        {qData.currentNode && (
+                          <div className="text-[10px] text-proto-logic flex items-center gap-1 mt-0.5 truncate max-w-[170px]" title={`${qData.currentNode.node.station_number || 'Station'}: ${qData.currentNode.node.title}`}>
+                            <Zap className="w-2.5 h-2.5 text-proto-gold shrink-0" />
+                            <span className="truncate">{qData.currentNode.node.station_number || 'Station'}: {qData.currentNode.node.title}</span>
+                          </div>
+                        )}
+                      </button>
                     </td>
 
                     <td className="py-3 px-3">
@@ -999,6 +1060,19 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
 
                     <td className="py-3 px-3 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        {/* Preview Operative Button */}
+                        <button
+                          onClick={() => {
+                            setPreviewAgent(ag);
+                            setIsPreviewModalOpen(true);
+                          }}
+                          title="Preview Operative Telemetry & Current Question"
+                          className="px-2 py-1 rounded-lg bg-proto-logic/15 text-proto-logic hover:bg-proto-logic hover:text-[#070b09] border border-proto-logic/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>Preview</span>
+                        </button>
+
                         {/* Send / Resend WhatsApp Pass Button */}
                         <button
                           onClick={() => handleSendWhatsAppToAgent(ag)}
@@ -1007,7 +1081,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
                           className="px-2 py-1 rounded-lg bg-proto-signal/15 text-proto-signal hover:bg-proto-signal hover:text-[#070b09] border border-proto-signal/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                         >
                           <Smartphone className="w-3 h-3" />
-                          <span>WhatsApp Pass</span>
+                          <span>Pass</span>
                         </button>
 
                         {/* Check-In / Check-Out Toggle Button */}
@@ -1177,6 +1251,38 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
         onSuccess={() => {
           refreshDashboard();
           setActionNotice('NEW OPERATIVE ENROLLED & WHATSAPP PASS TRANSMITTED');
+        }}
+      />
+
+      {/* Operative Telemetry Detail Preview Modal */}
+      <OperativePreviewModal
+        agent={previewAgent ? agents.find(a => a.agent_id === previewAgent.agent_id) || previewAgent : null}
+        isOpen={isPreviewModalOpen}
+        onClose={() => {
+          setIsPreviewModalOpen(false);
+          setPreviewAgent(null);
+        }}
+        onToggleCheckIn={(agentId) => {
+          handleToggleCheckIn(agentId);
+        }}
+        onResendWhatsApp={(ag) => {
+          handleSendWhatsAppToAgent(ag);
+        }}
+        onAdjustScore={(ag) => {
+          setAdjustTarget(ag);
+          setAdjustDelta(50);
+          setAdjustReason('Staff verification bonus');
+        }}
+        onResetAgent={(agentId) => {
+          handleEmergencyReset(agentId);
+        }}
+        onDeleteAgent={(agentId) => {
+          if (confirm(`Are you sure you want to delete operative ${agentId}?`)) {
+            Store.deleteAgent(agentId);
+            setIsPreviewModalOpen(false);
+            setPreviewAgent(null);
+            refreshDashboard();
+          }
         }}
       />
     </div>

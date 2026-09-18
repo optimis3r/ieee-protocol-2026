@@ -486,6 +486,16 @@ function setStored<T>(key: string, value: T, notify: boolean = true): void {
   }
 }
 
+function notifyServer(payload: any): void {
+  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+    fetch('/api/participants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  }
+}
+
 // Initialize Initial Data
 export function initStore(): void {
   if (typeof window === 'undefined') return;
@@ -731,6 +741,7 @@ export const Store = {
 
     setStored(KEY_AGENTS, agents, true);
     this.logAccess(agents[idx].agent_id, 'IN', notes || 'Admin Check-In: Active session started');
+    notifyServer({ action: 'update_status', agentId: agents[idx].agent_id, status: 'ACTIVE' });
 
     return {
       success: true,
@@ -762,6 +773,7 @@ export const Store = {
 
     setStored(KEY_AGENTS, agents, true);
     this.logAccess(agents[idx].agent_id, 'OUT', notes || 'Admin Check-Out: Session paused');
+    notifyServer({ action: 'update_status', agentId: agents[idx].agent_id, status: 'PAUSED' });
 
     return {
       success: true,
@@ -818,6 +830,7 @@ export const Store = {
       record.first_accessed_at = timestamp;
       setStored(KEY_AGENT_NODES, allAgentNodes);
     }
+    notifyServer({ action: 'record_node_access', agentId, nodeId });
     return record;
   },
 
@@ -901,6 +914,7 @@ export const Store = {
 
     agents.push(newAgent);
     setStored(KEY_AGENTS, agents);
+    notifyServer({ action: 'register', agent: newAgent });
 
     // Dynamic starting nodes allocation: 3 nodes matching/complementing role + 1 mystery + hypothesis
     const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
@@ -1094,6 +1108,7 @@ export const Store = {
       record.completed_at = new Date().toISOString();
       record.points_earned = points;
       setStored(KEY_AGENT_NODES, allAgentNodes);
+      notifyServer({ action: 'complete_node', agentId, nodeId, pointsEarned: points });
 
       const agents = this.getAgents();
       const ag = agents.find(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
@@ -1438,8 +1453,85 @@ export const Store = {
     const filtered = agents.filter(a => a.agent_id.toUpperCase() !== agentId.toUpperCase());
     if (filtered.length !== agents.length) {
       setStored(KEY_AGENTS, filtered, true);
+      notifyServer({ action: 'delete_agent', agentId });
       return true;
     }
     return false;
+  },
+
+  getAgentCurrentQuestion(agentId: string): {
+    currentNode: (AgentNode & { node: NodeItem }) | null;
+    status: 'IN_PROGRESS' | 'SOLVED' | 'NO_ACTIVITY';
+    totalSolved: number;
+    totalAssigned: number;
+  } {
+    const nodes = this.getAgentNodes(agentId);
+    const solved = nodes.filter(n => n.is_completed);
+
+    const inProgress = nodes
+      .filter(n => n.is_unlocked && !n.is_completed)
+      .sort((a, b) => {
+        const tA = a.first_accessed_at ? new Date(a.first_accessed_at).getTime() : 0;
+        const tB = b.first_accessed_at ? new Date(b.first_accessed_at).getTime() : 0;
+        return tB - tA;
+      });
+
+    if (inProgress.length > 0) {
+      return {
+        currentNode: inProgress[0],
+        status: 'IN_PROGRESS',
+        totalSolved: solved.length,
+        totalAssigned: nodes.length
+      };
+    }
+
+    if (solved.length > 0) {
+      const lastSolved = [...solved].sort((a, b) => {
+        const tA = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+        const tB = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+        return tB - tA;
+      })[0];
+      return {
+        currentNode: lastSolved,
+        status: 'SOLVED',
+        totalSolved: solved.length,
+        totalAssigned: nodes.length
+      };
+    }
+
+    return {
+      currentNode: nodes[0] || null,
+      status: 'NO_ACTIVITY',
+      totalSolved: 0,
+      totalAssigned: nodes.length
+    };
+  },
+
+  async syncWithServer(): Promise<Agent[]> {
+    if (typeof fetch === 'undefined') return this.getAgents();
+    try {
+      const res = await fetch('/api/participants', { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.agents)) {
+          const localAgents = this.getAgents();
+          const merged = [...localAgents];
+          data.agents.forEach((remoteAg: Agent) => {
+            const idx = merged.findIndex(a => a.agent_id.toUpperCase() === remoteAg.agent_id.toUpperCase());
+            if (idx >= 0) {
+              merged[idx] = { ...merged[idx], ...remoteAg };
+            } else {
+              merged.push(remoteAg);
+            }
+          });
+          setStored(KEY_AGENTS, merged, false);
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.warn('Sync with server failed, fallback to local store:', e);
+    }
+    return this.getAgents();
   }
 };
+

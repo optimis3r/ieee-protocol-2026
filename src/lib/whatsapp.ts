@@ -231,6 +231,7 @@ export interface WhatsAppGatewayStatus {
   message?: string;
   qrAvailable?: boolean;
   qrDataUrl?: string | null;
+  logs?: WhatsAppDispatchRecord[];
 }
 
 /**
@@ -252,12 +253,45 @@ export async function checkWhatsAppGatewayStatus(): Promise<WhatsAppGatewayStatu
         provider: data.provider,
         message: data.message,
         qrAvailable: data.qrAvailable,
-        qrDataUrl: data.qrDataUrl
+        qrDataUrl: data.qrDataUrl,
+        logs: data.logs || []
       };
     }
     return { online: false, status: 'OFFLINE' };
   } catch {
     return { online: false, status: 'OFFLINE' };
+  }
+}
+
+/**
+ * Fetch all centralized WhatsApp transmission records from the server
+ */
+export async function fetchCentralWhatsAppLogs(): Promise<WhatsAppDispatchRecord[]> {
+  if (typeof fetch === 'undefined') return [];
+  try {
+    const res = await fetch('/api/whatsapp/send?logs=true', { method: 'GET', cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data.logs) ? data.logs : [];
+    }
+    return [];
+  } catch (err) {
+    console.warn('Failed to fetch central WhatsApp logs:', err);
+    return [];
+  }
+}
+
+/**
+ * Clear centralized WhatsApp logs on the server
+ */
+export async function clearCentralWhatsAppLogs(): Promise<boolean> {
+  if (typeof fetch === 'undefined') return false;
+  try {
+    const res = await fetch('/api/whatsapp/send?action=clear_logs', { method: 'DELETE' });
+    return res.ok;
+  } catch (err) {
+    console.warn('Failed to clear central WhatsApp logs:', err);
+    return false;
   }
 }
 
@@ -274,4 +308,5 @@ export async function unlinkWhatsAppGateway(): Promise<{ success: boolean; messa
     return { success: false, error: err.message || 'Failed to unlink device' };
   }
 }
+
 

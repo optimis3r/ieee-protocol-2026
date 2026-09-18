@@ -44,3 +44,4 @@ next-env.d.ts
 # whatsapp bot session
 .baileys_auth/
 whatsapp_session/
+.data/
