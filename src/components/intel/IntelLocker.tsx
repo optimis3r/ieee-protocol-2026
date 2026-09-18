@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AgentIntel, IntelFragment } from '@/types/database';
-import { FileText, Lock, KeyRound, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { FileText, Lock, KeyRound, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 interface IntelLockerProps {
   intelList: Array<AgentIntel & { intel: IntelFragment }>;

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeCameraScanConfig } from 'html5-qrcode';
-import { Camera, X, Flashlight, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Camera, X, Flashlight, AlertCircle } from 'lucide-react';
 import { soundEffects } from '@/lib/audio';
 
 export interface ScanResult {
@@ -29,7 +29,6 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerId = 'interactive-qr-reader';
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -39,7 +38,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const parseScannedText = useCallback((text: string): ScanResult => {
     const trimmed = text.trim();
 
-    // 1. Check for signed URL query params e.g. /play?agent_id=AGT-1234&token=tok_abc
+    // 1. Check for signed URL query params e.g. /play?agent_id=AGT-047&token=tok_abc
     try {
       if (trimmed.includes('?') && (trimmed.includes('agent_id=') || trimmed.includes('node_id='))) {
         const url = new URL(trimmed.startsWith('http') ? trimmed : `https://network.ieee/${trimmed}`);
@@ -65,8 +64,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       }
     } catch {}
 
-    // 2. Check for Badge Pattern: AGT-[A-Z0-9]{4,8}
-    const badgeMatch = trimmed.match(/\b(AGT-[A-Z0-9]{4,8})\b/i);
+    // 2. Check for Badge Pattern: AGT-[A-Z0-9]{3,12}
+    const badgeMatch = trimmed.match(/\b(AGT-[A-Z0-9]{3,12})\b/i);
     if (badgeMatch) {
       return {
         raw: trimmed,
@@ -75,7 +74,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       };
     }
 
-    // 3. Check for Node Pattern: NODE-[A-Z0-9_-]+ or /node/[id]
+    // 3. Check for Node Pattern: /node/[id] or NODE-[A-Z0-9_-]+
     const nodeEndpointMatch = trimmed.match(/\/node\/([a-zA-Z0-9_-]+)/i);
     if (nodeEndpointMatch) {
       return {
@@ -120,26 +119,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
   // Initialize and start scanner when opened
   useEffect(() => {
-    if (!isOpen) {
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => {})
-          .then(() => {
-            scannerRef.current?.clear();
-            scannerRef.current = null;
-          });
-      }
-      setTorchOn(false);
-      setErrorMsg(null);
-      return;
-    }
+    if (!isOpen) return;
 
     let isMounted = true;
 
     const startScanner = async () => {
       try {
-        // Small delay to ensure modal DOM is mounted
         await new Promise((r) => setTimeout(r, 150));
         if (!isMounted) return;
 
@@ -148,30 +133,22 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
         const config: Html5QrcodeCameraScanConfig = {
           fps: 15,
-          qrbox: { width: 260, height: 260 },
+          qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
         };
 
         await scanner.start(
           { facingMode: 'environment' },
           config,
-          (decodedText) => {
-            handleScanData(decodedText);
+          (decoded) => {
+            handleScanData(decoded);
           },
-          () => {
-            // Frame scan miss, normal
-          }
+          () => {}
         );
-
+      } catch (err) {
         if (isMounted) {
-          setHasPermission(true);
-          setErrorMsg(null);
-        }
-      } catch (err: unknown) {
-        console.warn('Camera start issue:', err);
-        if (isMounted) {
-          setHasPermission(false);
-          setErrorMsg('Camera access unavailable. You can enter or paste the code manually below.');
+          setErrorMsg('Camera sensor feed unavailable. You can enter or paste code below.');
+          console.warn('Scanner error:', err);
         }
       }
     };
@@ -196,10 +173,10 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const toggleTorch = async () => {
     if (!scannerRef.current) return;
     try {
-      const scanner = scannerRef.current as any;
+      const scanner = scannerRef.current as unknown as { applyVideoConstraints?: (constraints: MediaTrackConstraints) => Promise<void> };
       if (scanner.applyVideoConstraints) {
         await scanner.applyVideoConstraints({
-          advanced: [{ torch: !torchOn }],
+          advanced: [{ torch: !torchOn } as unknown as MediaTrackConstraintSet],
         });
         setTorchOn(!torchOn);
       }
@@ -218,50 +195,50 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cat-crust/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-cat-base border border-cat-surface1 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Top Header */}
-        <div className="flex items-center justify-between px-5 py-4 bg-cat-mantle border-b border-cat-surface0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-proto-obsidian/85 backdrop-blur-md animate-in fade-in duration-200 font-mono-cyber">
+      <div className="relative w-full max-w-lg bg-proto-base border-2 border-proto-signal/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-proto-mantle border-b border-proto-surface1">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cat-surface0 text-cat-sapphire">
+            <div className="p-2 rounded-xl bg-proto-surface0 text-proto-signal">
               <Camera className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold tracking-wider text-cat-text uppercase font-mono-cyber">
+              <h3 className="text-sm font-bold text-proto-text uppercase">
                 {title}
               </h3>
-              <p className="text-xs text-cat-subtext">{subtitle}</p>
+              <p className="text-xs text-proto-subtext">
+                {subtitle}
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-cat-subtext hover:text-cat-red hover:bg-cat-surface0 rounded-lg transition-colors"
-            title="Abort Scanner"
+            className="p-1.5 text-proto-subtext hover:text-proto-text hover:bg-proto-surface0 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Camera Viewport */}
-        <div className="relative aspect-square w-full bg-cat-crust overflow-hidden flex items-center justify-center">
-          {/* HTML5 QR Container */}
+        <div className="relative aspect-square w-full bg-proto-obsidian flex items-center justify-center overflow-hidden">
           <div id={containerId} className="w-full h-full object-cover" />
 
           {/* Cyber Target Overlay */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="relative w-64 h-64 border-2 border-dashed border-cat-sapphire/50 rounded-xl flex items-center justify-center">
+            <div className="relative w-64 h-64 border-2 border-dashed border-proto-signal/50 rounded-xl flex items-center justify-center">
               {/* Corner brackets */}
-              <div className="absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 border-cat-sapphire" />
-              <div className="absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 border-cat-sapphire" />
-              <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 border-cat-sapphire" />
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 border-cat-sapphire" />
+              <div className="absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 border-proto-signal" />
+              <div className="absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 border-proto-signal" />
+              <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 border-proto-signal" />
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 border-proto-signal" />
 
               {/* Animated Scan Line */}
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cat-green to-transparent animate-pulse shadow-[0_0_8px_#a6da95]" />
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-proto-signal to-transparent animate-pulse shadow-[0_0_8px_#00ff88]" />
 
               {/* Center Crosshair */}
-              <div className="w-4 h-4 border border-cat-mauve/40 rounded-full flex items-center justify-center">
-                <div className="w-1 h-1 bg-cat-mauve rounded-full" />
+              <div className="w-4 h-4 border border-proto-gold/40 rounded-full flex items-center justify-center">
+                <div className="w-1 h-1 bg-proto-gold rounded-full" />
               </div>
             </div>
           </div>
@@ -269,10 +246,10 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
           {/* Flashlight/Torch toggle */}
           <button
             onClick={toggleTorch}
-            className={`absolute top-4 right-4 z-20 p-2.5 rounded-full border transition-all ${
+            className={`absolute top-4 right-4 z-20 p-2.5 rounded-full border transition-all cursor-pointer ${
               torchOn
-                ? 'bg-cat-yellow text-cat-base border-cat-yellow'
-                : 'bg-cat-base/80 text-cat-subtext border-cat-surface1 hover:text-cat-text'
+                ? 'bg-proto-gold text-proto-obsidian border-proto-gold'
+                : 'bg-proto-base/80 text-proto-subtext border-proto-surface1 hover:text-proto-text'
             }`}
             title="Toggle Illuminator"
           >
@@ -281,7 +258,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
           {/* Camera Permission Alert */}
           {errorMsg && (
-            <div className="absolute inset-x-6 bottom-4 z-20 p-3 rounded-xl bg-cat-surface0/90 border border-cat-peach/40 text-cat-peach text-xs flex items-center gap-2">
+            <div className="absolute inset-x-6 bottom-4 z-20 p-3 rounded-xl bg-proto-surface0/95 border border-proto-crimson/40 text-proto-crimson text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -289,29 +266,29 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         </div>
 
         {/* Manual Input Fallback & Controls */}
-        <div className="p-4 bg-cat-mantle border-t border-cat-surface0 space-y-3">
+        <div className="p-4 bg-proto-mantle border-t border-proto-surface1 space-y-3">
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <input
               type="text"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              placeholder="Paste or type code (e.g. AGT-TURING or NODE-ALPHA-QR)"
-              className="flex-1 px-3 py-2 text-xs font-mono-cyber bg-cat-base border border-cat-surface1 rounded-lg text-cat-text focus:outline-none focus:border-cat-sapphire placeholder:text-cat-subtext/50"
+              placeholder="Paste or type code (e.g. AGT-047 or NODE-ALPHA-QR)"
+              className="flex-1 px-3 py-2 text-xs font-mono-cyber bg-proto-base border border-proto-surface1 rounded-lg text-proto-text focus:outline-none focus:border-proto-signal placeholder:text-proto-subtext/50 uppercase"
             />
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-semibold uppercase tracking-wider bg-cat-sapphire text-cat-crust rounded-lg hover:bg-cat-sapphire/90 transition-colors"
+              className="px-4 py-2 text-xs font-bold uppercase tracking-wider bg-proto-signal text-[#0a0f0d] rounded-lg hover:bg-[#00e676] transition-colors cursor-pointer"
             >
               Verify
             </button>
           </form>
 
-          <div className="flex items-center justify-between text-[11px] text-cat-subtext">
+          <div className="flex items-center justify-between text-[11px] text-proto-subtext">
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-cat-green animate-ping" />
-              OPTICAL FEED ACTIVE
+              <span className="w-1.5 h-1.5 rounded-full bg-proto-signal animate-ping" />
+              OPTICAL SENSOR ACTIVE
             </span>
-            <span className="font-mono-cyber opacity-70">IEEE PROTOCOL SENSOR</span>
+            <span className="opacity-70">IEEE PROTOCOL SENSOR</span>
           </div>
         </div>
       </div>

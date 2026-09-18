@@ -6,11 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Store, initStore, INITIAL_AGENTS } from '@/lib/store';
 import { Agent } from '@/types/database';
 import { 
-  ScanLine, 
   ShieldAlert, 
   ArrowRight,
-  Calendar,
-  MapPin,
   Trophy,
   ChevronDown,
   QrCode,
@@ -24,9 +21,10 @@ export default function HomePage() {
   const router = useRouter();
   const [showDemoAgents, setShowDemoAgents] = useState(false);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<{ valid: boolean; minutesRemaining: number }>({
-    valid: false,
-    minutesRemaining: 0,
+  const [sessionStatus, setSessionStatus] = useState<{ canPlay: boolean; status: string; activeSeconds: number }>({
+    canPlay: false,
+    status: 'AWAITING_CHECKIN',
+    activeSeconds: 0
   });
 
   useEffect(() => {
@@ -35,8 +33,10 @@ export default function HomePage() {
     if (storedId) {
       const ag = Store.getAgentById(storedId);
       if (ag) {
-        setCurrentAgent(ag);
-        setSessionStatus(Store.checkSessionValidity(ag.agent_id));
+        setTimeout(() => {
+          setCurrentAgent(ag);
+          setSessionStatus(Store.checkSessionStatus(ag.agent_id));
+        }, 0);
       }
     }
   }, []);
@@ -118,26 +118,26 @@ export default function HomePage() {
             <div className="flex items-center justify-between text-xs">
               <div className="text-left">
                 <span className="text-[#8ea897] text-[10px] uppercase block">Current Operative</span>
-                <span className="font-bold text-[#eaf2ec]">{currentAgent.name}</span>
-                <span className="text-proto-signal text-[11px] ml-1.5">({currentAgent.agent_id})</span>
+                <span className="font-bold text-[#eaf2ec]">{currentAgent.agent_number || currentAgent.agent_id}</span>
+                <span className="text-proto-gold text-[11px] ml-1.5 font-mono">({currentAgent.wristband_id || currentAgent.agent_id})</span>
               </div>
               <div className="text-right">
-                {sessionStatus.valid ? (
+                {sessionStatus.canPlay ? (
                   <span className="inline-flex items-center gap-1 text-proto-signal text-[11px] bg-proto-signal/15 px-2 py-0.5 rounded border border-proto-signal/30">
                     <CheckCircle2 className="w-3 h-3" />
-                    <span>{sessionStatus.minutesRemaining}m Active</span>
+                    <span>Clearance Active</span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-proto-crimson text-[11px] bg-proto-crimson/15 px-2 py-0.5 rounded border border-proto-crimson/30">
                     <Clock className="w-3 h-3" />
-                    <span>Host Scan Required</span>
+                    <span>Desk Scan Required</span>
                   </span>
                 )}
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-              {sessionStatus.valid ? (
+              {sessionStatus.canPlay ? (
                 <Link
                   href="/play"
                   className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
@@ -151,7 +151,7 @@ export default function HomePage() {
                   className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
                   <QrCode className="w-4 h-4" />
-                  <span>Show QR Pass (Host Scan)</span>
+                  <span>Show QR Pass (Desk Check-In)</span>
                 </Link>
               )}
 

@@ -2,39 +2,51 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Store, initStore } from '@/lib/store';
-import { Agent, GameState } from '@/types/database';
+import { Store, initStore, formatActiveTime, getAgentActiveSeconds } from '@/lib/store';
+import { Agent, GameState, PrimaryDomain } from '@/types/database';
 import { 
   Trophy, 
   Lock, 
-  Terminal, 
   ArrowLeft, 
-  EyeOff, 
-  Radio, 
-  Sparkles, 
-  AlertTriangle,
-  Search,
-  ShieldCheck,
-  Flame,
-  Activity
+  Search, 
+  Clock, 
+  Layers, 
+  Activity, 
+  Eye, 
+  Cpu, 
+  Users,
+  Ticket
 } from 'lucide-react';
 
+const DOMAIN_ICONS: Record<PrimaryDomain, React.ComponentType<{ className?: string }>> = {
+  LOGIC: Layers,
+  SIGNAL: Activity,
+  OBSERVATION: Eye,
+  SYSTEM: Cpu,
+  SOCIAL: Users
+};
+
 export default function LeaderboardPage() {
-  const [gameState, setGameState] = useState<GameState>({
-    id: 1,
-    status: 'NETWORK_ACTIVE',
-    global_broadcast: null,
-    leaderboard_visible: true,
-    updated_at: new Date().toISOString()
+  const [gameState, setGameState] = useState<GameState>(() => {
+    if (typeof window !== 'undefined') return Store.getGameState();
+    return {
+      id: 1,
+      status: 'NETWORK_ACTIVE',
+      global_broadcast: null,
+      leaderboard_visible: true,
+      submission_cutoff_time: '20:00',
+      updated_at: new Date().toISOString()
+    };
   });
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agents, setAgents] = useState<Agent[]>(() => {
+    if (typeof window !== 'undefined') return Store.getAgents();
+    return [];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
 
   useEffect(() => {
     initStore();
-    setGameState(Store.getGameState());
-    setAgents(Store.getAgents());
 
     const handleUpdate = () => {
       setGameState(Store.getGameState());
@@ -44,18 +56,25 @@ export default function LeaderboardPage() {
     window.addEventListener('ieee_store_update', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
+    const timer = setInterval(() => {
+      setAgents(Store.getAgents());
+    }, 5000);
+
     return () => {
       window.removeEventListener('ieee_store_update', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
+      clearInterval(timer);
     };
   }, []);
 
   const sortedAgents = [...agents].sort((a, b) => (b.score || 0) - (a.score || 0));
   
   const filteredAgents = sortedAgents.filter((a) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch = 
-      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.agent_id.toLowerCase().includes(searchQuery.toLowerCase());
+      a.agent_id.toLowerCase().includes(q) ||
+      (a.agent_number && a.agent_number.toLowerCase().includes(q)) ||
+      (a.wristband_id && a.wristband_id.toLowerCase().includes(q));
     const matchesDomain = selectedDomain === 'ALL' || a.archetype === selectedDomain;
     return matchesSearch && matchesDomain;
   });
@@ -98,85 +117,76 @@ export default function LeaderboardPage() {
         {/* IF LEADERBOARD IS HIDDEN BY OPERATIONS: SUSPENSE BLACKOUT SCREEN */}
         {!gameState.leaderboard_visible ? (
           <div className="max-w-xl w-full mx-auto bg-[#141d17] border border-proto-crimson/50 rounded-2xl p-8 text-center space-y-5 animate-in fade-in duration-300">
-            {/* Lock Icon */}
-            <div className="w-16 h-16 rounded-2xl bg-proto-crimson/15 border border-proto-crimson/40 flex items-center justify-center mx-auto text-proto-crimson">
-              <EyeOff className="w-8 h-8" />
+            <div className="w-16 h-16 rounded-full bg-proto-crimson/20 border-2 border-proto-crimson flex items-center justify-center mx-auto text-proto-crimson shadow-[0_0_20px_rgba(255,51,68,0.3)] animate-pulse">
+              <Lock className="w-8 h-8" />
             </div>
 
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-proto-crimson/20 border border-proto-crimson/40 text-proto-crimson text-xs font-bold tracking-wider">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                TELEMETRY BLACKOUT
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-[#eaf2ec]">
-                STANDINGS CONCEALED
-              </h1>
-              <p className="text-xs text-[#8ea897]">
-                The competition enters the final phase.
+            <div className="space-y-2">
+              <span className="text-[10px] font-black tracking-widest text-proto-crimson uppercase px-3 py-1 rounded-full bg-proto-crimson/15 border border-proto-crimson/40 inline-block">
+                TELEMETRY BLACKOUT INITIATED
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-proto-text uppercase tracking-tight">
+                STANDINGS TEMPORARILY CONCEALED
+              </h2>
+              <p className="text-xs text-proto-subtext leading-relaxed font-sans max-w-md mx-auto">
+                Operations Desk has sealed live public standings to preserve climactic suspense for the final reveal. Submissions and deductions remain active on your terminal until <strong>8:00 PM</strong>.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#101713] border border-[#223027] text-xs text-[#8ea897] font-sans leading-relaxed text-left space-y-2">
-              <p>
-                Operations Command has placed the public leaderboard under cryptographic blackout.
-              </p>
-              <p className="text-[#eaf2ec] font-mono-cyber">
-                Scores continue to calculate silently in the background. The winner of the <strong>Claude Pro Subscription</strong> will be announced at the closing ceremony.
-              </p>
-            </div>
-
-            <div className="pt-2">
+            <div className="pt-4 border-t border-proto-surface1 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
                 href="/play"
-                className="inline-block px-6 py-2.5 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-[#0a0f0d] font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all shadow"
               >
-                Return to Terminal
+                Access Operative HUD
+              </Link>
+              <Link
+                href="/my-badge"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-proto-surface0 border border-proto-surface1 text-proto-text font-bold text-xs uppercase hover:border-proto-surface2 transition-all"
+              >
+                View My Pass
               </Link>
             </div>
           </div>
         ) : (
-          /* IF LEADERBOARD IS VISIBLE: LIVE GLOBAL RANKINGS */
-          <div className="space-y-6 animate-in fade-in duration-300">
-            {/* Prize Callout Banner */}
-            <div className="p-4 rounded-xl bg-[#141d17] border border-[#d4af37]/40 flex flex-wrap items-center justify-between gap-4">
+          /* LEADERBOARD IS ON: ANONYMOUS DISPLAY (AGENT IDs + SCORES ONLY) */
+          <div className="space-y-6">
+            {/* Prize & Anonymity Header */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#141d17] via-proto-base to-[#141d17] border border-proto-gold/40 shadow-xl flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-[#d4af37]/15 text-[#d4af37]">
-                  <Trophy className="w-5 h-5" />
+                <div className="p-2.5 rounded-xl bg-proto-gold/20 text-proto-gold border border-proto-gold/40">
+                  <Trophy className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-[10px] text-[#d4af37] font-bold uppercase tracking-wider block">
-                    Grand Prize
-                  </span>
-                  <span className="text-base font-bold text-[#eaf2ec]">
-                    Claude Pro Subscription
-                  </span>
-                  <span className="text-xs text-[#8ea897] block font-sans">
-                    Awarded to the top operative on final verification.
-                  </span>
+                  <div className="text-xs font-bold text-proto-gold uppercase flex items-center gap-1.5">
+                    <span>CLAUDE PRO SUBSCRIPTION PRIZE</span>
+                  </div>
+                  <div className="text-[11px] text-proto-subtext font-sans">
+                    Awarded to the top operative who solves key circuits & master topology deduction.
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs text-proto-signal font-semibold">
-                <span className="w-2 h-2 rounded-full bg-proto-signal" />
-                <span>Live Telemetry</span>
+              <div className="text-[10px] text-[#8ea897] font-mono bg-proto-surface0 px-3 py-1.5 rounded-xl border border-proto-surface1">
+                🔒 ANONYMIZED STANDINGS: Agent IDs only
               </div>
             </div>
 
-            {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              {/* Domain Filter Pills */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-                {(['ALL', 'LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'] as const).map((dom) => (
+            {/* Filter & Search Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Domain filter buttons */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                {['ALL', 'LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'].map((d) => (
                   <button
-                    key={dom}
-                    onClick={() => setSelectedDomain(dom)}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition-all whitespace-nowrap ${
-                      selectedDomain === dom
-                        ? 'bg-proto-surface1 text-proto-signal font-black shadow border border-proto-signal/40'
-                        : 'text-proto-subtext hover:text-proto-text bg-proto-base border border-proto-surface1'
+                    key={d}
+                    onClick={() => setSelectedDomain(d)}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      selectedDomain === d
+                        ? 'bg-proto-surface2 text-proto-signal border border-proto-signal/50 shadow-sm'
+                        : 'bg-proto-surface0/60 text-proto-subtext hover:text-proto-text border border-proto-surface1'
                     }`}
                   >
-                    {dom === 'ALL' ? 'All Domains' : dom}
+                    {d}
                   </button>
                 ))}
               </div>
@@ -188,22 +198,22 @@ export default function LeaderboardPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Agent ID or Name..."
+                  placeholder="Search Agent ID (e.g. Agent 047)..."
                   className="w-full pl-9 pr-3 py-2 text-xs bg-proto-base border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal"
                 />
               </div>
             </div>
 
-            {/* Standings Table Card */}
+            {/* Standings Table Card (ANONYMOUS: Agent IDs Only, No Names/Roll Numbers) */}
             <div className="bg-proto-base border border-proto-surface1 rounded-2xl shadow-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-proto-surface1 bg-proto-surface0/60 text-proto-subtext text-[10px] uppercase">
                       <th className="py-3 px-4">Rank</th>
-                      <th className="py-3 px-4">Operative</th>
-                      <th className="py-3 px-4">Domain</th>
-                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Agent Identifier</th>
+                      <th className="py-3 px-4">Role Domain</th>
+                      <th className="py-3 px-4">Active Play Time</th>
                       <th className="py-3 px-4 text-right">Clearance Score</th>
                     </tr>
                   </thead>
@@ -211,6 +221,10 @@ export default function LeaderboardPage() {
                     {filteredAgents.map((ag, index) => {
                       const isTop1 = index === 0;
                       const isTop3 = index < 3;
+                      const activeSecs = getAgentActiveSeconds(ag);
+                      const domainKey = (ag.archetype as PrimaryDomain) || 'LOGIC';
+                      const DomainIcon = DOMAIN_ICONS[domainKey] || Layers;
+
                       return (
                         <tr
                           key={ag.id}
@@ -224,32 +238,30 @@ export default function LeaderboardPage() {
                                 👑 #1
                               </span>
                             ) : (
-                              <span className={isTop3 ? 'text-proto-text' : 'text-proto-subtext'}>
+                              <span className={isTop3 ? 'text-proto-text font-bold' : 'text-proto-subtext'}>
                                 #{index + 1}
                               </span>
                             )}
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="font-bold text-proto-text">{ag.name}</div>
-                            <div className="text-[10px] text-proto-subtext">{ag.agent_id}</div>
+                            <div className="font-bold text-proto-text text-sm">
+                              {ag.agent_number || ag.agent_id}
+                            </div>
+                            <div className="text-[10px] text-proto-subtext flex items-center gap-1 font-mono">
+                              <Ticket className="w-3 h-3 text-proto-gold" />
+                              <span>Band: {ag.wristband_id || ag.agent_id}</span>
+                            </div>
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
-                              {ag.archetype}
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
+                              <DomainIcon className="w-3 h-3 text-proto-signal" />
+                              <span>{ag.archetype}</span>
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 text-[10px] ${
-                                ag.is_active ? 'text-proto-signal font-bold' : 'text-proto-subtext'
-                              }`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  ag.is_active ? 'bg-proto-signal animate-pulse' : 'bg-proto-subtext/40'
-                                }`}
-                              />
-                              {ag.is_active ? 'ACTIVE' : 'IDLE'}
+                            <span className="text-[11px] text-proto-subtext flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>{formatActiveTime(activeSecs)}</span>
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right font-black text-proto-gold text-base">

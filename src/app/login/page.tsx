@@ -6,11 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Store, initStore } from '@/lib/store';
 import { 
   Terminal, 
-  ArrowRight, 
   AlertTriangle, 
-  Lock, 
-  UserCheck,
-  QrCode
+  UserCheck
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -44,9 +41,9 @@ export default function LoginPage() {
     localStorage.setItem('ieee_agent_id', res.agent.agent_id);
     localStorage.setItem('ieee_agent_token', res.agent.token);
 
-    // Check if 15-min session is valid
-    const sessionStatus = Store.checkSessionValidity(res.agent.agent_id);
-    if (sessionStatus.valid) {
+    // Check if initial check-in is complete
+    const sessionStatus = Store.checkSessionStatus(res.agent.agent_id);
+    if (sessionStatus.canPlay) {
       router.push('/play');
     } else {
       router.push('/my-badge');

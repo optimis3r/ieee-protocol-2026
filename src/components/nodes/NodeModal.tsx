@@ -8,12 +8,10 @@ import confetti from 'canvas-confetti';
 import { 
   X, 
   CheckCircle2, 
-  AlertCircle, 
   Cpu, 
   Scan, 
   Users, 
   Terminal, 
-  Sparkles,
   ArrowRight,
   ShieldAlert,
   Layers,
@@ -26,7 +24,7 @@ interface NodeModalProps {
   agent: Agent;
   onClose: () => void;
   onSuccess: () => void;
-  onOpenScannerForNode: (nodeId: string) => void;
+  onOpenScannerForNode?: (nodeId: string) => void;
 }
 
 export const NodeModal: React.FC<NodeModalProps> = ({
@@ -244,7 +242,7 @@ export const NodeModal: React.FC<NodeModalProps> = ({
               {!is_completed && (
                 <div className="space-y-3">
                   <button
-                    onClick={() => onOpenScannerForNode(node.id)}
+                    onClick={() => onOpenScannerForNode?.(node.id)}
                     className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black text-xs tracking-wider uppercase flex items-center justify-center gap-2 hover:opacity-95 transition-all shadow-lg"
                   >
                     <Scan className="w-4 h-4" />

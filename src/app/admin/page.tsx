@@ -1,113 +1,77 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { KioskScanner } from '@/components/admin/KioskScanner';
 import { TelemetryDashboard } from '@/components/admin/TelemetryDashboard';
 import { PrintStation } from '@/components/admin/PrintStation';
 import { initStore } from '@/lib/store';
 import { 
-  ShieldCheck, 
   Camera, 
   BarChart3, 
   Printer, 
-  Lock, 
-  ExternalLink 
+  MessageSquare, 
+  ExternalLink,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
-
-const ADMIN_PASSCODE = 'ieee_ops_secure_2025';
+import { soundEffects } from '@/lib/audio';
 
 export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passcodeInput, setPasscodeInput] = useState('');
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'KIOSK' | 'TELEMETRY' | 'PRINT'>('KIOSK');
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [adminAgentName, setAdminAgentName] = useState<string>('ieee-protocol-admin');
+  const [activeTab, setActiveTab] = useState<'KIOSK' | 'TELEMETRY' | 'PRINT' | 'WHATSAPP'>('TELEMETRY');
 
   useEffect(() => {
     initStore();
-    const storedAuth = sessionStorage.getItem('ieee_admin_auth');
-    if (storedAuth === 'true') {
-      setIsAuthenticated(true);
+    if (typeof window !== 'undefined') {
+      const isAuth = sessionStorage.getItem('ieee_admin_auth') === 'true';
+      const storedAgent = sessionStorage.getItem('ieee_admin_agent') || 'ieee-protocol-admin';
+      
+      if (!isAuth) {
+        setIsAuthenticated(false);
+        router.push('/admin/login');
+      } else {
+        setIsAuthenticated(true);
+        setAdminAgentName(storedAgent);
+      }
     }
-  }, []);
+  }, [router]);
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passcodeInput.trim() === ADMIN_PASSCODE || passcodeInput.trim() === 'admin') {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('ieee_admin_auth', 'true');
-      setAuthError(null);
-    } else {
-      setAuthError('INVALID SECURITY TOKEN: Access to Operations Console denied.');
-    }
+  const handleLogout = () => {
+    soundEffects.playScanChirp();
+    sessionStorage.removeItem('ieee_admin_auth');
+    sessionStorage.removeItem('ieee_admin_agent');
+    setIsAuthenticated(false);
+    router.push('/admin/login');
   };
 
-  if (!isAuthenticated) {
+  // Loading or redirecting state
+  if (isAuthenticated === null || isAuthenticated === false) {
     return (
-      <div className="min-h-screen bg-proto-obsidian text-proto-text flex items-center justify-center p-4 scanlines font-mono-cyber">
-        <div className="max-w-md w-full bg-proto-base border border-proto-surface1 rounded-2xl p-6 shadow-2xl space-y-5">
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-proto-surface0 border border-proto-system/40 flex items-center justify-center mx-auto text-proto-system shadow-inner">
-              <Lock className="w-6 h-6" />
-            </div>
-            <h2 className="text-lg font-black text-proto-text">
-              OPERATIONS DESK GATEWAY
-            </h2>
-            <p className="text-xs text-proto-subtext font-sans">
-              NIT Warangal IEEE Student Branch • The Protocol Control Room.
-            </p>
-          </div>
-
-          {authError && (
-            <div className="p-3 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson text-xs">
-              {authError}
-            </div>
-          )}
-
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs text-proto-subtext mb-1 uppercase">
-                Admin Secret Bearer Token:
-              </label>
-              <input
-                type="password"
-                value={passcodeInput}
-                onChange={(e) => setPasscodeInput(e.target.value)}
-                placeholder="Enter admin token or 'admin'..."
-                className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-system"
-              />
-              <p className="text-[10px] text-proto-subtext/60 mt-1">
-                Default key: <span className="text-proto-logic">ieee_ops_secure_2025</span> (or <span className="text-proto-logic">admin</span>)
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-proto-system to-proto-gold text-proto-obsidian font-black text-xs tracking-wider uppercase hover:opacity-90 transition-all shadow-md"
-            >
-              AUTHENTICATE CONSOLE
-            </button>
-          </form>
-
-          <div className="text-center pt-2 border-t border-proto-surface1">
-            <a
-              href="/play"
-              className="text-xs text-proto-logic hover:underline inline-flex items-center gap-1"
-            >
-              Switch to Operative HUD <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
+      <div className="min-h-screen bg-[#070b09] text-[#eaf2ec] flex flex-col items-center justify-center p-4 font-mono-cyber">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-2 border-proto-signal border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-[#8ea897] tracking-widest uppercase animate-pulse">
+            CHECKING OPERATOR CLEARANCE...
+          </p>
+          <p className="text-[11px] text-[#55695c]">
+            Redirecting to <Link href="/admin/login" className="text-proto-signal underline">Personal Admin Login</Link>
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-proto-obsidian text-proto-text flex flex-col scanlines font-mono-cyber">
+    <div className="min-h-screen bg-proto-obsidian text-proto-text flex flex-col scanlines font-mono-cyber selection:bg-proto-signal selection:text-proto-obsidian">
       {/* Top Operations Header */}
       <header className="sticky top-0 z-30 bg-proto-base/95 backdrop-blur-md border-b border-proto-surface1">
         <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-proto-surface0 border border-proto-signal/40 flex items-center justify-center text-proto-signal font-black text-xs">
+            <div className="w-10 h-10 rounded-xl bg-proto-surface0 border border-proto-signal/40 flex items-center justify-center text-proto-signal font-black text-xs shadow-inner">
               NITW
             </div>
             <div>
@@ -119,46 +83,77 @@ export default function AdminPage() {
                   MASTER CONSOLE
                 </span>
               </div>
-              <p className="text-xs text-proto-subtext">
-                NIT Warangal IEEE Student Branch • 247 Agents Telemetry
-              </p>
+              <div className="flex items-center gap-2 text-xs text-proto-subtext mt-0.5">
+                <span className="inline-flex items-center gap-1 text-proto-signal font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Agent: {adminAgentName}</span>
+                </span>
+                <span>•</span>
+                <span>Full Tactical Controls Enabled</span>
+              </div>
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-1 bg-proto-surface0 p-1 rounded-xl border border-proto-surface1">
+          {/* Tab Navigation & Admin Session Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 bg-proto-surface0 p-1 rounded-xl border border-proto-surface1">
+              <button
+                onClick={() => setActiveTab('TELEMETRY')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'TELEMETRY'
+                    ? 'bg-proto-surface2 text-proto-logic shadow-sm'
+                    : 'text-proto-subtext hover:text-proto-text'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>TELEMETRY & CONTROLS</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('WHATSAPP')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'WHATSAPP'
+                    ? 'bg-proto-surface2 text-proto-signal shadow-sm'
+                    : 'text-proto-subtext hover:text-proto-text'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>WHATSAPP HUB</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('KIOSK')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'KIOSK'
+                    ? 'bg-proto-surface2 text-proto-signal shadow-sm'
+                    : 'text-proto-subtext hover:text-proto-text'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>KIOSK CHECK-IN</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('PRINT')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'PRINT'
+                    ? 'bg-proto-surface2 text-proto-gold shadow-sm'
+                    : 'text-proto-subtext hover:text-proto-text'
+                }`}
+              >
+                <Printer className="w-4 h-4" />
+                <span>BADGE STATION</span>
+              </button>
+            </div>
+
+            {/* Logout Admin Button */}
             <button
-              onClick={() => setActiveTab('KIOSK')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'KIOSK'
-                  ? 'bg-proto-surface2 text-proto-signal shadow-sm'
-                  : 'text-proto-subtext hover:text-proto-text'
-              }`}
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson hover:bg-proto-crimson hover:text-proto-obsidian font-bold text-xs transition-all cursor-pointer"
+              title="Logout from Admin Console"
             >
-              <Camera className="w-4 h-4" />
-              <span>KIOSK CHECK-IN</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('TELEMETRY')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'TELEMETRY'
-                  ? 'bg-proto-surface2 text-proto-logic shadow-sm'
-                  : 'text-proto-subtext hover:text-proto-text'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>TELEMETRY</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('PRINT')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'PRINT'
-                  ? 'bg-proto-surface2 text-proto-gold shadow-sm'
-                  : 'text-proto-subtext hover:text-proto-text'
-              }`}
-            >
-              <Printer className="w-4 h-4" />
-              <span>BADGE STATION</span>
+              <LogOut className="w-3.5 h-3.5" />
+              <span>LOGOUT</span>
             </button>
           </div>
         </div>
@@ -166,24 +161,33 @@ export default function AdminPage() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+        {activeTab === 'TELEMETRY' && <TelemetryDashboard defaultSection="CONTROLS" />}
+        {activeTab === 'WHATSAPP' && <TelemetryDashboard defaultSection="WHATSAPP" />}
         {activeTab === 'KIOSK' && <KioskScanner />}
-        {activeTab === 'TELEMETRY' && <TelemetryDashboard />}
         {activeTab === 'PRINT' && <PrintStation />}
       </main>
 
       {/* Footer */}
-      <footer className="w-full bg-proto-base border-t border-proto-surface1 px-4 py-3 text-center text-xs text-proto-subtext flex items-center justify-between max-w-7xl mx-auto">
+      <footer className="w-full bg-proto-base border-t border-proto-surface1 px-4 py-3 text-center text-xs text-proto-subtext flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto gap-2">
         <span className="opacity-75">
-          NIT WARANGAL IEEE STUDENT BRANCH // THE PROTOCOL
+          NIT WARANGAL IEEE STUDENT BRANCH // THE PROTOCOL CONSOLE
         </span>
-        <a
-          href="/play"
-          target="_blank"
-          rel="noreferrer"
-          className="text-proto-logic hover:underline flex items-center gap-1"
-        >
-          Open Operative Terminal <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/leaderboard"
+            target="_blank"
+            className="text-proto-gold hover:underline flex items-center gap-1"
+          >
+            Public Leaderboard <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+          <Link
+            href="/play"
+            target="_blank"
+            className="text-proto-logic hover:underline flex items-center gap-1"
+          >
+            Operative HUD <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </footer>
     </div>
   );

@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Agent, AgentNode, NodeItem, AgentIntel, IntelFragment, GameState } from '@/types/database';
-import { Store, initStore } from '@/lib/store';
+import { Store, initStore, getAgentActiveSeconds } from '@/lib/store';
 import { StatusRibbon } from '@/components/hud/StatusRibbon';
 import { BroadcastBanner } from '@/components/hud/BroadcastBanner';
 import { NodeTerminal } from '@/components/nodes/NodeTerminal';
@@ -13,14 +13,13 @@ import { IntelLocker } from '@/components/intel/IntelLocker';
 import { HypothesisModal } from '@/components/hypothesis/HypothesisModal';
 import { QRScannerModal, ScanResult } from '@/components/scanner/QRScannerModal';
 import { 
-  Terminal, 
-  KeyRound, 
-  Sparkles, 
   ScanLine, 
-  LogOut, 
-  Radio, 
-  AlertCircle,
-  QrCode
+  Pause,
+  FileSearch,
+  Radio,
+  ExternalLink,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 
 function AgentHUD() {
@@ -28,11 +27,13 @@ function AgentHUD() {
   const router = useRouter();
 
   const [agent, setAgent] = useState<Agent | null>(null);
+  const [activeSeconds, setActiveSeconds] = useState<number>(0);
   const [gameState, setGameState] = useState<GameState>({
     id: 1,
     status: 'NETWORK_ACTIVE',
     global_broadcast: null,
     leaderboard_visible: true,
+    submission_cutoff_time: '20:00',
     updated_at: new Date().toISOString(),
   });
   const [nodes, setNodes] = useState<Array<AgentNode & { node: NodeItem }>>([]);
@@ -50,6 +51,7 @@ function AgentHUD() {
     const freshAgent = Store.getAgentById(currentAgentId);
     if (freshAgent) {
       setAgent({ ...freshAgent });
+      setActiveSeconds(getAgentActiveSeconds(freshAgent));
       setNodes(Store.getAgentNodes(freshAgent.agent_id));
       setIntel(Store.getAgentIntel(freshAgent.agent_id));
       setGameState(Store.getGameState());
@@ -88,67 +90,39 @@ function AgentHUD() {
       return;
     }
 
-    // 4. Enforce 15-minute Gatekeeper Session Check
-    const validity = Store.checkSessionValidity(currentAgent.agent_id);
-    if (!validity.valid) {
-      // Must be scanned by host to enter/re-enter
+    // 4. Check Session Status: Mandatory Initial Check-In at Operations Desk
+    const sessionStatus = Store.checkSessionStatus(currentAgent.agent_id);
+    if (sessionStatus.status === 'AWAITING_CHECKIN') {
       router.push('/my-badge');
       return;
     }
 
-    // Agent is valid - record active presence
+    // Agent is checked-in: record presence and start live view
     Store.recordActivity(currentAgent.agent_id);
-    setAgent(currentAgent);
-    refreshAgentData(currentAgent.agent_id);
+    setTimeout(() => {
+      setAgent(currentAgent);
+      refreshAgentData(currentAgent.agent_id);
+    }, 0);
 
-    // Heartbeat: update active presence every 20s and re-verify validity
+    // Live 1-second interval to update active play timer clock
+    const clockInterval = setInterval(() => {
+      const live = Store.getAgentById(currentAgent.agent_id);
+      if (live) {
+        setActiveSeconds(getAgentActiveSeconds(live));
+      }
+    }, 1000);
+
+    // Heartbeat every 25s
     const heartbeatInterval = setInterval(() => {
       if (currentAgent) {
         Store.recordActivity(currentAgent.agent_id);
-        const check = Store.checkSessionValidity(currentAgent.agent_id);
-        if (!check.valid) {
-          router.push('/my-badge');
-        }
       }
-    }, 20000);
-
-    // Track departure when tab becomes hidden or window unloads
-    const handleVisibilityChange = () => {
-      if (!currentAgent) return;
-      if (document.visibilityState === 'hidden') {
-        Store.recordDeparture(currentAgent.agent_id);
-      } else if (document.visibilityState === 'visible') {
-        const check = Store.checkSessionValidity(currentAgent.agent_id);
-        if (!check.valid) {
-          router.push('/my-badge');
-        } else {
-          Store.recordActivity(currentAgent.agent_id);
-          refreshAgentData(currentAgent.agent_id);
-        }
-      }
-    };
-
-    const handleBeforeUnload = () => {
-      if (currentAgent) {
-        Store.recordDeparture(currentAgent.agent_id);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    }, 25000);
 
     // Cross-tab and live store event listener
     const handleStoreUpdate = () => {
       if (currentAgent) {
-        const fresh = Store.getAgentById(currentAgent.agent_id);
-        if (fresh) {
-          const check = Store.checkSessionValidity(fresh.agent_id);
-          if (!check.valid) {
-            router.push('/my-badge');
-            return;
-          }
-          refreshAgentData(fresh.agent_id);
-        }
+        refreshAgentData(currentAgent.agent_id);
       }
     };
 
@@ -156,9 +130,8 @@ function AgentHUD() {
     window.addEventListener('storage', handleStoreUpdate);
 
     return () => {
+      clearInterval(clockInterval);
       clearInterval(heartbeatInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('ieee_store_update', handleStoreUpdate);
       window.removeEventListener('storage', handleStoreUpdate);
     };
@@ -168,16 +141,18 @@ function AgentHUD() {
   const handleScanSuccess = (result: ScanResult) => {
     if (!agent) return;
 
-    if (result.type === 'NODE') {
-      // Find node and open its interaction modal
-      const targetNode = nodes.find(n => n.node.id === result.id);
+    if (result.type === 'NODE' || result.id.startsWith('NODE-')) {
+      // Record access to unlock or timestamp the node
+      Store.recordNodeAccess(agent.agent_id, result.id);
+      refreshAgentData(agent.agent_id);
+
+      const updatedList = Store.getAgentNodes(agent.agent_id);
+      const targetNode = updatedList.find(n => n.node.id.toUpperCase() === result.id.toUpperCase());
       if (targetNode) {
         setSelectedNode(targetNode);
+        setToastMessage(`STATION ACCESSED: [${targetNode.node.station_number || 'STATION'}] ${targetNode.node.title}`);
       } else {
-        // Auto-unlock and verify
-        const submitRes = Store.submitNodeAnswer(agent.agent_id, result.id, result.id);
-        setToastMessage(submitRes.message);
-        refreshAgentData(agent.agent_id);
+        setToastMessage(`NODE ${result.id} ACCESSED`);
       }
     } else if (result.type === 'BADGE') {
       // Handshake with peer agent
@@ -190,18 +165,8 @@ function AgentHUD() {
         setToastMessage(`OPERATIVE IDENTIFIED: ${result.id}. No pending handshake circuits currently active.`);
       }
     } else {
-      // Generic code test
-      setToastMessage(`SCANNED DATA: ${result.raw}`);
+      setToastMessage(`DATA PARSED: ${result.raw}`);
     }
-  };
-
-  const handleLogout = () => {
-    if (agent) {
-      Store.logoutPlayer(agent.agent_id);
-    }
-    localStorage.removeItem('ieee_agent_id');
-    localStorage.removeItem('ieee_agent_token');
-    router.push('/login');
   };
 
   if (!agent) {
@@ -215,12 +180,20 @@ function AgentHUD() {
     );
   }
 
+  const connectionsCount = Store.getAgents().filter(a => a.agent_id !== agent.agent_id).length > 0 ? 2 : 0;
+  const availableNodesCount = nodes.filter(n => !n.is_completed).length;
+  const isPaused = agent.check_in_status === 'PAUSED';
+
   return (
-    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col">
-      {/* Top Status Ribbon */}
+    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
+      {/* Top Status Ribbon with Agent 047 & Live Telemetry */}
       <StatusRibbon
         agent={agent}
         networkStatus={gameState.status}
+        activeSeconds={activeSeconds}
+        discoveriesCount={intel.length}
+        connectionsCount={connectionsCount}
+        availableNodesCount={availableNodesCount}
         onOpenScanner={() => setIsScannerOpen(true)}
       />
 
@@ -230,143 +203,122 @@ function AgentHUD() {
         status={gameState.status}
       />
 
+      {/* Paused Off-Site Status Notice */}
+      {isPaused && (
+        <div className="w-full bg-[#1e1b10] border-b border-proto-gold/40 px-4 py-2.5 text-xs text-proto-gold flex items-center justify-between">
+          <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
+            <Pause className="w-4 h-4 shrink-0 animate-pulse text-proto-gold" />
+            <span>
+              <strong>CHECKED OUT // TIMER PAUSED:</strong> You are currently off-site. Your score and progress are preserved. Scan your phone QR at the Operations Desk upon return to resume active play.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Main Agent Viewport */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* Toast alert banner */}
         {toastMessage && (
-          <div className="p-3 rounded-xl bg-cat-surface0 border border-cat-sapphire/40 text-xs font-mono-cyber flex items-center justify-between gap-3 animate-in fade-in">
-            <div className="flex items-center gap-2 text-cat-sapphire">
+          <div className="p-3 rounded-xl bg-[#141d17] border border-proto-logic/40 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2 text-proto-logic">
               <Radio className="w-4 h-4 shrink-0 animate-pulse" />
               <span>{toastMessage}</span>
             </div>
             <button
               onClick={() => setToastMessage(null)}
-              className="text-cat-subtext hover:text-cat-text text-[11px]"
+              className="text-[10px] text-[#8ea897] hover:text-[#eaf2ec]"
             >
-              DISMISS
+              Dismiss
             </button>
           </div>
         )}
 
-        {/* View Switcher Tabs */}
-        <div className="flex items-center justify-between border-b border-cat-surface0 pb-2">
-          <div className="flex items-center gap-2">
+        {/* Action Controls & View Toggles */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 bg-[#141d17] p-1.5 rounded-2xl border border-[#223027]">
             <button
               onClick={() => setActiveView('TERMINAL')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono-cyber font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 activeView === 'TERMINAL'
-                  ? 'bg-cat-surface1 text-cat-sapphire border border-cat-surface2'
-                  : 'text-cat-subtext hover:text-cat-text'
+                  ? 'bg-proto-signal text-[#0a0f0d] shadow-sm'
+                  : 'text-[#8ea897] hover:text-[#eaf2ec]'
               }`}
             >
-              <Terminal className="w-4 h-4" />
-              NODE CIRCUITS ({nodes.length})
+              <Layers className="w-4 h-4" />
+              <span>CIRCUIT TERMINALS ({nodes.length})</span>
             </button>
+
             <button
               onClick={() => setActiveView('INTEL')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono-cyber font-bold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 activeView === 'INTEL'
-                  ? 'bg-cat-surface1 text-cat-mauve border border-cat-surface2'
-                  : 'text-cat-subtext hover:text-cat-text'
+                  ? 'bg-proto-obs text-[#0a0f0d] shadow-sm'
+                  : 'text-[#8ea897] hover:text-[#eaf2ec]'
               }`}
             >
-              <KeyRound className="w-4 h-4" />
-              INTEL VAULT ({intel.length})
+              <Sparkles className="w-4 h-4" />
+              <span>INTEL LOCKER ({intel.length})</span>
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href="/my-badge"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-proto-signal text-xs font-mono-cyber border border-[#23332a] transition-colors"
-              title="View your personal host check-in QR code"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">My QR Pass</span>
-            </Link>
-
-            <a
-              href="/leaderboard"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-proto-gold text-xs font-mono-cyber border border-proto-gold/30 transition-colors"
-            >
-              <span>🏆 Leaderboard</span>
-            </a>
-
+            {/* Deduction Hypothesis Trigger Button */}
             <button
               onClick={() => setIsHypothesisOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16201a] hover:bg-[#1f2d25] text-proto-signal text-xs font-mono-cyber border border-proto-signal/40 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#141d17] hover:bg-[#1a251e] text-proto-gold border border-proto-gold/40 text-xs font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              TOPOLOGY (+400)
+              <FileSearch className="w-4 h-4 text-proto-gold" />
+              <span>TOPOLOGY DEDUCTION (+400)</span>
             </button>
 
+            {/* In-App Camera Scanner */}
             <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#16201a] hover:bg-proto-crimson/20 text-[#8ea897] hover:text-proto-crimson text-xs font-mono-cyber border border-[#23332a] transition-colors"
-              title="Log Out of this session"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-[#0a0f0d] text-xs font-black uppercase tracking-wider hover:opacity-95 active:scale-95 transition-all shadow cursor-pointer"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Exit</span>
+              <ScanLine className="w-4 h-4" />
+              <span>SCAN NODE QR</span>
             </button>
           </div>
         </div>
 
-        {/* Dynamic Viewport */}
+        {/* View Switcher: Terminal Nodes vs Intel Locker */}
         {activeView === 'TERMINAL' ? (
           <NodeTerminal
             nodes={nodes}
-            onSelectNode={(n) => setSelectedNode(n)}
+            onSelectNode={(nodeItem) => setSelectedNode(nodeItem)}
           />
         ) : (
-          <IntelLocker
-            intelList={intel}
+          <IntelLocker 
+            intelList={intel} 
             onOpenHypothesis={() => setIsHypothesisOpen(true)}
           />
         )}
       </main>
 
-      {/* Mobile Floating Action Toolbar */}
-      <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2 sm:hidden">
-        <button
-          onClick={() => setIsScannerOpen(true)}
-          className="p-3.5 rounded-full bg-cat-sapphire text-cat-crust shadow-xl active:scale-95 transition-transform"
-          title="Open Scanner"
-        >
-          <ScanLine className="w-6 h-6" />
-        </button>
-      </div>
+      {/* Node Interaction Modal */}
+      {selectedNode && (
+        <NodeModal
+          nodeItem={selectedNode}
+          agent={agent}
+          onClose={() => setSelectedNode(null)}
+          onSuccess={() => {
+            refreshAgentData(agent.agent_id);
+            setSelectedNode(null);
+          }}
+        />
+      )}
 
-      {/* Footer info bar */}
-      <footer className="w-full bg-cat-crust border-t border-cat-surface0 px-4 py-3 text-center text-xs font-mono-cyber text-cat-subtext flex items-center justify-between max-w-6xl mx-auto">
-        <span className="opacity-75">
-          IEEE PROTOCOL // SECURE TERMINAL v2.5
-        </span>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-1 text-[11px] hover:text-cat-red transition-colors"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          DISENGAGE SESSION
-        </button>
-      </footer>
-
-      {/* Modals */}
-      <NodeModal
-        nodeItem={selectedNode}
-        agent={agent}
-        onClose={() => setSelectedNode(null)}
-        onSuccess={() => {
-          refreshAgentData(agent.agent_id);
-          setSelectedNode(null);
-        }}
-        onOpenScannerForNode={(nodeId) => {
-          setSelectedNode(null);
-          setIsScannerOpen(true);
-        }}
+      {/* QR Scanner Modal (Client Camera) */}
+      <QRScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScanSuccess={handleScanSuccess}
+        title="OPTICAL SENSOR SCANNER"
+        subtitle="Align Station Node QR or Peer Wristband code in reticle"
       />
 
+      {/* Deduction Hypothesis Modal */}
       <HypothesisModal
         isOpen={isHypothesisOpen}
         agent={agent}
@@ -377,13 +329,25 @@ function AgentHUD() {
         }}
       />
 
-      <QRScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScanSuccess={handleScanSuccess}
-        title="OPERATIVE RETICLE SENSOR"
-        subtitle="Point camera at physical node tags or peer badges"
-      />
+      {/* Footer */}
+      <footer className="w-full bg-[#101713] border-t border-[#223027] px-4 py-3 text-center text-xs text-[#7d9787] flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-2">
+        <div className="flex items-center gap-2">
+          <span>NIT WARANGAL IEEE STUDENT BRANCH</span>
+          <span>•</span>
+          <span>{agent.agent_number || agent.agent_id}</span>
+        </div>
+        <div className="flex items-center gap-4 text-[11px]">
+          <Link href="/my-badge" className="hover:text-[#eaf2ec] transition-colors">
+            My QR Pass & Band
+          </Link>
+          <Link href="/leaderboard" className="hover:text-[#eaf2ec] transition-colors">
+            Live Standings
+          </Link>
+          <Link href="/admin" className="text-proto-logic hover:underline flex items-center gap-1">
+            Operations <ExternalLink className="w-3 h-3" />
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -392,8 +356,8 @@ export default function PlayPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-cat-mantle flex items-center justify-center p-4">
-          <div className="w-8 h-8 border-2 border-cat-sapphire border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-screen bg-[#0d120f] flex items-center justify-center p-4">
+          <div className="w-8 h-8 border-2 border-proto-signal border-t-transparent rounded-full animate-spin" />
         </div>
       }
     >

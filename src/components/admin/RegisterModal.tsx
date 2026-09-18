@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AgentArchetype } from '@/types/database';
 import { Store } from '@/lib/store';
 import { soundEffects } from '@/lib/audio';
+import { sendRegistrationWhatsAppMessages } from '@/lib/whatsapp';
 import confetti from 'canvas-confetti';
-import { X, UserPlus, Layers, Activity, Eye, Cpu, Users, CheckCircle2 } from 'lucide-react';
+import { X, UserPlus, Ticket, Sparkles } from 'lucide-react';
 
 interface RegisterModalProps {
   isOpen: boolean;
@@ -21,50 +21,12 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   initialAgentId,
 }) => {
   const [name, setName] = useState('');
+  const [rollNo, setRollNo] = useState('');
   const [contact, setContact] = useState('');
-  const [archetype, setArchetype] = useState<AgentArchetype>('LOGIC');
   const [agentId, setAgentId] = useState(initialAgentId || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
-
-  const domains: Array<{ type: AgentArchetype; title: string; desc: string; color: string; icon: any }> = [
-    {
-      type: 'LOGIC',
-      title: 'Logic Domain',
-      desc: 'Deciphers algorithmic ciphers, Base64 packet headers, and cryptographic puzzles.',
-      color: 'border-proto-logic text-proto-logic',
-      icon: Layers
-    },
-    {
-      type: 'SIGNAL',
-      title: 'Signal Domain',
-      desc: 'Monitors wave frequencies, antenna relays, and carrier stream telemetry.',
-      color: 'border-proto-signal text-proto-signal',
-      icon: Activity
-    },
-    {
-      type: 'OBSERVATION',
-      title: 'Observation Domain',
-      desc: 'Explores the physical venue, locates hidden optical QR tags, and inspects checkpoints.',
-      color: 'border-proto-obs text-proto-obs',
-      icon: Eye
-    },
-    {
-      type: 'SYSTEM',
-      title: 'System Domain',
-      desc: 'Traces memory exploits, autonomic routing daemons, and core topology schematics.',
-      color: 'border-proto-system text-proto-system',
-      icon: Cpu
-    },
-    {
-      type: 'SOCIAL',
-      title: 'Social Domain',
-      desc: 'Executes synchronous multi-agent handshakes and cross-examines conflicting intel.',
-      color: 'border-proto-social text-proto-social',
-      icon: Users
-    },
-  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,11 +34,23 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
     setIsSubmitting(true);
 
-    const { agent } = Store.registerAgent({
+    const { agent, token } = Store.registerAgent({
       name: name.trim(),
+      auth_identifier: rollNo.trim() || undefined,
       contact: contact.trim(),
-      archetype,
       customAgentId: agentId.trim() || undefined,
+      isPreVerified: true // Operations desk registration immediately verifies them IN
+    });
+
+    // Dispatch 2 WhatsApp transmissions: Group Link + Personal QR Pass
+    sendRegistrationWhatsAppMessages({
+      recipientPhone: contact.trim(),
+      agentName: name.trim(),
+      agentId: agent.agent_id,
+      agentNumber: agent.agent_number,
+      token
+    }).catch(err => {
+      console.warn('WhatsApp dispatch warning:', err);
     });
 
     soundEffects.playSuccessChime();
@@ -101,17 +75,17 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-proto-text">
-                THE PROTOCOL // OPERATIVE ENROLLMENT
+              <h3 className="text-sm font-bold text-proto-text uppercase">
+                OPERATIONS DESK ENROLLMENT
               </h3>
               <p className="text-xs text-proto-subtext">
-                NIT Warangal • Assign Domain • Seed Graph
+                Register operative & assign balanced tactical directive.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-proto-subtext hover:text-proto-crimson hover:bg-proto-surface0 rounded-lg transition-colors"
+            className="p-1.5 text-proto-subtext hover:text-proto-text hover:bg-proto-surface0 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -119,96 +93,81 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
-          <div>
-            <label className="block text-xs uppercase text-proto-subtext mb-1">
-              Badge Identifier / Agent ID (Auto-generated if blank)
-            </label>
-            <input
-              type="text"
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value.toUpperCase())}
-              placeholder="e.g. AGT-XXXXX"
-              className="w-full px-3.5 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal uppercase"
-            />
+          <div className="p-3 rounded-xl bg-proto-surface0 border border-proto-signal/30 text-xs flex items-center gap-2 text-proto-signal">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>Automatic Balanced Pool Allocation: Starting role will be evenly selected from Logic, Signal, Observation, System, or Social.</span>
           </div>
 
           <div>
-            <label className="block text-xs uppercase text-proto-subtext mb-1">
-              Operative Full Name *
+            <label className="block text-xs text-proto-subtext uppercase mb-1">
+              Full Name *
             </label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Margaret Hamilton"
-              className="w-full px-3.5 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal"
+              placeholder="e.g. Alan Turing"
+              className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal"
             />
           </div>
 
-          <div>
-            <label className="block text-xs uppercase text-proto-subtext mb-1">
-              Contact / Phone / Email *
-            </label>
-            <input
-              type="text"
-              required
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              placeholder="e.g. operative@nitw.ac.in"
-              className="w-full px-3.5 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal"
-            />
-          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-proto-subtext uppercase mb-1">
+                Roll No / Student ID
+              </label>
+              <input
+                type="text"
+                value={rollNo}
+                onChange={(e) => setRollNo(e.target.value)}
+                placeholder="e.g. 23CSB01"
+                className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal uppercase"
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs uppercase text-proto-subtext mb-2">
-              Select Operative Domain (From The Protocol Poster) *
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {domains.map((dom) => {
-                const isSelected = archetype === dom.type;
-                const Icon = dom.icon;
-                return (
-                  <div
-                    key={dom.type}
-                    onClick={() => setArchetype(dom.type)}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                      isSelected
-                        ? `bg-proto-surface0 ${dom.color} border-2 shadow-md`
-                        : 'bg-proto-base border-proto-surface1 hover:border-proto-surface2 text-proto-subtext'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs font-bold mb-1">
-                      <span className="flex items-center gap-1.5">
-                        <Icon className="w-3.5 h-3.5" />
-                        {dom.title}
-                      </span>
-                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
-                    </div>
-                    <p className="text-[11px] opacity-80 leading-relaxed font-sans">
-                      {dom.desc}
-                    </p>
-                  </div>
-                );
-              })}
+            <div>
+              <label className="block text-xs text-proto-subtext uppercase mb-1">
+                Phone / WhatsApp *
+              </label>
+              <input
+                type="text"
+                required
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="+91 98480..."
+                className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal"
+              />
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-proto-surface0 border border-proto-surface1 text-[11px] text-proto-subtext space-y-1">
-            <span className="text-proto-signal font-bold block">AUTOMATED SEEDING SPEC:</span>
-            <span>• 3 initial domain-tailored circuits</span><br />
-            <span>• 2 authentic intel fragments</span><br />
-            <span>• 1 poisoned/conflicting disinformation fragment (TRUST NO ONE)</span>
+          <div>
+            <label className="block text-xs text-proto-subtext uppercase mb-1 flex items-center justify-between">
+              <span>Wristband / Custom Agent ID (Optional):</span>
+              <span className="text-[10px] text-proto-gold">Auto-assigned if blank</span>
+            </label>
+            <div className="relative">
+              <Ticket className="w-4 h-4 text-proto-gold absolute left-3 top-2.5" />
+              <input
+                type="text"
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+                placeholder="e.g. AGT-047 (Wristband code)"
+                className="w-full pl-9 pr-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-gold font-bold focus:outline-none focus:border-proto-gold uppercase"
+              />
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black text-xs tracking-wider uppercase hover:opacity-95 transition-all shadow-lg flex items-center justify-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            ACTIVATE OPERATIVE & SEED GRAPH
-          </button>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>CONFIRM CHECK-IN & ENROLL OPERATIVE</span>
+            </button>
+          </div>
         </form>
       </div>
     </div>

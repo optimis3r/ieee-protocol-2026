@@ -8,13 +8,7 @@ import {
   ScanLine, 
   Terminal, 
   Lock,
-  ArrowRight,
-  AlertTriangle,
-  Layers,
-  Activity,
-  Eye,
-  Cpu,
-  Users
+  AlertTriangle
 } from 'lucide-react';
 
 export default function ScanToEnterPage() {

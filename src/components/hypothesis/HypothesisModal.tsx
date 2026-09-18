@@ -7,8 +7,6 @@ import { soundEffects } from '@/lib/audio';
 import confetti from 'canvas-confetti';
 import { 
   X, 
-  Sparkles, 
-  CheckCircle2, 
   AlertTriangle, 
   Send, 
   FileSearch,

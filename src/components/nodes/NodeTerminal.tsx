@@ -4,17 +4,16 @@ import React, { useState } from 'react';
 import { AgentNode, NodeItem } from '@/types/database';
 import { Store, calculateDynamicScore } from '@/lib/store';
 import { 
-  Scan, 
   Terminal, 
   Users, 
-  Sparkles, 
   CheckCircle2, 
   Clock, 
   ChevronRight,
   Layers,
   Activity,
   Eye,
-  Cpu
+  Cpu,
+  Laptop
 } from 'lucide-react';
 
 interface NodeTerminalProps {
@@ -73,9 +72,9 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
   };
 
   return (
-    <div className="space-y-5">
-      {/* Top Banner: RECOVERED Status from Poster */}
-      <div className="p-4 rounded-2xl bg-proto-surface0/90 border border-proto-surface1 flex flex-wrap items-center justify-between gap-4 font-mono-cyber">
+    <div className="space-y-5 font-mono-cyber">
+      {/* Top Banner: RECOVERED Status */}
+      <div className="p-4 rounded-2xl bg-proto-surface0/90 border border-proto-surface1 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="text-left">
             <span className="text-[10px] text-proto-subtext uppercase tracking-widest block">
@@ -90,7 +89,7 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
         {/* Segmented Cyan Bars */}
         <div className="h-3 w-44 bg-proto-obsidian rounded-sm overflow-hidden p-0.5 border border-proto-logic/40">
           <div 
-            className="h-full progress-segments shadow-[0_0_8px_#00d2ff] transition-all duration-500" 
+            className="h-full progress-segments shadow-[0_0_8px_#00d2ff] transition-all duration-500 bg-proto-logic" 
             style={{ width: `${Math.max(5, (completedCount / Math.max(1, nodes.length)) * 100)}%` }}
           />
         </div>
@@ -110,7 +109,7 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono-cyber transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-proto-surface1 text-proto-text font-bold shadow'
                   : 'text-proto-subtext hover:text-proto-text'
@@ -121,7 +120,7 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
           ))}
         </div>
 
-        <div className="text-xs font-mono-cyber text-proto-subtext">
+        <div className="text-xs text-proto-subtext">
           <span>{filteredNodes.length} CIRCUITS TRACKED</span>
         </div>
       </div>
@@ -133,6 +132,14 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
           const globalSolves = Store.getNodeGlobalSolves(node.id);
           const currentScore = calculateDynamicScore(node.base_points, globalSolves, attempts);
 
+          const payloadTeaser = typeof node.payload.hint === 'string'
+            ? node.payload.hint
+            : typeof node.payload.cipher === 'string'
+            ? `Cipher: ${node.payload.cipher}`
+            : typeof node.payload.description === 'string'
+            ? node.payload.description
+            : 'Encrypted circuit parameters pending physical verification.';
+
           return (
             <div
               key={node.id}
@@ -143,7 +150,7 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
               )}`}
             >
               <div>
-                {/* Header */}
+                {/* Header with Station number */}
                 <div className="flex items-start justify-between gap-2 mb-2.5">
                   <div className="flex items-center gap-2">
                     <div className="p-2 rounded-xl bg-proto-surface0 border border-proto-surface1 group-hover:border-proto-logic transition-colors">
@@ -151,11 +158,11 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono-cyber text-[10px] text-proto-subtext">
-                          {node.id}
+                        <span className="text-[10px] text-proto-signal font-bold">
+                          {node.station_number || node.id}
                         </span>
                         {node.domain && (
-                          <span className="text-[9px] font-mono-cyber font-bold px-1.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
+                          <span className="text-[9px] font-bold px-1.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
                             {node.domain}
                           </span>
                         )}
@@ -177,18 +184,22 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
                   )}
                 </div>
 
+                {/* Laptop Station hint */}
+                {node.laptop_label && (
+                  <div className="text-[10px] text-proto-gold flex items-center gap-1 my-1">
+                    <Laptop className="w-3 h-3" />
+                    <span className="truncate">{node.laptop_label}</span>
+                  </div>
+                )}
+
                 {/* Subtitle / Payload teaser */}
-                <div className="text-xs text-proto-subtext font-mono-cyber line-clamp-2 my-2 min-h-[32px]">
-                  {node.payload.location ||
-                    node.payload.cipher ||
-                    node.payload.circuit_name ||
-                    node.payload.description ||
-                    'Encrypted circuit parameters pending verification.'}
+                <div className="text-xs text-proto-subtext line-clamp-2 my-2 min-h-[32px]">
+                  {payloadTeaser}
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="pt-3 border-t border-proto-surface1 flex items-center justify-between text-xs font-mono-cyber">
+              <div className="pt-3 border-t border-proto-surface1 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 text-proto-subtext text-[11px]">
                   <Clock className="w-3 h-3" />
                   <span>{globalSolves} solves</span>
