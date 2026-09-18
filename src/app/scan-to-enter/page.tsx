@@ -27,7 +27,10 @@ export default function ScanToEnterPage() {
       if (agent) {
         localStorage.setItem('ieee_agent_id', agent.agent_id);
         localStorage.setItem('ieee_agent_token', agent.token);
-        router.push(`/play?agent_id=${agent.agent_id}&token=${agent.token}`);
+        const destination = Store.isEventActive()
+          ? `/play?agent_id=${agent.agent_id}&token=${agent.token}`
+          : '/standby';
+        router.push(destination);
       } else {
         setErrorMsg(`Badge identifier ${result.id} not registered yet. Please check in at the Admin Operations desk.`);
       }
@@ -44,7 +47,10 @@ export default function ScanToEnterPage() {
     if (agent) {
       localStorage.setItem('ieee_agent_id', agent.agent_id);
       localStorage.setItem('ieee_agent_token', agent.token);
-      router.push(`/play?agent_id=${agent.agent_id}&token=${agent.token}`);
+      const destination = Store.isEventActive()
+        ? `/play?agent_id=${agent.agent_id}&token=${agent.token}`
+        : '/standby';
+      router.push(destination);
     } else {
       setErrorMsg(`Operative ${manualId.toUpperCase()} not found in Protocol directory.`);
     }
@@ -55,7 +61,10 @@ export default function ScanToEnterPage() {
     if (agent) {
       localStorage.setItem('ieee_agent_id', agent.agent_id);
       localStorage.setItem('ieee_agent_token', agent.token);
-      router.push(`/play?agent_id=${agent.agent_id}&token=${agent.token}`);
+      const destination = Store.isEventActive()
+        ? `/play?agent_id=${agent.agent_id}&token=${agent.token}`
+        : '/standby';
+      router.push(destination);
     }
   };
 

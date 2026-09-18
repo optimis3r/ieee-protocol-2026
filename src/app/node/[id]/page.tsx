@@ -12,7 +12,8 @@ import {
   ArrowLeft, 
   Laptop, 
   KeyRound, 
-  ArrowRight 
+  ArrowRight,
+  Clock 
 } from 'lucide-react';
 
 interface NodePageProps {
@@ -131,6 +132,49 @@ export default function NodeStationPage({ params }: NodePageProps) {
           >
             <ArrowLeft className="w-4 h-4" /> Return to HUD
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Standby Guard: Block participant access to challenge circuits until event starts on Sept 24th
+  const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('ieee_admin_auth') === 'true';
+  if (!isAdmin && !Store.isEventActive()) {
+    return (
+      <div className="min-h-screen bg-[#070b09] text-[#eaf2ec] flex flex-col items-center justify-center p-4 font-mono-cyber">
+        <div className="max-w-md w-full bg-[#0e1612] border-2 border-proto-gold/50 rounded-2xl p-6 shadow-2xl text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-proto-gold/15 border-2 border-proto-gold/40 flex items-center justify-center mx-auto text-proto-gold animate-pulse">
+            <Clock className="w-7 h-7" />
+          </div>
+          <div>
+            <span className="text-[10px] text-proto-gold font-bold uppercase tracking-widest block">
+              CIRCUIT TERMINALS IN STANDBY
+            </span>
+            <h1 className="text-xl font-black text-[#f3f7f4] mt-1">
+              THE EVENT HAS NOT STARTED YET
+            </h1>
+            <p className="text-xs text-proto-gold font-bold mt-1">
+              OFFICIAL LAUNCH: SEPTEMBER 24TH, 2026
+            </p>
+          </div>
+          <p className="text-xs text-[#8ea897] font-sans leading-relaxed">
+            Decryption challenges and station answer submissions are offline. 
+            All challenge circuits will be activated simultaneously by the Operations team on launch day.
+          </p>
+          <div className="pt-2 flex flex-col gap-2">
+            <Link
+              href="/standby"
+              className="w-full py-3 px-4 rounded-xl bg-proto-gold text-[#070b09] font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all text-center cursor-pointer"
+            >
+              View Standby Launch Timer
+            </Link>
+            <Link
+              href="/"
+              className="text-xs text-proto-subtext hover:underline"
+            >
+              Return to Protocol Home
+            </Link>
+          </div>
         </div>
       </div>
     );

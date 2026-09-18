@@ -1,95 +1,100 @@
-# IEEE Protocol: The Network — Deployment & Hosting Guide
+# IEEE Protocol: The Network — Complete Deployment Guide
 
-Yes, the application is **100% build-ready and production-tested** (`npm run build` exits with 0 errors).
-
-Because mobile cameras require **HTTPS** for optical QR scanning (`getUserMedia` browser security restriction), hosting the application with SSL/HTTPS is essential.
-
-Here are the best hosting options:
+This guide explains how to deploy the entire system with **100% free hosting**, automatic HTTPS (mandatory for mobile phone camera QR scanning), and 24/7 zero-cost WhatsApp automated messaging.
 
 ---
 
-## Step 1: Set Up Supabase Database (5 Minutes)
+## Architecture Overview
 
-1. Go to [supabase.com](https://supabase.com) and create a new project (Free Tier).
-2. Once created, click on the **SQL Editor** tab on the left sidebar.
-3. Open [`supabase/schema.sql`](supabase/schema.sql) from this project, copy its entire contents, paste into the Supabase SQL editor, and click **Run**.
-   - This creates all custom ENUMs, the 8 tables, initial nodes, seeded intel fragments, the dynamic scoring function, and the atomic graph registration function.
-4. Go to **Project Settings** -> **API** and copy:
-   - **Project URL** (`NEXT_PUBLIC_SUPABASE_URL`)
-   - **anon / public key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+The system consists of two parts:
+1. **Frontend & App Engine (Next.js)** ➔ Deployed on **Vercel** (Free, instant global CDN, automatic SSL/HTTPS).
+2. **WhatsApp Gateway (Baileys Web Protocol)** ➔ Deployed on **Render.com** (Free 24/7 Web Service via Docker) or run on an organizer's laptop.
 
----
-
-## Step 2: Hosting Options
-
-### Option A: Vercel (Recommended — Fastest & Free with HTTPS)
-
-Vercel is the creators of Next.js and provides instant automated deployment, global CDN, and automatic free SSL/HTTPS certificates.
-
-#### Via GitHub (Recommended)
-1. Push this folder to a GitHub repository:
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: IEEE Protocol ARG initial release"
-   git branch -M main
-   git remote add origin https://github.com/<your-user>/ieee-protocol.git
-   git push -u origin main
-   ```
-2. Go to [vercel.com](https://vercel.com) and click **"Add New Project"**.
-3. Import your GitHub repository.
-4. In **Environment Variables**, add:
-   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase Anon key
-   - `ADMIN_SECRET_TOKEN` = `ieee_ops_secure_2025` (or your custom password)
-5. Click **Deploy**. Your app will be live at `https://your-project.vercel.app` in under 60 seconds!
-
-#### Via Vercel CLI (Without Git)
-```bash
-npx vercel
 ```
-Follow the interactive prompts to deploy directly from your terminal.
+[ Participants / Mobile Phones ] ──HTTPS──> [ Vercel: Next.js App ]
+                                                    │
+                                                    ▼ (Webhook POST /send)
+                                            [ Render.com: WhatsApp Gateway ]
+                                                    │
+                                                    ▼ (Persistent 24/7 WebSocket)
+                                            [ WhatsApp Multi-Device Network ]
+```
 
 ---
 
-### Option B: Railway / Render / Fly.io (Docker Container)
+## Part 1: Deploy the WhatsApp Gateway (Render.com — 100% Free 24/7)
 
-A production-ready multi-stage [`Dockerfile`](Dockerfile) is provided in this repository.
+Because Vercel functions are serverless and shut down after 15 seconds, the persistent WhatsApp WebSocket runs 24/7 on Render's free tier.
 
-1. Connect your GitHub repository to [Railway.app](https://railway.app) or [Render.com](https://render.com).
-2. Select **Docker** deployment.
-3. Configure the environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ADMIN_SECRET_TOKEN`).
-4. Deploy!
-
----
-
-### Option C: Instant Phone Testing Right Now (Free HTTPS via Cloudflare Tunnel)
-
-If you want to test on your phone or let other students scan badges **right now** before deploying to the cloud:
-
-1. Keep the local server running:
+1. **Push your code to GitHub**:
    ```bash
-   npm run dev
+   git add .
+   git commit -m "feat: complete event standby & whatsapp automation"
+   git push origin main
    ```
-2. In a separate terminal, run an instant free Cloudflare Tunnel:
-   ```bash
-   npx cloudflared tunnel --url http://localhost:3000
-   ```
-3. Cloudflare will output a temporary public HTTPS URL (e.g. `https://random-words.trycloudflare.com`).
-4. Open that URL on your phone! The camera will activate immediately with full HTTPS permissions.
+2. Go to [render.com](https://render.com) and create a free account (no credit card needed).
+3. Click **New +** ➔ **Web Service** and select your GitHub repository.
+4. Configure the settings:
+   - **Name**: `ieee-protocol-wa-gateway` (or your choice)
+   - **Language / Runtime**: **Docker**
+   - **Dockerfile Path**: `Dockerfile.gateway`
+   - **Instance Type**: **Free**
+5. Click **Deploy Web Service**.
+6. When deployment finishes, copy your service URL (e.g. `https://ieee-protocol-wa-gateway.onrender.com`).
+   - Your webhook URL will be: `https://ieee-protocol-wa-gateway.onrender.com/send`.
+
+> [!TIP]
+> **Alternative (Local Laptop)**: If you prefer running the gateway on your own laptop rather than the cloud, simply run `npm run wa:gateway` locally and expose port 5005 with a free Cloudflare tunnel: `npx cloudflared tunnel --url http://localhost:5005`.
 
 ---
 
-## Step 3: Event Day Checklist for Organizers
+## Part 2: Deploy the Main Web Application (Vercel — 100% Free)
 
-1. **Access Operations Desk**:
-   - Navigate to `https://your-domain/admin`.
-   - Log in with your `ADMIN_SECRET_TOKEN` (default: `ieee_ops_secure_2025`).
-2. **Print Physical Codes**:
-   - Go to the **BADGE STATION** tab in the admin portal.
-   - Print badge QR cards for participants and physical node optical tags to place at campus coordinates.
-3. **Kiosk Check-In Desk**:
-   - Keep a laptop or tablet at the registration table on `/admin` -> **KIOSK CHECK-IN**.
-   - As participants arrive, scan their wristband or click **Enroll New Operative** to immediately assign their archetype and seed their private graph.
-4. **Broadcast Emergency Directives**:
-   - Under `/admin` -> **TELEMETRY**, push real-time broadcasts or trigger `NETWORK_LOCKED` at the end of the event window to freeze submissions.
+1. Go to [vercel.com](https://vercel.com) and sign in with GitHub.
+2. Click **Add New...** ➔ **Project** and import your repository.
+3. In **Environment Variables**, add:
+   - `WHATSAPP_PROVIDER`: `CUSTOM`
+   - `CUSTOM_WHATSAPP_WEBHOOK_URL`: `https://your-gateway.onrender.com/send` *(from Part 1)*
+   - `NEXT_PUBLIC_WHATSAPP_GROUP_URL`: `https://chat.whatsapp.com/YOUR_GROUP_CODE` *(your actual WhatsApp group link)*
+   - `ADMIN_SECRET_TOKEN`: `protocol2026`
+   *(Optional: If using Supabase, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`)*
+4. Click **Deploy**. In under 60 seconds, your site will be live at:
+   `https://your-project.vercel.app`
+
+---
+
+## Part 3: Link Your WhatsApp (Takes 10 Seconds)
+
+1. Open your live Vercel admin URL:
+   `https://your-project.vercel.app/admin`
+2. Log in with admin credentials:
+   - **Agent-Name**: `ieee-protocol-admin`
+   - **Password**: `protocol2026`
+3. In the **WhatsApp Transmission Center**, the live QR code will appear on your screen.
+4. Open WhatsApp on your phone ➔ **Settings** (iOS) or **Three Dots ⋮** (Android) ➔ **Linked Devices** ➔ **Link a Device**.
+5. Scan the QR code on your computer screen.
+6. The dashboard immediately switches to:
+   `🟢 BAILEYS GATEWAY: LIVE (+91XXXXXXXXXX)`.
+7. **It will now remain linked for the entire 3–4 day event window.**
+
+---
+
+## Part 4: How the Pre-Event & Launch Workflow Operates
+
+1. **Pre-Event Registration**:
+   - Share `https://your-project.vercel.app/register` with participants.
+   - When a student registers, their profile is saved and the gateway instantly delivers **two WhatsApp messages**:
+     1. Message 1: Official NIT Warangal WhatsApp Group Link.
+     2. Message 2: Their personal Operative QR Pass Card image (`[QR] / [Agent Name]`).
+   - The participant is automatically forwarded to the `/standby` holding page with the live countdown to **September 24th, 2026**.
+   - If they try logging in early at `/login` or scanning station nodes, they are safely held on the standby holding screen.
+
+2. **Official Event Launch (September 24th)**:
+   - Open `/admin` on your device.
+   - In the Telemetry section, click the **ACTIVE** button.
+   - **Instantly and synchronously across campus**:
+     - All waiting participants on `/standby` automatically transition into the live game HUD (`/play`) without needing to refresh.
+     - All question stations and decrypt terminals (`/node/[id]`) unlock for solving.
+
+3. **Event Lockdown**:
+   - When the submission window ends, click **LOCKDOWN** in `/admin` to freeze point submissions and display final standings.

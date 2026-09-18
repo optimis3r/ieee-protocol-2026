@@ -7,7 +7,8 @@ import { Store, initStore } from '@/lib/store';
 import { 
   Terminal, 
   AlertTriangle, 
-  UserCheck
+  UserCheck,
+  Clock
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -41,6 +42,12 @@ export default function LoginPage() {
     localStorage.setItem('ieee_agent_id', res.agent.agent_id);
     localStorage.setItem('ieee_agent_token', res.agent.token);
 
+    // If event is in STANDBY, forward directly to the holding countdown page
+    if (!Store.isEventActive()) {
+      router.push('/standby');
+      return;
+    }
+
     // Check if initial check-in is complete
     const sessionStatus = Store.checkSessionStatus(res.agent.agent_id);
     if (sessionStatus.canPlay) {
@@ -72,6 +79,19 @@ export default function LoginPage() {
           <div className="p-3 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson text-xs flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Standby Banner if event has not started yet */}
+        {!Store.isEventActive() && (
+          <div className="p-3.5 rounded-xl bg-proto-gold/15 border border-proto-gold/40 text-proto-gold text-xs space-y-1">
+            <div className="font-bold flex items-center gap-1.5 uppercase">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Network in Standby Mode</span>
+            </div>
+            <p className="text-[11px] text-[#9bb3a4] font-sans">
+              The event officially commences on <strong>September 24th, 2026</strong>. Logging in will display your enrolled holding card and launch countdown.
+            </p>
           </div>
         )}
 

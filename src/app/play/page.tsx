@@ -90,7 +90,14 @@ function AgentHUD() {
       return;
     }
 
-    // 4. Check Session Status: Mandatory Initial Check-In at Operations Desk
+    // 4. Event Status Guard: If event is in STANDBY, only admins can access play HUD
+    const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('ieee_admin_auth') === 'true';
+    if (!isAdmin && !Store.isEventActive()) {
+      router.push('/standby');
+      return;
+    }
+
+    // 5. Check Session Status: Mandatory Initial Check-In at Operations Desk
     const sessionStatus = Store.checkSessionStatus(currentAgent.agent_id);
     if (sessionStatus.status === 'AWAITING_CHECKIN') {
       router.push('/my-badge');

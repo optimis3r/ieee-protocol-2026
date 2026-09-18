@@ -4,7 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Store, formatActiveTime, getAgentActiveSeconds } from '@/lib/store';
 import { Agent, GameStatus, GameState } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
-import { sendRegistrationWhatsAppMessages } from '@/lib/whatsapp';
+import { 
+  sendRegistrationWhatsAppMessages, 
+  checkWhatsAppGatewayStatus, 
+  unlinkWhatsAppGateway,
+  WhatsAppGatewayStatus 
+} from '@/lib/whatsapp';
 import { RegisterModal } from './RegisterModal';
 import { 
   Activity, 
@@ -13,25 +18,27 @@ import {
   ShieldAlert, 
   Send, 
   BarChart3, 
-  Lock,
-  Play,
-  Pause,
-  Trophy,
-  Download,
-  Ticket,
-  Clock,
-  Edit3,
-  RotateCcw,
-  X,
-  MessageSquare,
-  Smartphone,
-  Eye,
-  EyeOff,
-  UserPlus,
-  Trash2,
-  CheckCircle2,
-  ExternalLink,
-  Search
+  Lock, 
+  Play, 
+  Pause, 
+  Trophy, 
+  Download, 
+  Ticket, 
+  Clock, 
+  Edit3, 
+  RotateCcw, 
+  X, 
+  MessageSquare, 
+  Smartphone, 
+  Eye, 
+  EyeOff, 
+  UserPlus, 
+  Trash2, 
+  CheckCircle2, 
+  ExternalLink, 
+  Search,
+  QrCode,
+  LogOut
 } from 'lucide-react';
 
 interface TelemetryDashboardProps {
@@ -67,6 +74,10 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
   const [cutoffTimeInput, setCutoffTimeInput] = useState(gameState.submission_cutoff_time || '20:00');
   const [isEditingCutoff, setIsEditingCutoff] = useState(false);
 
+  // WhatsApp Baileys Gateway Status
+  const [gatewayInfo, setGatewayInfo] = useState<WhatsAppGatewayStatus | null>(null);
+  const [isUnlinkingWa, setIsUnlinkingWa] = useState(false);
+
   const refreshDashboard = useCallback(() => {
     setGameState(Store.getGameState());
     setAgents(Store.getAgents());
@@ -74,6 +85,43 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
     setWaLogs(Store.getWhatsAppLogs());
     setWaConfig(Store.getWhatsAppConfig());
   }, []);
+
+  const checkGateway = useCallback(async () => {
+    const info = await checkWhatsAppGatewayStatus();
+    setGatewayInfo(info);
+  }, []);
+
+  useEffect(() => {
+    checkGateway();
+    // Poll faster (every 2.5s) if waiting for QR scan so UI updates instantly on link
+    const pollIntervalMs = gatewayInfo?.status === 'QR_READY' ? 2500 : 8000;
+    const gwInterval = setInterval(checkGateway, pollIntervalMs);
+    return () => clearInterval(gwInterval);
+  }, [checkGateway, gatewayInfo?.status]);
+
+  const handleUnlinkWhatsApp = async () => {
+    if (!confirm('Are you sure you want to unlink the current WhatsApp device? You will need to scan a new QR code to link another phone.')) {
+      return;
+    }
+    setIsUnlinkingWa(true);
+    soundEffects.playScanChirp();
+    try {
+      const res = await unlinkWhatsAppGateway();
+      if (res.success) {
+        soundEffects.playSuccessChime();
+        setActionNotice('WhatsApp session unlinked. Generating fresh QR code...');
+        await checkGateway();
+      } else {
+        alert(res.error || 'Failed to unlink device');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error unlinking WhatsApp device');
+    } finally {
+      setIsUnlinkingWa(false);
+      setTimeout(() => setActionNotice(null), 3500);
+    }
+  };
 
   useEffect(() => {
     setActiveSection(defaultSection);
@@ -549,11 +597,106 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ defaultS
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-[#121b15] border border-[#203226] text-proto-signal">
-              ENGINE: ACTIVE ({waConfig.provider || 'SIMULATED / LIVE'})
+            <span className={`text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 transition-all ${
+              gatewayInfo?.online
+                ? 'bg-proto-signal/20 text-proto-signal border border-proto-signal/40'
+                : gatewayInfo?.status === 'QR_READY'
+                ? 'bg-proto-gold/20 text-proto-gold border border-proto-gold/40'
+                : 'bg-proto-surface1 text-proto-subtext border border-proto-surface2'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                gatewayInfo?.online
+                  ? 'bg-proto-signal animate-pulse'
+                  : gatewayInfo?.status === 'QR_READY'
+                  ? 'bg-proto-gold animate-ping'
+                  : 'bg-proto-subtext'
+              }`} />
+              <span>
+                {gatewayInfo?.online
+                  ? `BAILEYS GATEWAY: LIVE (${gatewayInfo.connectedUser || 'LINKED'})`
+                  : gatewayInfo?.status === 'QR_READY'
+                  ? 'GATEWAY: SCAN QR BELOW'
+                  : 'GATEWAY: OFFLINE (SIMULATION FALLBACK)'}
+              </span>
             </span>
+
+            {gatewayInfo?.online && (
+              <button
+                onClick={handleUnlinkWhatsApp}
+                disabled={isUnlinkingWa}
+                className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-950/40 text-red-400 border border-red-800/50 hover:bg-red-900/60 transition-all flex items-center gap-1 cursor-pointer"
+                title="Unlink phone and generate a fresh QR code"
+              >
+                {isUnlinkingWa ? <Activity className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />}
+                <span>Unlink Device</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Interactive In-Dashboard WhatsApp QR Code Pairing Screen */}
+        {gatewayInfo?.status === 'QR_READY' && gatewayInfo?.qrDataUrl && (
+          <div className="p-6 rounded-2xl bg-[#0b120e] border-2 border-proto-gold/60 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-300">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-proto-surface1 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-proto-gold/20 text-proto-gold border border-proto-gold/40 animate-pulse">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-proto-text uppercase tracking-wide flex items-center gap-2">
+                    <span>PAIR OPERATIVE WHATSAPP GATEWAY</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-proto-gold/20 text-proto-gold border border-proto-gold/40">
+                      SCAN ONCE • STAYS LINKED FOR EVENT
+                    </span>
+                  </h4>
+                  <p className="text-xs text-proto-subtext">
+                    Scan this screen with WhatsApp Linked Devices. It will stay linked for the entire 3–4 day event window.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-proto-gold text-xs font-mono">
+                <span>Listening for device...</span>
+                <Activity className="w-4 h-4 animate-spin" />
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center justify-center gap-8 py-3">
+              {/* Visual QR Code Image */}
+              <div className="flex flex-col items-center bg-white p-4 rounded-2xl shadow-2xl border-4 border-proto-gold/40">
+                <img
+                  src={gatewayInfo.qrDataUrl}
+                  alt="WhatsApp Web Pairing QR Code"
+                  className="w-56 h-56 md:w-64 md:h-64 object-contain rounded-lg"
+                />
+                <div className="text-[11px] text-gray-800 font-mono font-bold mt-2 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-black" />
+                  <span>Point phone camera at this code</span>
+                </div>
+              </div>
+
+              {/* Instructions Card */}
+              <div className="space-y-3 max-w-md text-xs">
+                <h5 className="font-bold text-proto-gold uppercase tracking-wider text-[11px]">
+                  HOW TO LINK YOUR PHONE (TAKES 10 SECONDS):
+                </h5>
+                <div className="space-y-2.5 text-proto-subtext font-mono">
+                  <div className="flex items-start gap-2.5 bg-proto-surface0 p-3 rounded-xl border border-proto-surface1">
+                    <span className="w-5 h-5 rounded-full bg-proto-gold text-black font-black flex items-center justify-center text-[11px] shrink-0">1</span>
+                    <span>Open <strong>WhatsApp</strong> on your phone (Organizer or IEEE club phone).</span>
+                  </div>
+                  <div className="flex items-start gap-2.5 bg-proto-surface0 p-3 rounded-xl border border-proto-surface1">
+                    <span className="w-5 h-5 rounded-full bg-proto-gold text-black font-black flex items-center justify-center text-[11px] shrink-0">2</span>
+                    <span>Go to <strong>Settings</strong> (iOS) or <strong>Three Dots ⋮</strong> (Android) ➔ tap <strong>Linked Devices</strong> ➔ <strong>Link a Device</strong>.</span>
+                  </div>
+                  <div className="flex items-start gap-2.5 bg-proto-surface0 p-3 rounded-xl border border-proto-surface1">
+                    <span className="w-5 h-5 rounded-full bg-proto-gold text-black font-black flex items-center justify-center text-[11px] shrink-0">3</span>
+                    <span>Point your camera at this QR code. Once scanned, this screen will automatically turn <strong className="text-proto-signal">GREEN (LIVE)</strong> and remain linked!</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* WhatsApp Group Link Configuration */}

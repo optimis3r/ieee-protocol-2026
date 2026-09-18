@@ -1,7 +1,7 @@
 import { generateAgentQRBadgeDataUrl } from './qr-image';
 
 export interface WhatsAppConfig {
-  provider: 'SIMULATED' | 'META_CLOUD' | 'ULTRAMSG' | 'GREEN_API' | 'TWILIO' | 'CUSTOM';
+  provider: 'SIMULATED' | 'META_CLOUD' | 'ULTRAMSG' | 'GREEN_API' | 'TWILIO' | 'CUSTOM' | 'BAILEYS';
   groupLink: string;
   apiToken?: string;
   phoneNumberId?: string;
@@ -136,9 +136,41 @@ export async function sendRegistrationWhatsAppMessages(options: {
     agentNumber: options.agentNumber
   });
 
-  // Check if real provider configured in process.env or fallback to simulation
-  const provider = process.env.WHATSAPP_PROVIDER || 'SIMULATED';
-  const isSimulation = provider === 'SIMULATED' || !process.env.WHATSAPP_API_TOKEN;
+  // Dispatch via server API route (supports Baileys gateway, live APIs, and simulation fallback)
+  let apiStatus: 'DELIVERED' | 'SIMULATED' | 'FAILED' = 'SIMULATED';
+  let apiErrorMessage: string | undefined;
+
+  if (typeof fetch !== 'undefined') {
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: cleanPhone,
+          agentId: options.agentId,
+          agentName: options.agentName,
+          agentNumber: options.agentNumber,
+          groupLink,
+          message1Body,
+          message2Caption,
+          badgeDataUrl
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success && data.provider !== 'SIMULATED') {
+        apiStatus = 'DELIVERED';
+      } else if (data.simulated || data.provider === 'SIMULATED') {
+        apiStatus = 'SIMULATED';
+      } else {
+        apiStatus = 'FAILED';
+        apiErrorMessage = data.error;
+      }
+    } catch (apiErr: any) {
+      console.warn('WhatsApp API server unreachable, logging local simulation:', apiErr);
+      apiStatus = 'SIMULATED';
+    }
+  }
 
   const now = new Date().toISOString();
 
@@ -150,8 +182,9 @@ export async function sendRegistrationWhatsAppMessages(options: {
     agentId: options.agentId,
     agentName: options.agentName,
     type: 'GROUP_INVITE',
-    status: isSimulation ? 'SIMULATED' : 'DELIVERED',
-    previewText: `Group Link: ${groupLink}`
+    status: apiStatus,
+    previewText: `Group Link: ${groupLink}`,
+    error: apiErrorMessage
   };
 
   const record2: WhatsAppDispatchRecord = {
@@ -161,9 +194,10 @@ export async function sendRegistrationWhatsAppMessages(options: {
     agentId: options.agentId,
     agentName: options.agentName,
     type: 'QR_BADGE_IMAGE',
-    status: isSimulation ? 'SIMULATED' : 'DELIVERED',
+    status: apiStatus,
     previewText: `Personal QR Pass Image: [QR] / [${options.agentNumber || options.agentName}]`,
-    mediaUrl: badgeDataUrl.slice(0, 100) + '...' // truncated preview for log storage
+    mediaUrl: badgeDataUrl.slice(0, 100) + '...', // truncated preview for log storage
+    error: apiErrorMessage
   };
 
   // If running in browser and has localStorage/Store, log it locally
@@ -180,38 +214,64 @@ export async function sendRegistrationWhatsAppMessages(options: {
     }
   }
 
-  // Attempt real API delivery if credentials exist
-  if (!isSimulation && typeof fetch !== 'undefined') {
-    try {
-      // Call server-side WhatsApp API route
-      const response = await fetch('/api/whatsapp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: cleanPhone,
-          agentId: options.agentId,
-          agentName: options.agentName,
-          agentNumber: options.agentNumber,
-          groupLink,
-          message1Body,
-          message2Caption,
-          badgeDataUrl
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.warn('WhatsApp API server returned warning:', errorData);
-      }
-    } catch (apiErr) {
-      console.warn('WhatsApp dispatch fallback to simulation mode:', apiErr);
-    }
-  }
-
   return {
-    success: true,
+    success: apiStatus !== 'FAILED',
     message1: record1,
     message2: record2,
-    badgeDataUrl
+    badgeDataUrl,
+    error: apiErrorMessage
   };
 }
+
+export interface WhatsAppGatewayStatus {
+  online: boolean;
+  status: string;
+  connectedUser?: string | null;
+  provider?: string;
+  message?: string;
+  qrAvailable?: boolean;
+  qrDataUrl?: string | null;
+}
+
+/**
+ * Check if the local WhatsApp Gateway (Baileys) or live provider is online
+ */
+export async function checkWhatsAppGatewayStatus(): Promise<WhatsAppGatewayStatus> {
+  if (typeof fetch === 'undefined') {
+    return { online: false, status: 'OFFLINE' };
+  }
+
+  try {
+    const res = await fetch('/api/whatsapp/send', { method: 'GET', cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        online: data.gatewayOnline || data.isConnected || false,
+        status: data.status || 'UNKNOWN',
+        connectedUser: data.connectedUser,
+        provider: data.provider,
+        message: data.message,
+        qrAvailable: data.qrAvailable,
+        qrDataUrl: data.qrDataUrl
+      };
+    }
+    return { online: false, status: 'OFFLINE' };
+  } catch {
+    return { online: false, status: 'OFFLINE' };
+  }
+}
+
+/**
+ * Deliberately unlink/logout the current WhatsApp phone from the gateway
+ */
+export async function unlinkWhatsAppGateway(): Promise<{ success: boolean; message?: string; error?: string }> {
+  if (typeof fetch === 'undefined') return { success: false, error: 'No browser fetch available' };
+  try {
+    const res = await fetch('/api/whatsapp/send', { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    return { success: res.ok, ...data };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to unlink device' };
+  }
+}
+

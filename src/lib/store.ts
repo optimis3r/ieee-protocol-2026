@@ -585,12 +585,16 @@ export const Store = {
   getGameState(): GameState {
     return getStored<GameState>(KEY_GAME_STATE, {
       id: 1,
-      status: 'NETWORK_ACTIVE',
-      global_broadcast: 'PROTOCOL ACTIVE: 247 OPERATIVES DETECTED // SUBMISSIONS LOCK AT 8:00 PM // TRUST NO ONE',
+      status: 'STANDBY',
+      global_broadcast: 'PROTOCOL STANDBY // EVENT COMMENCES ON SEPTEMBER 24TH // AWAIT SYSTEM ACTIVATION',
       leaderboard_visible: true,
       submission_cutoff_time: '20:00',
       updated_at: new Date().toISOString()
     });
+  },
+
+  isEventActive(): boolean {
+    return this.getGameState().status === 'NETWORK_ACTIVE';
   },
 
   setGameState(

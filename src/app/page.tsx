@@ -137,7 +137,15 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-              {sessionStatus.canPlay ? (
+              {!Store.isEventActive() ? (
+                <Link
+                  href="/standby"
+                  className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-proto-gold hover:bg-[#ffcf66] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm text-center"
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Event In Standby (Sept 24)</span>
+                </Link>
+              ) : sessionStatus.canPlay ? (
                 <Link
                   href="/play"
                   className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"

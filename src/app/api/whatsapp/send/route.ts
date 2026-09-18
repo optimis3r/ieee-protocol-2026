@@ -106,32 +106,61 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Generic Webhook / Custom Provider
-    const webhookUrl = process.env.CUSTOM_WHATSAPP_WEBHOOK_URL;
-    if (provider === 'CUSTOM' && webhookUrl) {
-      const res = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient,
-          agentId,
-          agentName,
-          agentNumber,
-          groupLink,
-          messages: [
-            { type: 'text', content: message1Body },
-            { type: 'image', media: badgeDataUrl, caption: message2Caption }
-          ]
-        })
-      });
-      return NextResponse.json({ success: true, provider: 'CUSTOM', status: res.status });
+    // 3. Baileys / Custom Webhook Gateway
+    const webhookUrl = process.env.CUSTOM_WHATSAPP_WEBHOOK_URL || (provider === 'CUSTOM' || provider === 'BAILEYS' ? 'http://localhost:5005/send' : undefined);
+    if ((provider === 'CUSTOM' || provider === 'BAILEYS') && webhookUrl) {
+      try {
+        const res = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient,
+            agentId,
+            agentName,
+            agentNumber,
+            groupLink,
+            messages: [
+              { type: 'text', content: message1Body },
+              { type: 'image', media: badgeDataUrl, caption: message2Caption }
+            ]
+          })
+        });
+
+        const resData = await res.json().catch(() => ({}));
+        if (res.ok) {
+          return NextResponse.json({
+            success: true,
+            provider: 'BAILEYS_GATEWAY',
+            ...resData
+          });
+        } else {
+          return NextResponse.json({
+            success: false,
+            provider: 'BAILEYS_GATEWAY',
+            error: resData.error || `Gateway returned status ${res.status}`,
+            note: 'WhatsApp Gateway reported an issue. Check the terminal where npm run wa:gateway is running.'
+          }, { status: 502 });
+        }
+      } catch (gatewayErr: unknown) {
+        console.warn('[WhatsApp API] Gateway service unreachable on', webhookUrl, gatewayErr);
+        return NextResponse.json({
+          success: false,
+          provider: 'SIMULATED',
+          error: 'WhatsApp Gateway is offline. Run `npm run wa:gateway` in a separate terminal to link WhatsApp.',
+          simulated: true,
+          dispatched: {
+            message1: { type: 'GROUP_INVITE', to: recipient, content: message1Body },
+            message2: { type: 'QR_BADGE_IMAGE', to: recipient, caption: message2Caption }
+          }
+        });
+      }
     }
 
     // Default: Local Simulated Mode (Always succeeds, safe for dev/demo)
     return NextResponse.json({
       success: true,
       provider: 'SIMULATED',
-      message: `2 WhatsApp transmissions successfully simulated for ${recipient}. Add WHATSAPP_API_TOKEN in .env to transmit via live provider.`,
+      message: `2 WhatsApp transmissions successfully simulated for ${recipient}. Start WhatsApp Gateway (npm run wa:gateway) for live transmissions.`,
       dispatched: {
         message1: { type: 'GROUP_INVITE', to: recipient, content: message1Body },
         message2: { type: 'QR_BADGE_IMAGE', to: recipient, caption: message2Caption }
@@ -147,4 +176,48 @@ export async function POST(request: Request) {
       note: 'Fell back safely; registration data preserved.'
     }, { status: 500 });
   }
+}
+
+export async function GET() {
+  const provider = process.env.WHATSAPP_PROVIDER || 'CUSTOM';
+  const webhookUrl = process.env.CUSTOM_WHATSAPP_WEBHOOK_URL || 'http://localhost:5005/send';
+  const statusUrl = webhookUrl.replace(/\/send$/, '/status');
+
+  if (provider === 'CUSTOM' || provider === 'BAILEYS') {
+    try {
+      const res = await fetch(statusUrl, { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json({ provider, gatewayOnline: true, ...data });
+      }
+    } catch {
+      return NextResponse.json({ 
+        provider, 
+        gatewayOnline: false, 
+        status: 'OFFLINE',
+        message: 'Gateway offline. Start it via npm run wa:gateway' 
+      });
+    }
+  }
+
+  return NextResponse.json({ provider, gatewayOnline: false, status: provider });
+}
+
+export async function DELETE() {
+  const provider = process.env.WHATSAPP_PROVIDER || 'CUSTOM';
+  const webhookUrl = process.env.CUSTOM_WHATSAPP_WEBHOOK_URL || 'http://localhost:5005/send';
+  const unlinkUrl = webhookUrl.replace(/\/send$/, '/unlink');
+
+  if (provider === 'CUSTOM' || provider === 'BAILEYS') {
+    try {
+      const res = await fetch(unlinkUrl, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      return NextResponse.json({ success: res.ok, ...data });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Gateway unreachable';
+      return NextResponse.json({ success: false, error: msg }, { status: 503 });
+    }
+  }
+
+  return NextResponse.json({ success: true, message: 'Reset simulated session.' });
 }

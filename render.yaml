@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ieee-protocol-wa-gateway
+    env: docker
+    dockerfilePath: Dockerfile.gateway
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: 5005
+      - key: NODE_ENV
+        value: production

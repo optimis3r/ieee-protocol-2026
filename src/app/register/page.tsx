@@ -110,9 +110,13 @@ export default function RegisterPage() {
       domain: assignedDomain
     });
 
-    // Forward to personal badge after brief reveal
+    // Forward to standby holding screen (or badge if already active) after brief reveal
     setTimeout(() => {
-      router.push('/my-badge');
+      if (Store.isEventActive()) {
+        router.push('/my-badge');
+      } else {
+        router.push('/standby');
+      }
     }, 2800);
   };
 
@@ -183,7 +187,9 @@ export default function RegisterPage() {
                 </div>
 
                 <p className="text-[10px] text-[#7d9787]">
-                  Transitioning to your digital badge pass...
+                  {Store.isEventActive() 
+                    ? 'Transitioning to your digital badge pass...' 
+                    : 'Event commences Sept 24 • Forwarding to Holding Desk...'}
                 </p>
               </div>
             )}

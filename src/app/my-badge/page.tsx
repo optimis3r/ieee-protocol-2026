@@ -69,11 +69,15 @@ export default function MyBadgePage() {
         setAgent({ ...updated });
         setActiveSeconds(getAgentActiveSeconds(updated));
 
-        // When admin checks them in (transitions to ACTIVE), automatically enter HUD
+        // When admin checks them in (transitions to ACTIVE), enter HUD if active, else standby
         if (updated.check_in_status === 'ACTIVE' && current.check_in_status !== 'ACTIVE') {
           soundEffects.playSuccessChime();
           setTimeout(() => {
-            router.push('/play');
+            if (Store.isEventActive()) {
+              router.push('/play');
+            } else {
+              router.push('/standby');
+            }
           }, 800);
         }
       }
@@ -210,7 +214,15 @@ export default function MyBadgePage() {
         </div>
 
         {/* Action Button */}
-        {isActive ? (
+        {!Store.isEventActive() ? (
+          <Link
+            href="/standby"
+            className="w-full py-3.5 px-4 rounded-xl bg-proto-gold hover:bg-[#ffcf66] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm text-center"
+          >
+            <Clock className="w-4 h-4" />
+            <span>Event In Standby • Commencing Sept 24</span>
+          </Link>
+        ) : isActive ? (
           <Link
             href="/play"
             className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
