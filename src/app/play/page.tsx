@@ -60,76 +60,123 @@ function AgentHUD() {
 
   useEffect(() => {
     initStore();
+    let isCancelled = false;
 
-    // 1. Check query parameters first
-    const paramAgentId = searchParams.get('agent_id');
-    const paramToken = searchParams.get('token');
+    const initializeHUD = async () => {
+      // 1. Check query parameters first
+      const paramAgentId = searchParams.get('agent_id');
+      const paramToken = searchParams.get('token');
 
-    let currentAgent: Agent | null = null;
+      let currentAgent: Agent | null = null;
 
-    if (paramAgentId) {
-      currentAgent = Store.validateAgent(paramAgentId, paramToken || undefined);
-      if (currentAgent) {
-        localStorage.setItem('ieee_agent_id', currentAgent.agent_id);
-        localStorage.setItem('ieee_agent_token', currentAgent.token);
+      if (paramAgentId) {
+        currentAgent = Store.validateAgent(paramAgentId, paramToken || undefined);
+        if (currentAgent) {
+          localStorage.setItem('ieee_agent_id', currentAgent.agent_id);
+          localStorage.setItem('ieee_agent_token', currentAgent.token);
+        }
       }
-    }
 
-    // 2. Fall back to localStorage session token
-    if (!currentAgent) {
-      const storedAgentId = localStorage.getItem('ieee_agent_id');
-      const storedToken = localStorage.getItem('ieee_agent_token');
-      if (storedAgentId) {
-        currentAgent = Store.validateAgent(storedAgentId, storedToken || undefined);
+      // 2. Fall back to localStorage session token
+      if (!currentAgent) {
+        const storedAgentId = localStorage.getItem('ieee_agent_id');
+        const storedToken = localStorage.getItem('ieee_agent_token');
+        if (storedAgentId) {
+          currentAgent = Store.validateAgent(storedAgentId, storedToken || undefined);
+        }
       }
-    }
 
-    // 3. If still not authenticated, redirect to /login
-    if (!currentAgent) {
-      router.push('/login');
-      return;
-    }
+      const activeId = currentAgent?.agent_id || searchParams.get('agent_id') || (typeof window !== 'undefined' ? localStorage.getItem('ieee_agent_id') : null);
 
-    // 4. Event Status Guard: If event is in STANDBY, only admins can access play HUD
-    const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('ieee_admin_auth') === 'true';
-    if (!isAdmin && !Store.isEventActive()) {
-      router.push('/standby');
-      return;
-    }
+      // Sync fresh server state (status, timer, gameState) before applying route guards
+      if (activeId) {
+        try {
+          const syncResult = await Store.syncAgentWithServer(activeId);
+          if (syncResult.agent) {
+            currentAgent = syncResult.agent;
+            localStorage.setItem('ieee_agent_id', currentAgent.agent_id);
+            localStorage.setItem('ieee_agent_token', currentAgent.token);
+          }
+        } catch (_) {}
+      }
 
-    // 5. Check Session Status: Mandatory Initial Check-In at Operations Desk
-    const sessionStatus = Store.checkSessionStatus(currentAgent.agent_id);
-    if (sessionStatus.status === 'AWAITING_CHECKIN') {
-      router.push('/my-badge');
-      return;
-    }
+      if (isCancelled) return;
 
-    // Agent is checked-in: record presence and start live view
-    Store.recordActivity(currentAgent.agent_id);
-    setTimeout(() => {
+      // 3. If still not authenticated, redirect to /login
+      if (!currentAgent) {
+        router.push('/login');
+        return;
+      }
+
+      // 4. Event Status Guard: If event is in STANDBY, only admins can access play HUD
+      const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('ieee_admin_auth') === 'true';
+      if (!isAdmin && !Store.isEventActive()) {
+        router.push('/standby');
+        return;
+      }
+
+      // 5. Check Session Status: Mandatory Initial Check-In at Operations Desk
+      const sessionStatus = Store.checkSessionStatus(currentAgent.agent_id);
+      if (sessionStatus.status === 'AWAITING_CHECKIN') {
+        router.push('/my-badge');
+        return;
+      }
+
+      // Agent is checked-in: record presence and start live view
+      Store.recordActivity(currentAgent.agent_id);
       setAgent(currentAgent);
       refreshAgentData(currentAgent.agent_id);
-    }, 0);
+    };
+
+    initializeHUD();
 
     // Live 1-second interval to update active play timer clock
     const clockInterval = setInterval(() => {
-      const live = Store.getAgentById(currentAgent.agent_id);
-      if (live) {
-        setActiveSeconds(getAgentActiveSeconds(live));
+      const activeId = localStorage.getItem('ieee_agent_id');
+      if (activeId) {
+        const live = Store.getAgentById(activeId);
+        if (live) {
+          setActiveSeconds(getAgentActiveSeconds(live));
+        }
       }
     }, 1000);
 
+    // Live server polling every 3 seconds for desk pause/resume & game state changes
+    const pollInterval = setInterval(async () => {
+      const activeId = localStorage.getItem('ieee_agent_id');
+      if (!activeId || isCancelled) return;
+
+      try {
+        const { agent: freshAg, gameState: freshState } = await Store.syncAgentWithServer(activeId);
+        if (isCancelled) return;
+
+        const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('ieee_admin_auth') === 'true';
+        if (!isAdmin && freshState && freshState.status === 'STANDBY') {
+          router.push('/standby');
+          return;
+        }
+
+        if (freshAg) {
+          setAgent({ ...freshAg });
+          setActiveSeconds(getAgentActiveSeconds(freshAg));
+          if (freshState) setGameState(freshState);
+        }
+      } catch (_) {}
+    }, 3000);
+
     // Heartbeat every 25s
     const heartbeatInterval = setInterval(() => {
-      if (currentAgent) {
-        Store.recordActivity(currentAgent.agent_id);
+      const activeId = localStorage.getItem('ieee_agent_id');
+      if (activeId) {
+        Store.recordActivity(activeId);
       }
     }, 25000);
 
     // Cross-tab and live store event listener
     const handleStoreUpdate = () => {
-      if (currentAgent) {
-        refreshAgentData(currentAgent.agent_id);
+      const activeId = localStorage.getItem('ieee_agent_id');
+      if (activeId) {
+        refreshAgentData(activeId);
       }
     };
 
@@ -137,7 +184,9 @@ function AgentHUD() {
     window.addEventListener('storage', handleStoreUpdate);
 
     return () => {
+      isCancelled = true;
       clearInterval(clockInterval);
+      clearInterval(pollInterval);
       clearInterval(heartbeatInterval);
       window.removeEventListener('ieee_store_update', handleStoreUpdate);
       window.removeEventListener('storage', handleStoreUpdate);

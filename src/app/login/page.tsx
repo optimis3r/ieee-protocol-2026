@@ -14,11 +14,10 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState('');
-  const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -30,7 +29,10 @@ export default function LoginPage() {
     setIsSubmitting(true);
     initStore();
 
-    const res = Store.loginPlayer(identifier.trim(), pin.trim() || undefined);
+    // Sync latest agents from server first in case user registered on another device
+    await Store.syncWithServer().catch(() => {});
+
+    const res = Store.loginPlayer(identifier.trim());
 
     if (!res.success || !res.agent) {
       setErrorMsg(res.message);
@@ -41,6 +43,9 @@ export default function LoginPage() {
     // Save session in localStorage
     localStorage.setItem('ieee_agent_id', res.agent.agent_id);
     localStorage.setItem('ieee_agent_token', res.agent.token);
+
+    // Sync this specific agent's live server status
+    await Store.syncAgentWithServer(res.agent.agent_id).catch(() => {});
 
     // If event is in STANDBY, forward directly to the holding countdown page
     if (!Store.isEventActive()) {
@@ -107,19 +112,6 @@ export default function LoginPage() {
               onChange={(e) => setIdentifier(e.target.value)}
               placeholder="e.g. 23CSB01 or AGT-TURING"
               className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal uppercase"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-              PIN / Passcode (Optional)
-            </label>
-            <input
-              type="password"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="Default: 1234"
-              className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
             />
           </div>
 

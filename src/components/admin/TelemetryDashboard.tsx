@@ -229,17 +229,18 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
     };
   }, [refreshDashboard]);
 
-  const handleStateChange = (newStatus: GameStatus) => {
-    const updated = Store.setGameState(newStatus);
+  const handleStateChange = async (newStatus: GameStatus) => {
+    const updated = await Store.setGameStateAsync(newStatus);
     setGameState(updated);
     soundEffects.playScanChirp();
     setActionNotice(`PROTOCOL STATE SHIFTED TO: ${newStatus}`);
+    await refreshDashboard();
     setTimeout(() => setActionNotice(null), 3500);
   };
 
-  const handleToggleLeaderboard = () => {
+  const handleToggleLeaderboard = async () => {
     const nextVal = !gameState.leaderboard_visible;
-    const updated = Store.toggleLeaderboard(nextVal);
+    const updated = await Store.setGameStateAsync(gameState.status, gameState.global_broadcast, nextVal, gameState.submission_cutoff_time);
     setGameState(updated);
     soundEffects.playScanChirp();
     setActionNotice(
@@ -250,9 +251,9 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
     setTimeout(() => setActionNotice(null), 4000);
   };
 
-  const handleSaveCutoffTime = (e: React.FormEvent) => {
+  const handleSaveCutoffTime = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated = Store.setGameState(
+    const updated = await Store.setGameStateAsync(
       gameState.status,
       gameState.global_broadcast,
       gameState.leaderboard_visible,
@@ -265,29 +266,31 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
     setTimeout(() => setActionNotice(null), 3500);
   };
 
-  const handleDispatchBroadcast = (e: React.FormEvent) => {
+  const handleDispatchBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!broadcastInput.trim()) return;
 
-    Store.setGameState(gameState.status, broadcastInput.trim());
+    const updated = await Store.setGameStateAsync(gameState.status, broadcastInput.trim());
+    setGameState(updated);
     soundEffects.playSuccessChime();
     setActionNotice(`PRIORITY DIRECTIVE BROADCAST TO ALL OPERATIVES`);
     setBroadcastInput('');
     setTimeout(() => setActionNotice(null), 3500);
   };
 
-  const handleClearBroadcast = () => {
-    Store.setGameState(gameState.status, null);
+  const handleClearBroadcast = async () => {
+    const updated = await Store.setGameStateAsync(gameState.status, null);
+    setGameState(updated);
     soundEffects.playScanChirp();
     setActionNotice('BROADCAST CLEARED');
     setTimeout(() => setActionNotice(null), 3500);
   };
 
-  const handleToggleCheckIn = (agentId: string) => {
-    const res = Store.toggleCheckIn(agentId);
+  const handleToggleCheckIn = async (agentId: string) => {
+    const res = await Store.toggleCheckInAsync(agentId);
     soundEffects.playSuccessChime();
     setActionNotice(res.message);
-    refreshDashboard();
+    await refreshDashboard();
     setTimeout(() => setActionNotice(null), 3500);
   };
 

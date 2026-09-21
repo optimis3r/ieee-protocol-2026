@@ -35,7 +35,6 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [rollNumber, setRollNumber] = useState('');
   const [contact, setContact] = useState('');
-  const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allocationStep, setAllocationStep] = useState<string | null>(null);
@@ -58,7 +57,7 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     initStore();
 
-    // Check if roll number already registered
+    // Check if roll number already registered locally
     const existing = Store.findAgentByIdentifier(rollNumber.trim());
     if (existing) {
       setErrorMsg(`Roll number / ID '${rollNumber.trim()}' is already registered. Please log in.`);
@@ -69,21 +68,20 @@ export default function RegisterPage() {
     // Dynamic pool-balancing reveal animation
     soundEffects.playScanChirp();
     setAllocationStep('CONNECTING TO THE PROTOCOL CORE...');
-    await new Promise(r => setTimeout(r, 450));
+    await new Promise(r => setTimeout(r, 400));
 
     setAllocationStep('ANALYZING OPERATIVE CAPABILITIES & ROSTER DENSITY...');
-    await new Promise(r => setTimeout(r, 500));
-
-    setAllocationStep('BALANCING TACTICAL CELL POOLS...');
     await new Promise(r => setTimeout(r, 450));
 
-    // Execute atomic registration with balanced role allocation
-    const { agent, token, assignedDomain } = Store.registerAgent({
+    setAllocationStep('ALLOCATING UNIQUE OPERATIVE ID & TACTICAL CELL...');
+    await new Promise(r => setTimeout(r, 400));
+
+    // Execute atomic registration with server-authoritative sequential ID
+    const { agent, token, assignedDomain } = await Store.registerAgentAsync({
       name: name.trim(),
       auth_identifier: rollNumber.trim(),
       contact: contact.trim(),
-      pin: pin.trim() || '1234',
-      isPreVerified: false // Requires initial host QR check-in at desk
+      isPreVerified: false
     });
 
     // Save session in local storage
@@ -109,14 +107,14 @@ export default function RegisterPage() {
       domain: assignedDomain
     });
 
-    // Forward to standby holding screen (or badge if already active) after brief reveal
+    // Forward to standby holding screen (if event not started yet) or badge/game if already active
     setTimeout(() => {
       if (Store.isEventActive()) {
         router.push('/my-badge');
       } else {
         router.push('/standby');
       }
-    }, 2800);
+    }, 2400);
   };
 
   return (
@@ -225,34 +223,18 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-                  Phone / WhatsApp *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="Contact number"
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-                  PIN / Passcode (Optional)
-                </label>
-                <input
-                  type="password"
-                  maxLength={8}
-                  value={pin}
-                  onChange={(e) => setPin(e.target.value)}
-                  placeholder="Default: 1234"
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
-                />
-              </div>
+            <div>
+              <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
+                Phone / WhatsApp *
+              </label>
+              <input
+                type="text"
+                required
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="Contact number (e.g. +91 9876543210)"
+                className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
+              />
             </div>
 
             {/* Dynamic Role Assignment Explainer */}

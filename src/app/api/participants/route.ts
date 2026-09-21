@@ -7,11 +7,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const agentId = searchParams.get('agentId');
 
+    const gameState = ServerStore.getGameState();
+
     if (agentId) {
       const sanitizedId = agentId.slice(0, 40);
       const agent = ServerStore.getAgentById(sanitizedId);
       if (!agent) {
-        return NextResponse.json({ error: 'Operative not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Operative not found', gameState }, { status: 404 });
       }
       const nodes = ServerStore.getAgentNodes(sanitizedId);
       const questionData = ServerStore.getAgentCurrentQuestion(sanitizedId);
@@ -19,6 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true,
         agent,
+        gameState,
         nodes,
         currentQuestion: questionData.currentNode,
         questionStatus: questionData.status,
@@ -31,6 +34,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       agents: enrichedAgents,
+      gameState,
       totalCount: enrichedAgents.length,
       timestamp: new Date().toISOString()
     });
@@ -69,23 +73,31 @@ export async function POST(request: Request) {
           agent_id: typeof agent.agent_id === 'string' ? agent.agent_id.trim().toUpperCase().slice(0, 30) : '',
           agent_number: typeof agent.agent_number === 'string' ? agent.agent_number.trim().slice(0, 30) : '',
           contact: typeof agent.contact === 'string' ? agent.contact.replace(/\D/g, '').slice(0, 15) : '',
-          roll_number: typeof agent.roll_number === 'string' ? agent.roll_number.trim().slice(0, 30) : undefined
+          auth_identifier: typeof agent.auth_identifier === 'string' ? agent.auth_identifier.trim().slice(0, 30) : undefined
         };
 
-        if (!sanitizedAgent.agent_id) {
-          return NextResponse.json({ error: 'agent_id is required' }, { status: 400 });
-        }
-
         const savedAgent = ServerStore.registerAgent(sanitizedAgent);
-        return NextResponse.json({ success: true, agent: savedAgent });
+        const gameState = ServerStore.getGameState();
+        return NextResponse.json({ success: true, agent: savedAgent, gameState });
+      }
+
+      case 'update_game_state': {
+        const { status, global_broadcast, leaderboard_visible, submission_cutoff_time } = body;
+        const updated = ServerStore.updateGameState({
+          status,
+          global_broadcast,
+          leaderboard_visible,
+          submission_cutoff_time
+        });
+        return NextResponse.json({ success: true, gameState: updated });
       }
 
       case 'update_status': {
-        const { agentId, status } = body;
+        const { agentId, status, agentData } = body;
         if (!agentId || !status) {
           return NextResponse.json({ error: 'agentId and status are required' }, { status: 400 });
         }
-        const updated = ServerStore.updateAgentStatus(String(agentId).slice(0, 40), status);
+        const updated = ServerStore.updateAgentStatus(String(agentId).slice(0, 40), status, agentData);
         return NextResponse.json({ success: Boolean(updated), agent: updated });
       }
 

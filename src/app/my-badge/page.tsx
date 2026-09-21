@@ -62,35 +62,52 @@ export default function MyBadgePage() {
       },
     }).then(setQrDataUrl).catch(console.error);
 
-    // Live store event listener (triggers when admin desk scans their QR)
-    const handleStoreUpdate = () => {
-      const updated = Store.getAgentById(current.agent_id);
-      if (updated) {
-        setAgent({ ...updated });
-        setActiveSeconds(getAgentActiveSeconds(updated));
+    // Live server polling to detect desk check-in across devices
+    let isCancelled = false;
+    let prevCheckInStatus = current.check_in_status;
 
-        // When admin checks them in (transitions to ACTIVE), enter HUD if active, else standby
-        if (updated.check_in_status === 'ACTIVE' && current.check_in_status !== 'ACTIVE') {
+    const pollLiveStatus = async () => {
+      try {
+        const { agent: serverAg, gameState } = await Store.syncAgentWithServer(current.agent_id);
+        if (isCancelled || !serverAg) return;
+
+        setAgent({ ...serverAg });
+        setActiveSeconds(getAgentActiveSeconds(serverAg));
+
+        // When desk staff completes check-in, automatically advance phone
+        if (serverAg.check_in_status === 'ACTIVE' && prevCheckInStatus !== 'ACTIVE') {
+          prevCheckInStatus = 'ACTIVE';
           soundEffects.playSuccessChime();
           setTimeout(() => {
-            if (Store.isEventActive()) {
-              router.push('/play');
-            } else {
-              router.push('/standby');
+            if (!isCancelled) {
+              if (gameState?.status === 'NETWORK_ACTIVE' || Store.isEventActive()) {
+                router.push('/play');
+              } else {
+                router.push('/standby');
+              }
             }
           }, 800);
+        } else {
+          prevCheckInStatus = serverAg.check_in_status;
         }
+      } catch {
+        // Fallback to local
+        refreshState(current.agent_id);
       }
+    };
+
+    pollLiveStatus();
+    const interval = setInterval(pollLiveStatus, 2000);
+
+    const handleStoreUpdate = () => {
+      pollLiveStatus();
     };
 
     window.addEventListener('ieee_store_update', handleStoreUpdate);
     window.addEventListener('storage', handleStoreUpdate);
 
-    const interval = setInterval(() => {
-      refreshState(current.agent_id);
-    }, 1000);
-
     return () => {
+      isCancelled = true;
       window.removeEventListener('ieee_store_update', handleStoreUpdate);
       window.removeEventListener('storage', handleStoreUpdate);
       clearInterval(interval);

@@ -372,18 +372,28 @@ function setStored<T>(key: string, value: T, notify: boolean = true): void {
   }
 }
 
-function notifyServer(payload: Record<string, unknown>): void {
+export async function notifyServerAsync(payload: Record<string, unknown>): Promise<boolean> {
   if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-    const adminToken = sessionStorage.getItem('ieee_admin_token') || '';
-    fetch('/api/participants', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        ...(adminToken ? { 'x-admin-token': adminToken } : {})
-      },
-      body: JSON.stringify(payload)
-    }).catch(() => {});
+    try {
+      const adminToken = sessionStorage.getItem('ieee_admin_token') || '';
+      const res = await fetch('/api/participants', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(adminToken ? { 'x-admin-token': adminToken } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   }
+  return false;
+}
+
+function notifyServer(payload: Record<string, unknown>): Promise<boolean> {
+  return notifyServerAsync(payload);
 }
 
 // Initialize Initial Data
@@ -393,8 +403,8 @@ export function initStore(): void {
   if (!localStorage.getItem(KEY_GAME_STATE)) {
     const defaultState: GameState = {
       id: 1,
-      status: 'NETWORK_ACTIVE',
-      global_broadcast: 'PROTOCOL ACTIVE: 247 OPERATIVES DETECTED // SUBMISSIONS LOCK AT 8:00 PM // TRUST NO ONE',
+      status: 'STANDBY',
+      global_broadcast: 'PROTOCOL STANDBY // EVENT COMMENCES ON SEPTEMBER 24TH // AWAIT SYSTEM ACTIVATION',
       leaderboard_visible: true,
       submission_cutoff_time: '20:00',
       updated_at: new Date().toISOString()
@@ -456,6 +466,18 @@ export const Store = {
       updated_at: new Date().toISOString()
     };
     setStored(KEY_GAME_STATE, updated);
+    notifyServer({ action: 'update_game_state', ...updated });
+    return updated;
+  },
+
+  async setGameStateAsync(
+    status: GameState['status'], 
+    global_broadcast?: string | null,
+    leaderboard_visible?: boolean,
+    submission_cutoff_time?: string
+  ): Promise<GameState> {
+    const updated = this.setGameState(status, global_broadcast, leaderboard_visible, submission_cutoff_time);
+    await notifyServerAsync({ action: 'update_game_state', ...updated });
     return updated;
   },
 
@@ -491,15 +513,10 @@ export const Store = {
     ) || null;
   },
 
-  loginPlayer(identifier: string, pin?: string): { success: boolean; agent?: Agent; message: string } {
+  loginPlayer(identifier: string): { success: boolean; agent?: Agent; message: string } {
     const agent = this.findAgentByIdentifier(identifier);
     if (!agent) {
-      return { success: false, message: 'Operative account not found. Please check your Roll No / ID or register.' };
-    }
-    if (agent.pin && agent.pin.trim() !== '') {
-      if (!pin || agent.pin !== pin.trim()) {
-        return { success: false, message: 'Invalid authentication pass-code (PIN).' };
-      }
+      return { success: false, message: 'Operative account not found. Please check your Roll No, Agent ID, or register.' };
     }
     return { success: true, agent, message: 'Authentication successful.' };
   },
@@ -574,7 +591,7 @@ export const Store = {
 
     setStored(KEY_AGENTS, agents, true);
     this.logAccess(agents[idx].agent_id, 'IN', notes || 'Admin Check-In: Active session started');
-    notifyServer({ action: 'update_status', agentId: agents[idx].agent_id, status: 'ACTIVE' });
+    notifyServer({ action: 'update_status', agentId: agents[idx].agent_id, status: 'ACTIVE', agentData: agents[idx] });
 
     return {
       success: true,
@@ -606,13 +623,43 @@ export const Store = {
 
     setStored(KEY_AGENTS, agents, true);
     this.logAccess(agents[idx].agent_id, 'OUT', notes || 'Admin Check-Out: Session paused');
-    notifyServer({ action: 'update_status', agentId: agents[idx].agent_id, status: 'PAUSED' });
+    notifyServer({ action: 'update_status', agentId: agents[idx].agent_id, status: 'PAUSED', agentData: agents[idx] });
 
     return {
       success: true,
       agent: agents[idx],
       message: `CHECK-OUT RECORDED: ${agents[idx].agent_number || agents[idx].agent_id} PAUSED. Active play timer frozen.`
     };
+  },
+
+  // Async versions that wait for server roundtrip and file flush
+  async checkInAgentAsync(agentId: string, notes?: string): Promise<{ success: boolean; agent?: Agent; message: string }> {
+    const res = this.checkInAgent(agentId, notes);
+    if (res.agent) {
+      await notifyServerAsync({ action: 'update_status', agentId: res.agent.agent_id, status: 'ACTIVE', agentData: res.agent });
+    }
+    return res;
+  },
+
+  async checkOutAgentAsync(agentId: string, notes?: string): Promise<{ success: boolean; agent?: Agent; message: string }> {
+    const res = this.checkOutAgent(agentId, notes);
+    if (res.agent) {
+      await notifyServerAsync({ action: 'update_status', agentId: res.agent.agent_id, status: 'PAUSED', agentData: res.agent });
+    }
+    return res;
+  },
+
+  async toggleCheckInAsync(agentId: string): Promise<{ success: boolean; agent?: Agent; status: 'ACTIVE' | 'PAUSED'; message: string }> {
+    const agent = this.getAgentById(agentId);
+    if (!agent) return { success: false, status: 'PAUSED', message: 'Operative not found' };
+
+    if (agent.check_in_status === 'ACTIVE') {
+      const res = await this.checkOutAgentAsync(agentId);
+      return { success: res.success, agent: res.agent, status: 'PAUSED', message: res.message };
+    } else {
+      const res = await this.checkInAgentAsync(agentId);
+      return { success: res.success, agent: res.agent, status: 'ACTIVE', message: res.message };
+    }
   },
 
   // Toggle Check-In / Check-Out for Rapid Queue Management
@@ -672,7 +719,6 @@ export const Store = {
     name: string;
     contact: string;
     auth_identifier?: string;
-    pin?: string;
     customAgentId?: string;
     isPreVerified?: boolean;
   }): { agent: Agent; token: string; assignedDomain: PrimaryDomain } {
@@ -730,7 +776,6 @@ export const Store = {
       name: payload.name,
       contact: payload.contact,
       auth_identifier: payload.auth_identifier?.trim(),
-      pin: payload.pin?.trim() || '1234',
       archetype: assignedDomain,
       score: 0,
       is_active: Boolean(payload.isPreVerified),
@@ -821,6 +866,59 @@ export const Store = {
     }
 
     return { agent: newAgent, token, assignedDomain };
+  },
+
+  async registerAgentAsync(payload: {
+    name: string;
+    contact: string;
+    auth_identifier?: string;
+    customAgentId?: string;
+    isPreVerified?: boolean;
+  }): Promise<{ agent: Agent; token: string; assignedDomain: PrimaryDomain }> {
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      try {
+        const res = await fetch('/api/participants', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'register',
+            agent: {
+              name: payload.name.trim(),
+              contact: payload.contact.trim(),
+              auth_identifier: payload.auth_identifier?.trim(),
+              agent_id: payload.customAgentId?.trim().toUpperCase(),
+              is_active: Boolean(payload.isPreVerified),
+              check_in_status: payload.isPreVerified ? 'ACTIVE' : 'AWAITING_CHECKIN'
+            }
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.agent) {
+            const canonicalAgent: Agent = data.agent;
+            const agents = this.getAgents();
+            const existingIdx = agents.findIndex(a => a.agent_id.toUpperCase() === canonicalAgent.agent_id.toUpperCase());
+            if (existingIdx >= 0) {
+              agents[existingIdx] = canonicalAgent;
+            } else {
+              agents.unshift(canonicalAgent);
+            }
+            setStored(KEY_AGENTS, agents, true);
+            if (data.gameState) {
+              setStored(KEY_GAME_STATE, data.gameState, false);
+            }
+            return {
+              agent: canonicalAgent,
+              token: canonicalAgent.token,
+              assignedDomain: (canonicalAgent.archetype as PrimaryDomain) || 'LOGIC'
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Server registration failed, falling back to local allocation:', err);
+      }
+    }
+    return this.registerAgent(payload);
   },
 
   logAccess(agentId: string, direction: 'IN' | 'OUT', notes?: string): AccessLog {
@@ -1340,16 +1438,73 @@ export const Store = {
     };
   },
 
+  async syncAgentWithServer(agentId?: string): Promise<{ agent: Agent | null; gameState: GameState }> {
+    const currentGameState = this.getGameState();
+    if (typeof fetch === 'undefined') {
+      return { agent: agentId ? this.getAgentById(agentId) : null, gameState: currentGameState };
+    }
+
+    try {
+      const url = agentId ? `/api/participants?agentId=${encodeURIComponent(agentId)}` : '/api/participants';
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        
+        // 1. Sync Game State
+        if (data.gameState) {
+          const prevStatus = currentGameState.status;
+          setStored(KEY_GAME_STATE, data.gameState, false);
+          if (prevStatus !== data.gameState.status) {
+            window.dispatchEvent(new CustomEvent('ieee_game_state_change', { detail: data.gameState }));
+            window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: data.gameState }));
+          }
+        }
+
+        // 2. Sync Agent if returned
+        if (data.agent) {
+          const remoteAgent: Agent = data.agent;
+          const agents = this.getAgents();
+          const idx = agents.findIndex(a => a.agent_id.toUpperCase() === remoteAgent.agent_id.toUpperCase());
+          let statusChanged = false;
+          if (idx >= 0) {
+            if (agents[idx].check_in_status !== remoteAgent.check_in_status || agents[idx].score !== remoteAgent.score) {
+              statusChanged = true;
+            }
+            agents[idx] = { ...agents[idx], ...remoteAgent };
+          } else {
+            agents.unshift(remoteAgent);
+            statusChanged = true;
+          }
+          setStored(KEY_AGENTS, agents, false);
+          if (statusChanged) {
+            window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: remoteAgent }));
+          }
+          return { agent: remoteAgent, gameState: data.gameState || currentGameState };
+        }
+      }
+    } catch (err) {
+      console.warn('Sync with server warning:', err);
+    }
+
+    return { agent: agentId ? this.getAgentById(agentId) : null, gameState: this.getGameState() };
+  },
+
   async syncWithServer(): Promise<Agent[]> {
     if (typeof fetch === 'undefined') return this.getAgents();
     try {
       const res = await fetch('/api/participants', { method: 'GET', cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
+        
+        // Sync Game State
+        if (data.gameState) {
+          setStored(KEY_GAME_STATE, data.gameState, false);
+        }
+
         if (Array.isArray(data.agents)) {
-          if (data.agents.length === 0) {
-            setStored(KEY_AGENTS, [], false);
-            return [];
+          const localAgents = this.getAgents();
+          if (data.agents.length === 0 && localAgents.length > 0) {
+            return localAgents;
           }
           setStored(KEY_AGENTS, data.agents, false);
           return data.agents;

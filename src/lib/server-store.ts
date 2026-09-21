@@ -137,12 +137,86 @@ export const ServerStore = {
     return data.agents.find(a => a.agent_id.toUpperCase() === agentId.toUpperCase()) || null;
   },
 
+  getGameState(): GameState {
+    const data = loadServerData();
+    return data.game_state || {
+      id: 1,
+      status: 'STANDBY',
+      global_broadcast: 'PROTOCOL STANDBY // EVENT COMMENCES ON SEPTEMBER 24TH // AWAIT SYSTEM ACTIVATION',
+      leaderboard_visible: true,
+      submission_cutoff_time: '20:00',
+      updated_at: new Date().toISOString()
+    };
+  },
+
+  updateGameState(updates: Partial<GameState>): GameState {
+    const data = loadServerData();
+    const current = data.game_state || {
+      id: 1,
+      status: 'STANDBY',
+      global_broadcast: '',
+      leaderboard_visible: true,
+      submission_cutoff_time: '20:00',
+      updated_at: new Date().toISOString()
+    };
+    const updated: GameState = {
+      ...current,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    data.game_state = updated;
+    saveServerData(data, true);
+    return updated;
+  },
+
+  getNextAgentId(data: ServerStoreData): { agentId: string; agentNumber: string } {
+    let maxNum = 0;
+    data.agents.forEach(a => {
+      const match = a.agent_id.match(/AGT-(\d+)/i);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (!isNaN(n) && n > maxNum) maxNum = n;
+      }
+    });
+    const nextNum = maxNum + 1;
+    const padded = String(nextNum).padStart(3, '0');
+    return {
+      agentId: `AGT-${padded}`,
+      agentNumber: `Agent ${padded}`
+    };
+  },
+
+  getNextArchetype(data: ServerStoreData): 'LOGIC' | 'SIGNAL' | 'OBSERVATION' | 'SYSTEM' | 'SOCIAL' {
+    const counts: Record<string, number> = {
+      LOGIC: 0,
+      SIGNAL: 0,
+      OBSERVATION: 0,
+      SYSTEM: 0,
+      SOCIAL: 0
+    };
+    data.agents.forEach(a => {
+      if (counts[a.archetype] !== undefined) counts[a.archetype]++;
+    });
+    const minVal = Math.min(...Object.values(counts));
+    const eligible = (Object.keys(counts) as Array<'LOGIC' | 'SIGNAL' | 'OBSERVATION' | 'SYSTEM' | 'SOCIAL'>).filter(
+      k => counts[k] === minVal
+    );
+    return eligible[Math.floor(Math.random() * eligible.length)];
+  },
+
   registerAgent(agentData: Partial<Agent>): Agent {
     const data = loadServerData();
-    const existingIndex = data.agents.findIndex(
-      a => (agentData.agent_id && a.agent_id.toUpperCase() === agentData.agent_id.toUpperCase()) ||
-           (agentData.contact && a.contact.replace(/\D/g, '') === agentData.contact.replace(/\D/g, ''))
-    );
+    const cleanPhone = agentData.contact ? agentData.contact.replace(/\D/g, '') : '';
+    
+    // Find existing operative by phone contact or exact ID
+    const existingIndex = data.agents.findIndex(a => {
+      const aPhone = a.contact ? a.contact.replace(/\D/g, '') : '';
+      if (cleanPhone && aPhone && cleanPhone === aPhone) return true;
+      if (agentData.agent_id && a.agent_id.toUpperCase() === agentData.agent_id.toUpperCase()) {
+        return !cleanPhone || !aPhone || cleanPhone === aPhone;
+      }
+      return false;
+    });
 
     const now = new Date().toISOString();
     let agent: Agent;
@@ -156,28 +230,36 @@ export const ServerStore = {
       };
       data.agents[existingIndex] = agent;
     } else {
-      // Create new operative
-      const count = data.agents.length + 101;
-      const agentId = agentData.agent_id || `AGT-${count}`;
+      // Assign sequential unique ID to prevent multi-device collision
+      const isCustomId = agentData.agent_id && 
+                         !agentData.agent_id.match(/^AGT-001$/i) && 
+                         !data.agents.some(a => a.agent_id.toUpperCase() === agentData.agent_id?.toUpperCase());
+      
+      const { agentId, agentNumber } = isCustomId && agentData.agent_id
+        ? { agentId: agentData.agent_id.trim().toUpperCase(), agentNumber: agentData.agent_number || agentData.agent_id.trim() }
+        : this.getNextAgentId(data);
+
+      const archetype = agentData.archetype || this.getNextArchetype(data);
+      const isPreVerified = Boolean(agentData.is_active || agentData.check_in_status === 'ACTIVE');
+
       agent = {
         id: `agent-uuid-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         agent_id: agentId,
         wristband_id: agentData.wristband_id || agentId,
-        agent_number: agentData.agent_number || `Agent ${count}`,
-        token: agentData.token || `sec_tok_${count}_${Math.random().toString(36).substring(2, 6)}`,
-        name: agentData.name || `Operative ${count}`,
+        agent_number: agentNumber,
+        token: agentData.token || `sec_tok_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+        name: agentData.name || `Operative ${agentId}`,
         contact: agentData.contact || '',
         auth_identifier: agentData.auth_identifier || '',
-        pin: agentData.pin || '1234',
-        archetype: agentData.archetype || 'LOGIC',
+        archetype,
         score: agentData.score || 0,
-        is_active: true,
-        check_in_status: agentData.check_in_status || 'AWAITING_CHECKIN',
+        is_active: isPreVerified,
+        check_in_status: isPreVerified ? 'ACTIVE' : 'AWAITING_CHECKIN',
         total_active_seconds: agentData.total_active_seconds || 0,
-        session_start_time: agentData.check_in_status === 'ACTIVE' ? now : null,
-        initial_check_in_at: agentData.check_in_status === 'ACTIVE' ? now : null,
-        last_check_in: agentData.check_in_status === 'ACTIVE' ? now : null,
-        last_host_verified_at: null,
+        session_start_time: isPreVerified ? now : null,
+        initial_check_in_at: isPreVerified ? now : null,
+        last_check_in: isPreVerified ? now : null,
+        last_host_verified_at: isPreVerified ? now : null,
         last_active_at: now,
         logged_out_at: null,
         created_at: now
@@ -212,19 +294,34 @@ export const ServerStore = {
       });
     }
 
-    saveServerData(data);
+    saveServerData(data, true);
     return agent;
   },
 
-  updateAgentStatus(agentId: string, status: 'ACTIVE' | 'PAUSED' | 'AWAITING_CHECKIN'): Agent | null {
+  updateAgentStatus(
+    agentId: string, 
+    status: 'ACTIVE' | 'PAUSED' | 'AWAITING_CHECKIN',
+    agentData?: Partial<Agent>
+  ): Agent | null {
     const data = loadServerData();
-    const index = data.agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
-    if (index === -1) return null;
+    let index = data.agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+
+    // Auto-create in ServerStore if not yet synchronized from client
+    if (index === -1) {
+      if (agentData) {
+        this.registerAgent({ ...agentData, agent_id: agentId, check_in_status: status });
+        const refreshed = loadServerData();
+        index = refreshed.agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+        if (index === -1) return null;
+      } else {
+        return null;
+      }
+    }
 
     const agent = data.agents[index];
     const now = new Date().toISOString();
 
-    if (status === 'ACTIVE' && agent.check_in_status !== 'ACTIVE') {
+    if (status === 'ACTIVE') {
       agent.check_in_status = 'ACTIVE';
       agent.is_active = true;
       agent.session_start_time = now;
@@ -233,24 +330,26 @@ export const ServerStore = {
       if (!agent.initial_check_in_at) {
         agent.initial_check_in_at = now;
       }
-    } else if (status === 'PAUSED' && agent.check_in_status === 'ACTIVE') {
+    } else if (status === 'PAUSED') {
+      agent.check_in_status = 'PAUSED';
+      agent.is_active = false;
       if (agent.session_start_time) {
         const elapsed = Math.floor((Date.now() - new Date(agent.session_start_time).getTime()) / 1000);
         if (elapsed > 0) {
           agent.total_active_seconds = (agent.total_active_seconds || 0) + elapsed;
         }
       }
-      agent.check_in_status = 'PAUSED';
       agent.session_start_time = null;
       agent.last_active_at = now;
       agent.logged_out_at = now;
     } else {
       agent.check_in_status = status;
+      agent.is_active = false;
       agent.last_active_at = now;
     }
 
     data.agents[index] = agent;
-    saveServerData(data);
+    saveServerData(data, true);
     return agent;
   },
 

@@ -28,7 +28,6 @@ export default function NodeStationPage({ params }: NodePageProps) {
   const [node, setNode] = useState<NodeItem | null>(null);
   const [agentNode, setAgentNode] = useState<AgentNode | null>(null);
   const [loginInput, setLoginInput] = useState('');
-  const [loginPin, setLoginPin] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Challenge Input
@@ -73,7 +72,7 @@ export default function NodeStationPage({ params }: NodePageProps) {
     setLoginError(null);
     if (!loginInput.trim()) return;
 
-    const res = Store.loginPlayer(loginInput.trim(), loginPin.trim() || undefined);
+    const res = Store.loginPlayer(loginInput.trim());
     if (res.success && res.agent) {
       localStorage.setItem('ieee_agent_id', res.agent.agent_id);
       localStorage.setItem('ieee_agent_token', res.agent.token);
@@ -219,19 +218,6 @@ export default function NodeStationPage({ params }: NodePageProps) {
                 onChange={(e) => setLoginInput(e.target.value)}
                 placeholder="e.g. 23CSB01 or AGT-047"
                 className="w-full px-3.5 py-2.5 text-xs bg-[#141d17] border border-[#27392f] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] text-[#8ea897] uppercase mb-1">
-                Passcode / PIN (Optional):
-              </label>
-              <input
-                type="password"
-                value={loginPin}
-                onChange={(e) => setLoginPin(e.target.value)}
-                placeholder="Default: 1234"
-                className="w-full px-3.5 py-2.5 text-xs bg-[#141d17] border border-[#27392f] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
               />
             </div>
 

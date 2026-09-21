@@ -125,8 +125,8 @@ export const KioskScanner: React.FC = () => {
     []
   );
 
-  const handleModalCheckIn = (agentId: string) => {
-    Store.checkInAgent(agentId, 'Kiosk desk camera scan');
+  const handleModalCheckIn = async (agentId: string) => {
+    await Store.checkInAgentAsync(agentId, 'Kiosk desk camera scan');
     const updated = Store.getAgentById(agentId);
     setLastScannedAgent(updated);
     setLastAction('CHECKED IN (ACTIVE - TIMER STARTED)');
@@ -136,8 +136,8 @@ export const KioskScanner: React.FC = () => {
     triggerCooldown(2500);
   };
 
-  const handleModalCheckOut = (agentId: string) => {
-    Store.checkOutAgent(agentId, 'Kiosk desk camera scan');
+  const handleModalCheckOut = async (agentId: string) => {
+    await Store.checkOutAgentAsync(agentId, 'Kiosk desk camera scan');
     const updated = Store.getAgentById(agentId);
     setLastScannedAgent(updated);
     setLastAction('CHECKED OUT (PAUSED - TIMER FROZEN)');
