@@ -70,8 +70,8 @@ export async function POST(request: Request) {
         const sanitizedAgent = {
           ...agent,
           name: typeof agent.name === 'string' ? agent.name.trim().slice(0, 80) : '',
-          agent_id: typeof agent.agent_id === 'string' ? agent.agent_id.trim().toUpperCase().slice(0, 30) : '',
-          agent_number: typeof agent.agent_number === 'string' ? agent.agent_number.trim().slice(0, 30) : '',
+          agent_id: typeof agent.agent_id === 'string' && agent.agent_id.trim() ? agent.agent_id.trim().toUpperCase().slice(0, 30) : undefined,
+          agent_number: typeof agent.agent_number === 'string' && agent.agent_number.trim() ? agent.agent_number.trim().slice(0, 30) : undefined,
           contact: typeof agent.contact === 'string' ? agent.contact.replace(/\D/g, '').slice(0, 15) : '',
           auth_identifier: typeof agent.auth_identifier === 'string' ? agent.auth_identifier.trim().slice(0, 30) : undefined
         };

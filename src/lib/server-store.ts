@@ -222,10 +222,13 @@ export const ServerStore = {
     let agent: Agent;
 
     if (existingIndex >= 0) {
-      // Update existing record
+      // Update existing record without wiping agent_id
+      const existing = data.agents[existingIndex];
       agent = {
-        ...data.agents[existingIndex],
+        ...existing,
         ...agentData,
+        agent_id: (agentData.agent_id && agentData.agent_id.trim()) || existing.agent_id,
+        agent_number: (agentData.agent_number && agentData.agent_number.trim()) || existing.agent_number,
         last_active_at: now
       };
       data.agents[existingIndex] = agent;

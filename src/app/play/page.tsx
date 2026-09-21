@@ -19,7 +19,8 @@ import {
   Radio,
   ExternalLink,
   Layers,
-  Sparkles
+  Sparkles,
+  QrCode
 } from 'lucide-react';
 
 function AgentHUD() {
@@ -241,7 +242,7 @@ function AgentHUD() {
   const isPaused = agent.check_in_status === 'PAUSED';
 
   return (
-    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
+    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col font-mono-cyber tactile-grain select-none">
       {/* Top Status Ribbon with Agent 047 & Live Telemetry */}
       <StatusRibbon
         agent={agent}
@@ -261,80 +262,81 @@ function AgentHUD() {
 
       {/* Paused Off-Site Status Notice */}
       {isPaused && (
-        <div className="w-full bg-[#1e1b10] border-b border-proto-gold/40 px-4 py-2.5 text-xs text-proto-gold flex items-center justify-between">
+        <div className="w-full bg-[#eab308]/10 border-b border-[#eab308]/40 px-3 py-2 text-xs text-[#eab308] flex items-center justify-between font-mono">
           <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
-            <Pause className="w-4 h-4 shrink-0 animate-pulse text-proto-gold" />
-            <span>
-              <strong>CHECKED OUT // TIMER PAUSED:</strong> You are currently off-site. Your score and progress are preserved. Scan your phone QR at the Operations Desk upon return to resume active play.
+            <Pause className="w-3.5 h-3.5 shrink-0 text-[#eab308]" />
+            <span className="text-[11px]">
+              <strong>[OFF-SITE // TIMER FROZEN]:</strong> Progress preserved. Scan QR at desk to resume active session.
             </span>
           </div>
         </div>
       )}
 
       {/* Main Agent Viewport */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5 space-y-4">
         {/* Toast alert banner */}
         {toastMessage && (
-          <div className="p-3 rounded-xl bg-[#141d17] border border-proto-logic/40 text-xs flex items-center justify-between gap-3 animate-in fade-in">
-            <div className="flex items-center gap-2 text-proto-logic">
-              <Radio className="w-4 h-4 shrink-0 animate-pulse" />
+          <div className="p-2.5 rounded-sm bg-[#121513] border border-[#38bdf8]/40 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+            <div className="flex items-center gap-2 text-[#38bdf8]">
+              <Radio className="w-3.5 h-3.5 shrink-0 animate-pulse" />
               <span>{toastMessage}</span>
             </div>
             <button
               onClick={() => setToastMessage(null)}
-              className="text-[10px] text-[#8ea897] hover:text-[#eaf2ec]"
+              className="text-[10px] text-[#8f9e91] hover:text-[#f1ede4] uppercase font-bold"
             >
-              Dismiss
+              [Dismiss]
             </button>
           </div>
         )}
 
         {/* Action Controls & View Toggles */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 bg-[#141d17] p-1.5 rounded-2xl border border-[#223027]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#28302b] pb-2">
+          {/* Toggles */}
+          <div className="flex items-center gap-1 bg-[#121513] p-1 rounded-sm border border-[#28302b]">
             <button
               onClick={() => setActiveView('TERMINAL')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase transition-all cursor-pointer ${
                 activeView === 'TERMINAL'
-                  ? 'bg-proto-signal text-[#0a0f0d] shadow-sm'
-                  : 'text-[#8ea897] hover:text-[#eaf2ec]'
+                  ? 'bg-[#22c55e] text-[#0c0e0d]'
+                  : 'text-[#8f9e91] hover:text-[#f1ede4]'
               }`}
             >
-              <Layers className="w-4 h-4" />
-              <span>CIRCUIT TERMINALS ({nodes.length})</span>
+              <Layers className="w-3.5 h-3.5" />
+              <span>CIRCUITS ({nodes.length})</span>
             </button>
 
             <button
               onClick={() => setActiveView('INTEL')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase transition-all cursor-pointer ${
                 activeView === 'INTEL'
-                  ? 'bg-proto-obs text-[#0a0f0d] shadow-sm'
-                  : 'text-[#8ea897] hover:text-[#eaf2ec]'
+                  ? 'bg-[#c084fc] text-[#0c0e0d]'
+                  : 'text-[#8f9e91] hover:text-[#f1ede4]'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              <span>INTEL LOCKER ({intel.length})</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>INTEL ({intel.length})</span>
             </button>
           </div>
 
+          {/* Action Triggers */}
           <div className="flex items-center gap-2">
-            {/* Deduction Hypothesis Trigger Button */}
             <button
               onClick={() => setIsHypothesisOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#141d17] hover:bg-[#1a251e] text-proto-gold border border-proto-gold/40 text-xs font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm btn-tactile-amber text-[11px] font-bold uppercase cursor-pointer"
             >
-              <FileSearch className="w-4 h-4 text-proto-gold" />
-              <span>TOPOLOGY DEDUCTION (+400)</span>
+              <FileSearch className="w-3.5 h-3.5" />
+              <span>DEDUCE (+400)</span>
             </button>
 
-            {/* In-App Camera Scanner */}
-            <button
-              onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-[#0a0f0d] text-xs font-black uppercase tracking-wider hover:opacity-95 active:scale-95 transition-all shadow cursor-pointer"
+            <Link
+              href="/my-badge"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm btn-tactile-dark text-[11px] font-bold uppercase"
+              title="View Personal QR Pass"
             >
-              <ScanLine className="w-4 h-4" />
-              <span>SCAN NODE QR</span>
-            </button>
+              <QrCode className="w-3.5 h-3.5 text-[#eab308]" />
+              <span className="hidden sm:inline">MY PASS</span>
+            </Link>
           </div>
         </div>
 

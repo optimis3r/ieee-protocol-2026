@@ -9,12 +9,13 @@ import { Agent, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
 import { 
   Terminal, 
-  AlertCircle, 
   Clock, 
   CheckCircle2, 
   LogOut,
   Ticket,
-  Play
+  ArrowRight,
+  ShieldAlert,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function MyBadgePage() {
@@ -54,10 +55,10 @@ export default function MyBadgePage() {
     const qrPayload = `${origin}/play?agent_id=${current.agent_id}&token=${current.token}`;
 
     QRCode.toDataURL(qrPayload, {
-      width: 320,
-      margin: 2,
+      width: 280,
+      margin: 1,
       color: {
-        dark: '#0a0f0d',
+        dark: '#0c0e0d',
         light: '#ffffff',
       },
     }).then(setQrDataUrl).catch(console.error);
@@ -91,7 +92,6 @@ export default function MyBadgePage() {
           prevCheckInStatus = serverAg.check_in_status;
         }
       } catch {
-        // Fallback to local
         refreshState(current.agent_id);
       }
     };
@@ -122,8 +122,8 @@ export default function MyBadgePage() {
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-[#0d120f] flex items-center justify-center p-4">
-        <div className="w-8 h-8 border-2 border-proto-signal border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#0c0e0d] flex items-center justify-center p-4">
+        <div className="w-6 h-6 border-2 border-[#22c55e] border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -133,151 +133,151 @@ export default function MyBadgePage() {
   const isPaused = agent.check_in_status === 'PAUSED';
 
   return (
-    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col justify-between p-4 sm:p-6 font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
-      {/* Top Header */}
-      <header className="max-w-md w-full mx-auto text-center pt-6 pb-2">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#16201a] border border-[#23332a] text-[#8ea897] text-xs mb-2">
-          <Terminal className="w-3.5 h-3.5 text-proto-signal" />
-          <span>NIT WARANGAL • THE PROTOCOL</span>
+    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col justify-between p-3 sm:p-5 tactile-grain select-none">
+      {/* Tactical Top Identifier */}
+      <header className="max-w-sm w-full mx-auto flex items-center justify-between text-[11px] text-[#8f9e91] border-b border-[#28302b] pb-2">
+        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[#f1ede4]">
+          <span>NITW</span>
+          <span className="text-[#8f9e91]">/</span>
+          <span>IEEE THE PROTOCOL</span>
         </div>
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#f3f7f4]">
-          PERSONAL OPERATIVE BADGE
-        </h1>
-        <p className="text-xs text-[#8ea897] font-sans">
-          Keep this QR code on your phone for station scans & check-in.
-        </p>
+        <div className="text-[10px] uppercase tracking-widest text-[#eab308] font-bold">
+          [FIELD PASS]
+        </div>
       </header>
 
-      {/* Main Badge Card */}
-      <main className="max-w-md w-full mx-auto bg-[#141d17] border border-[#223027] rounded-2xl p-6 shadow-2xl space-y-5 text-center">
-        
-        {/* Verification Status Pill */}
-        {isActive ? (
-          <div className="p-3 rounded-xl bg-proto-signal/15 border border-proto-signal/40 text-proto-signal text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span className="font-black uppercase tracking-wider">CHECKED IN // ACTIVE</span>
-            </div>
-            <span className="font-bold">{formatActiveTime(activeSeconds)}</span>
-          </div>
-        ) : isPaused ? (
-          <div className="p-3 rounded-xl bg-proto-gold/15 border border-proto-gold/40 text-proto-gold text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 shrink-0" />
-              <span className="font-black uppercase tracking-wider">CHECKED OUT // PAUSED</span>
-            </div>
-            <span className="font-bold">Timer Frozen</span>
-          </div>
-        ) : (
-          <div className="p-3 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 animate-pulse" />
-              <span className="font-black uppercase tracking-wider">Awaiting Venue Check-In</span>
-            </div>
-            <span className="text-[10px] text-proto-subtext font-sans">Desk Scan Required</span>
-          </div>
-        )}
+      {/* Main Single-Screen Credential Pass */}
+      <main className="max-w-sm w-full mx-auto my-auto py-2">
+        <div className="bg-[#121513] border-2 border-[#28302b] rounded-sm p-4 sm:p-5 shadow-2xl relative">
+          
+          {/* Lanyard punch notch simulation */}
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-2 rounded-full bg-[#0c0e0d] border border-[#28302b]" />
 
-        {/* Physical Wristband Verification Callout */}
-        <div className="p-3.5 rounded-xl bg-[#101713] border border-proto-gold/40 flex items-center justify-between text-left">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-proto-gold/15 border border-proto-gold/30 flex items-center justify-center text-proto-gold">
-              <Ticket className="w-4 h-4" />
-            </div>
+          {/* Operative Header Strip */}
+          <div className="flex items-start justify-between gap-2 border-b border-[#28302b] pb-3 mb-3">
             <div>
-              <span className="text-[10px] text-[#8ea897] block uppercase tracking-wider font-bold">
-                PHYSICAL WRISTBAND ID
+              <div className="text-[9px] uppercase tracking-widest text-[#8f9e91] font-bold">
+                DESIGNATION // CALL SIGN
+              </div>
+              <div className="text-2xl font-black tracking-tight text-[#f1ede4] leading-tight">
+                {agent.agent_id}
+              </div>
+              <div className="text-xs text-[#8f9e91] font-sans truncate max-w-[200px] mt-0.5">
+                {agent.name} {agent.auth_identifier ? `• ${agent.auth_identifier}` : ''}
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span 
+                className="inline-block text-[10px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-wider"
+                style={{ 
+                  color: roleMeta.color || '#38bdf8', 
+                  borderColor: `${roleMeta.color || '#38bdf8'}40`,
+                  backgroundColor: `${roleMeta.color || '#38bdf8'}10`
+                }}
+              >
+                {roleMeta.title}
               </span>
-              <span className="text-sm font-black text-proto-gold tracking-widest">
-                {agent.wristband_id || agent.agent_id}
-              </span>
+              <div className="text-[9px] text-[#8f9e91] uppercase mt-1 font-mono">
+                BAND: <strong className="text-[#eab308]">{agent.wristband_id || agent.agent_id}</strong>
+              </div>
             </div>
           </div>
-          <div className="text-[10px] text-[#8ea897] text-right font-sans max-w-[140px] leading-tight">
-            Matches your physical wristband for visual checkpoints.
-          </div>
-        </div>
 
-        {/* The QR Code (Stays on Phone) */}
-        <div className="flex justify-center my-2">
-          <div className="p-4 bg-white rounded-2xl shadow-xl inline-block border-2 border-proto-signal/40">
-            {qrDataUrl ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={qrDataUrl}
-                alt="Operative Pass QR Code"
-                className="w-56 h-56 sm:w-64 sm:h-64 object-contain"
-              />
+          {/* Centered High-Contrast Physical QR Code */}
+          <div className="flex flex-col items-center justify-center my-1">
+            <div className="p-3 bg-white rounded-sm border-2 border-[#121513] shadow-md inline-block">
+              {qrDataUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={qrDataUrl}
+                  alt="Operative Authentication Pass"
+                  className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
+                />
+              ) : (
+                <div className="w-48 h-48 flex items-center justify-center bg-[#f1ede4]">
+                  <div className="w-6 h-6 border-2 border-[#0c0e0d] border-t-transparent animate-spin" />
+                </div>
+              )}
+            </div>
+            <div className="text-[9px] text-[#8f9e91] uppercase tracking-wider font-mono mt-2 text-center">
+              PRESENT QR FOR DESK CHECK-IN & STATIONS
+            </div>
+          </div>
+
+          {/* Physical Rubber Stamp Status Badge */}
+          <div className="my-3 text-center">
+            {isActive ? (
+              <div className="stamp-box stamp-active w-full justify-center text-xs">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>ACTIVE // {formatActiveTime(activeSeconds)}</span>
+              </div>
+            ) : isPaused ? (
+              <div className="stamp-box stamp-standby w-full justify-center text-xs">
+                <Clock className="w-3.5 h-3.5" />
+                <span>OFF-SITE // TIMER FROZEN</span>
+              </div>
             ) : (
-              <div className="w-56 h-56 flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-proto-signal border-t-transparent rounded-full animate-spin" />
+              <div className="stamp-box stamp-danger w-full justify-center text-[11px]">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>DESK VERIFICATION REQUIRED</span>
               </div>
             )}
           </div>
+
+          {/* Direct Tactical Action */}
+          <div className="pt-2">
+            {!Store.isEventActive() ? (
+              <Link
+                href="/standby"
+                className="w-full py-2.5 px-3 rounded-sm btn-tactile-amber text-xs flex items-center justify-center gap-2 cursor-pointer text-center"
+              >
+                <span>AWAITING LAUNCH • VIEW STANDBY</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            ) : isActive ? (
+              <Link
+                href="/play"
+                className="w-full py-2.5 px-3 rounded-sm btn-tactile-primary text-xs flex items-center justify-center gap-2 cursor-pointer text-center"
+              >
+                <span>ENTER MISSION TERMINAL</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            ) : isPaused ? (
+              <Link
+                href="/play"
+                className="w-full py-2.5 px-3 rounded-sm btn-tactile-amber text-xs flex items-center justify-center gap-2 cursor-pointer text-center"
+              >
+                <span>VIEW PROGRESS (PAUSED)</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            ) : (
+              <div className="text-[10px] text-[#8f9e91] text-center font-sans">
+                Show this pass to IEEE operations staff at desk to begin.
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* Operative Details */}
-        <div className="space-y-2 text-center pt-1">
-          <div className="text-xl font-black text-[#f3f7f4] tracking-wider">
-            {agent.agent_number || agent.agent_id}
-          </div>
-          <div className="text-xs text-[#8ea897]">
-            {agent.name} • {agent.auth_identifier || agent.contact}
-          </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#18261e] border border-proto-signal/30 text-xs">
-            <span className="font-black text-proto-signal">{roleMeta.title} Operative</span>
-            <span className="text-[10px] text-[#8ea897]">({roleMeta.subtitle})</span>
-          </div>
-        </div>
-
-        {/* Action Button */}
-        {!Store.isEventActive() ? (
-          <Link
-            href="/standby"
-            className="w-full py-3.5 px-4 rounded-xl bg-proto-gold hover:bg-[#ffcf66] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm text-center"
-          >
-            <Clock className="w-4 h-4" />
-            <span>Event In Standby • Commencing Sept 24</span>
-          </Link>
-        ) : isActive ? (
-          <Link
-            href="/play"
-            className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
-          >
-            <Play className="w-4 h-4 fill-current" />
-            <span>Launch Operative HUD Terminal</span>
-          </Link>
-        ) : isPaused ? (
-          <Link
-            href="/play"
-            className="w-full py-3.5 px-4 rounded-xl bg-proto-gold hover:bg-[#ffcf66] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
-          >
-            <span>View Saved Progress in HUD (Timer Paused)</span>
-          </Link>
-        ) : (
-          <div className="p-3 rounded-xl bg-[#101713] border border-[#23332a] text-xs text-[#8ea897] font-sans">
-            Show this screen to an IEEE Operations staff member at the desk to complete mandatory initial check-in.
-          </div>
-        )}
-
-        {/* Log out / Switch Operative */}
-        <div className="pt-2 border-t border-[#1b2620] flex items-center justify-between text-xs text-[#7d9787]">
-          <Link href="/leaderboard" className="hover:text-[#eaf2ec] transition-colors">
-            Standings Leaderboard
+        {/* Tactical Footer Strip */}
+        <div className="mt-2.5 flex items-center justify-between text-[10px] text-[#8f9e91] px-1">
+          <Link href="/leaderboard" className="hover:text-[#f1ede4] transition-colors underline underline-offset-2">
+            Leaderboard
           </Link>
           <button
             onClick={handleLogout}
-            className="text-proto-crimson hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-[#dc2626] hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-3 h-3" />
             <span>Switch Account</span>
           </button>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="max-w-md w-full mx-auto text-center py-4 text-xs text-[#7d9787]">
-        NIT Warangal IEEE Student Branch // The Protocol
+      {/* Minimal Bottom Stamp */}
+      <footer className="max-w-sm w-full mx-auto text-center text-[9px] text-[#48544c] uppercase tracking-widest pt-1">
+        NIT WARANGAL • IEEE THE PROTOCOL • AUTONOMOUS VERIFICATION
       </footer>
     </div>
   );

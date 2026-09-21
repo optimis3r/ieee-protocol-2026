@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Store, initStore } from '@/lib/store';
 import { 
-  Terminal, 
   AlertTriangle, 
-  UserCheck,
+  ArrowRight,
+  LogIn,
   Clock
 } from 'lucide-react';
 
@@ -22,16 +22,14 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     if (!identifier.trim()) {
-      setErrorMsg('Please enter your Student Roll No, Agent ID, or registered contact.');
+      setErrorMsg('Enter your Student Roll No, Agent ID, or registered phone.');
       return;
     }
 
     setIsSubmitting(true);
     initStore();
 
-    // Sync latest agents from server first in case user registered on another device
     await Store.syncWithServer().catch(() => {});
-
     const res = Store.loginPlayer(identifier.trim());
 
     if (!res.success || !res.agent) {
@@ -40,20 +38,16 @@ export default function LoginPage() {
       return;
     }
 
-    // Save session in localStorage
     localStorage.setItem('ieee_agent_id', res.agent.agent_id);
     localStorage.setItem('ieee_agent_token', res.agent.token);
 
-    // Sync this specific agent's live server status
     await Store.syncAgentWithServer(res.agent.agent_id).catch(() => {});
 
-    // If event is in STANDBY, forward directly to the holding countdown page
     if (!Store.isEventActive()) {
       router.push('/standby');
       return;
     }
 
-    // Check if initial check-in is complete
     const sessionStatus = Store.checkSessionStatus(res.agent.agent_id);
     if (sessionStatus.canPlay) {
       router.push('/play');
@@ -63,79 +57,91 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col justify-between p-4 sm:p-6 font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
-      {/* Top Header */}
-      <header className="max-w-md w-full mx-auto text-center pt-8 pb-4">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#16201a] border border-[#23332a] text-[#8ea897] text-xs mb-3">
-          <Terminal className="w-3.5 h-3.5 text-proto-signal" />
-          <span>NIT WARANGAL • IEEE THE PROTOCOL</span>
+    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col justify-between p-3 sm:p-5 tactile-grain select-none">
+      {/* Tactical Top Identifier */}
+      <header className="max-w-sm w-full mx-auto flex items-center justify-between text-[11px] text-[#8f9e91] border-b border-[#28302b] pb-2">
+        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[#f1ede4]">
+          <span>NITW</span>
+          <span className="text-[#8f9e91]">/</span>
+          <span>IEEE THE PROTOCOL</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#f3f7f4]">
-          OPERATIVE ACCESS
-        </h1>
-        <p className="text-xs text-[#8ea897] font-sans mt-1">
-          Log in to retrieve your personal QR pass and access your terminal.
-        </p>
+        <div className="text-[10px] uppercase tracking-widest text-[#eab308] font-bold">
+          [AUTHENTICATION]
+        </div>
       </header>
 
-      {/* Login Card */}
-      <main className="max-w-md w-full mx-auto bg-[#141d17] border border-[#223027] rounded-2xl p-6 shadow-2xl space-y-5">
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson text-xs flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Standby Banner if event has not started yet */}
-        {!Store.isEventActive() && (
-          <div className="p-3.5 rounded-xl bg-proto-gold/15 border border-proto-gold/40 text-proto-gold text-xs space-y-1">
-            <div className="font-bold flex items-center gap-1.5 uppercase">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Network in Standby Mode</span>
+      {/* Main Login Card */}
+      <main className="max-w-sm w-full mx-auto my-auto py-2">
+        <div className="bg-[#121513] border-2 border-[#28302b] rounded-sm p-4 sm:p-5 shadow-2xl space-y-4">
+          
+          <div className="border-b border-[#28302b] pb-2">
+            <div className="text-[9px] uppercase tracking-widest text-[#8f9e91] font-bold">
+              TERMINAL CREDENTIAL VERIFICATION
             </div>
-            <p className="text-[11px] text-[#9bb3a4] font-sans">
-              The event officially commences on <strong>September 24th, 2026</strong>. Logging in will display your enrolled holding card and launch countdown.
+            <h1 className="text-xl font-black text-[#f1ede4] tracking-tight uppercase">
+              OPERATIVE ACCESS
+            </h1>
+            <p className="text-[11px] text-[#8f9e91] font-mono mt-0.5">
+              Input account key to recall your QR pass and circuit status.
             </p>
           </div>
-        )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-              Student Roll No / Agent ID / Contact *
-            </label>
-            <input
-              type="text"
-              required
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="e.g. 23CSB01 or AGT-TURING"
-              className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal uppercase"
-            />
+          {errorMsg && (
+            <div className="p-2.5 bg-[#dc2626]/10 border border-[#dc2626]/40 text-[#dc2626] text-xs flex items-center gap-2 rounded-sm">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {!Store.isEventActive() && (
+            <div className="p-2.5 bg-[#eab308]/10 border border-[#eab308]/40 text-[#eab308] text-xs space-y-0.5 rounded-sm font-mono">
+              <div className="font-bold flex items-center gap-1.5 uppercase text-[10px]">
+                <Clock className="w-3 h-3" />
+                <span>NETWORK STATUS: STANDBY</span>
+              </div>
+              <div className="text-[9px] text-[#8f9e91]">
+                Official commencement: Sept 24, 2026. Logging in displays holding countdown.
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-3">
+            <div>
+              <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
+                Student Roll No / Agent ID / Contact *
+              </label>
+              <input
+                type="text"
+                required
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="e.g. 23CSB01 or AGT-001"
+                className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] uppercase font-mono"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-2.5 px-3 rounded-sm btn-tactile-primary text-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>ACCESS OPERATIVE TERMINAL</span>
+            </button>
+          </form>
+
+          <div className="text-center pt-2 border-t border-[#28302b] text-[11px] text-[#8f9e91]">
+            <span>Not registered yet? </span>
+            <Link href="/register" className="text-[#22c55e] hover:underline font-bold">
+              Enlist device here →
+            </Link>
           </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>Retrieve My Badge & QR Pass</span>
-          </button>
-        </form>
-
-        <div className="text-center pt-2 border-t border-[#1b2620] text-xs text-[#7d9787]">
-          <span>Not registered yet? </span>
-          <Link href="/register" className="text-proto-signal hover:underline font-bold">
-            Register your device here →
-          </Link>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="max-w-md w-full mx-auto text-center py-4 text-xs text-[#7d9787]">
-        NIT Warangal IEEE Student Branch // The Protocol
+      {/* Minimal Bottom Stamp */}
+      <footer className="max-w-sm w-full mx-auto text-center text-[9px] text-[#48544c] uppercase tracking-widest pt-1">
+        NIT WARANGAL • IEEE THE PROTOCOL • LOCAL TERMINAL RE-ENTRY
       </footer>
     </div>
   );

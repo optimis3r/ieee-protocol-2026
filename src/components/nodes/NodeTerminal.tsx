@@ -4,16 +4,16 @@ import React, { useState } from 'react';
 import { AgentNode, NodeItem } from '@/types/database';
 import { Store, calculateDynamicScore } from '@/lib/store';
 import { 
-  Terminal, 
-  Users, 
   CheckCircle2, 
-  Clock, 
-  ChevronRight,
-  Layers,
-  Activity,
-  Eye,
-  Cpu,
-  Laptop
+  ChevronRight, 
+  Layers, 
+  Activity, 
+  Eye, 
+  Cpu, 
+  Users, 
+  Terminal,
+  Laptop,
+  Clock
 } from 'lucide-react';
 
 interface NodeTerminalProps {
@@ -39,94 +39,74 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
   const getDomainIcon = (domain?: NodeItem['domain']) => {
     switch (domain) {
       case 'LOGIC':
-        return <Layers className="w-4 h-4 text-proto-logic" />;
+        return <Layers className="w-3.5 h-3.5 text-[#38bdf8]" />;
       case 'SIGNAL':
-        return <Activity className="w-4 h-4 text-proto-signal" />;
+        return <Activity className="w-3.5 h-3.5 text-[#22c55e]" />;
       case 'OBSERVATION':
-        return <Eye className="w-4 h-4 text-proto-obs" />;
+        return <Eye className="w-3.5 h-3.5 text-[#c084fc]" />;
       case 'SYSTEM':
-        return <Cpu className="w-4 h-4 text-proto-system" />;
+        return <Cpu className="w-3.5 h-3.5 text-[#f97316]" />;
       case 'SOCIAL':
-        return <Users className="w-4 h-4 text-proto-social" />;
+        return <Users className="w-3.5 h-3.5 text-[#2dd4bf]" />;
       default:
-        return <Terminal className="w-4 h-4 text-proto-logic" />;
-    }
-  };
-
-  const getDomainBorder = (domain?: NodeItem['domain'], isCompleted?: boolean) => {
-    if (isCompleted) return 'border-proto-signal/60 bg-proto-base/90 hover:border-proto-signal';
-    switch (domain) {
-      case 'LOGIC':
-        return 'border-proto-surface1 hover:border-proto-logic hover:shadow-[0_0_15px_rgba(0,210,255,0.2)]';
-      case 'SIGNAL':
-        return 'border-proto-surface1 hover:border-proto-signal hover:shadow-[0_0_15px_rgba(0,255,136,0.2)]';
-      case 'OBSERVATION':
-        return 'border-proto-surface1 hover:border-proto-obs hover:shadow-[0_0_15px_rgba(191,85,236,0.2)]';
-      case 'SYSTEM':
-        return 'border-proto-surface1 hover:border-proto-system hover:shadow-[0_0_15px_rgba(255,119,0,0.2)]';
-      case 'SOCIAL':
-        return 'border-proto-surface1 hover:border-proto-social hover:shadow-[0_0_15px_rgba(0,240,255,0.2)]';
-      default:
-        return 'border-proto-surface1 hover:border-proto-logic';
+        return <Terminal className="w-3.5 h-3.5 text-[#38bdf8]" />;
     }
   };
 
   return (
-    <div className="space-y-5 font-mono-cyber">
-      {/* Top Banner: RECOVERED Status */}
-      <div className="p-4 rounded-2xl bg-proto-surface0/90 border border-proto-surface1 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="text-left">
-            <span className="text-[10px] text-proto-subtext uppercase tracking-widest block">
-              CIRCUIT RECOVERY TRACKER
-            </span>
-            <span className="text-sm font-black text-proto-logic">
-              RECOVERED: {String(completedCount).padStart(2, '0')} / {String(nodes.length).padStart(2, '0')}
-            </span>
-          </div>
+    <div className="space-y-3 font-mono-cyber">
+      {/* Top Banner: RECOVERED Status (Tactile Meter) */}
+      <div className="p-3 bg-[#121513] border-2 border-[#28302b] rounded-sm flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[#8f9e91] uppercase tracking-wider font-bold">
+            CIRCUITS RESTORED:
+          </span>
+          <span className="text-sm font-black text-[#22c55e]">
+            {String(completedCount).padStart(2, '0')} / {String(nodes.length).padStart(2, '0')}
+          </span>
         </div>
 
-        {/* Segmented Cyan Bars */}
-        <div className="h-3 w-44 bg-proto-obsidian rounded-sm overflow-hidden p-0.5 border border-proto-logic/40">
+        {/* Minimal Progress Line */}
+        <div className="h-2 w-32 sm:w-48 bg-[#0c0e0d] border border-[#28302b] rounded-none overflow-hidden p-0.5">
           <div 
-            className="h-full progress-segments shadow-[0_0_8px_#00d2ff] transition-all duration-500 bg-proto-logic" 
-            style={{ width: `${Math.max(5, (completedCount / Math.max(1, nodes.length)) * 100)}%` }}
+            className="h-full bg-[#22c55e] transition-all duration-300" 
+            style={{ width: `${Math.max(4, (completedCount / Math.max(1, nodes.length)) * 100)}%` }}
           />
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-proto-surface1 pb-3">
-        <div className="flex items-center gap-1 p-1 bg-proto-base rounded-xl border border-proto-surface1">
+      {/* Tab Navigation (Tactile Filter Tabs) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#28302b] pb-2">
+        <div className="flex items-center gap-1">
           {(
             [
-              { id: 'ALL', label: 'All Circuits' },
-              { id: 'AVAILABLE', label: 'Available' },
-              { id: 'HANDSHAKE', label: 'Social Handshakes' },
-              { id: 'COMPLETED', label: 'Completed' },
+              { id: 'ALL', label: 'ALL' },
+              { id: 'AVAILABLE', label: 'AVAILABLE' },
+              { id: 'HANDSHAKE', label: 'HANDSHAKE' },
+              { id: 'COMPLETED', label: 'SOLVED' },
             ] as const
           ).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-sm text-[10px] font-bold tracking-wider transition-all cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-proto-surface1 text-proto-text font-bold shadow'
-                  : 'text-proto-subtext hover:text-proto-text'
+                  ? 'bg-[#28302b] text-[#f1ede4] border border-[#48544c]'
+                  : 'text-[#8f9e91] hover:text-[#f1ede4] border border-transparent'
               }`}
             >
-              {tab.label}
+              [{tab.label}]
             </button>
           ))}
         </div>
 
-        <div className="text-xs text-proto-subtext">
-          <span>{filteredNodes.length} CIRCUITS TRACKED</span>
+        <div className="text-[10px] text-[#8f9e91] font-mono">
+          {filteredNodes.length} STATIONS LISTED
         </div>
       </div>
 
-      {/* Nodes Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Nodes Grid (Tactile Station Dossiers) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {filteredNodes.map((item) => {
           const { node, is_completed, attempts, points_earned } = item;
           const globalSolves = Store.getNodeGlobalSolves(node.id);
@@ -144,77 +124,79 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
             <div
               key={node.id}
               onClick={() => onSelectNode(item)}
-              className={`group relative rounded-2xl bg-proto-base border p-5 cursor-pointer transition-all duration-200 hover:-translate-y-1 shadow-xl flex flex-col justify-between ${getDomainBorder(
-                node.domain,
-                is_completed
-              )}`}
+              className={`group rounded-sm bg-[#121513] border-2 p-3.5 cursor-pointer transition-all duration-150 shadow-md flex flex-col justify-between ${
+                is_completed 
+                  ? 'border-[#22c55e]/50 hover:border-[#22c55e]' 
+                  : 'border-[#28302b] hover:border-[#38bdf8]'
+              }`}
             >
               <div>
-                {/* Header with Station number */}
-                <div className="flex items-start justify-between gap-2 mb-2.5">
+                {/* Top Row: Station number + Domain */}
+                <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-proto-surface0 border border-proto-surface1 group-hover:border-proto-logic transition-colors">
+                    <div className="p-1.5 rounded-sm bg-[#171b18] border border-[#28302b]">
                       {getDomainIcon(node.domain)}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-proto-signal font-bold">
+                        <span className="text-[10px] text-[#eab308] font-bold">
                           {node.station_number || node.id}
                         </span>
                         {node.domain && (
-                          <span className="text-[9px] font-bold px-1.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
+                          <span className="text-[9px] font-bold px-1 rounded-sm bg-[#171b18] text-[#8f9e91] border border-[#28302b]">
                             {node.domain}
                           </span>
                         )}
                       </div>
-                      <h4 className="text-sm font-bold text-proto-text leading-snug group-hover:text-proto-logic transition-colors mt-0.5">
+                      <h4 className="text-xs font-bold text-[#f1ede4] leading-snug group-hover:text-[#38bdf8] transition-colors mt-0.5">
                         {node.title}
                       </h4>
                     </div>
                   </div>
 
                   {is_completed ? (
-                    <span className="shrink-0 p-1 rounded-full bg-proto-signal/20 text-proto-signal">
-                      <CheckCircle2 className="w-4 h-4" />
+                    <span className="shrink-0 stamp-box stamp-active text-[9px] py-0.5 px-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>SOLVED</span>
                     </span>
                   ) : (
-                    <span className="shrink-0 p-1 rounded-full bg-proto-surface0 text-proto-subtext group-hover:text-proto-logic transition-colors">
-                      <ChevronRight className="w-4 h-4" />
+                    <span className="shrink-0 p-1 text-[#8f9e91] group-hover:text-[#f1ede4] transition-colors">
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </span>
                   )}
                 </div>
 
                 {/* Laptop Station hint */}
                 {node.laptop_label && (
-                  <div className="text-[10px] text-proto-gold flex items-center gap-1 my-1">
+                  <div className="text-[10px] text-[#eab308] flex items-center gap-1 my-1 font-mono">
                     <Laptop className="w-3 h-3" />
                     <span className="truncate">{node.laptop_label}</span>
                   </div>
                 )}
 
                 {/* Subtitle / Payload teaser */}
-                <div className="text-xs text-proto-subtext line-clamp-2 my-2 min-h-[32px]">
+                <div className="text-[11px] text-[#8f9e91] line-clamp-2 my-1.5 min-h-[28px] font-sans">
                   {payloadTeaser}
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="pt-3 border-t border-proto-surface1 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-proto-subtext text-[11px]">
+              {/* Card Footer Strip */}
+              <div className="pt-2 border-t border-[#28302b] flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-1.5 text-[#8f9e91]">
                   <Clock className="w-3 h-3" />
                   <span>{globalSolves} solves</span>
                   {attempts > 0 && !is_completed && (
-                    <span className="text-proto-crimson ml-1">({attempts} tries)</span>
+                    <span className="text-[#dc2626]">({attempts} tries)</span>
                   )}
                 </div>
 
                 <div className="font-bold">
                   {is_completed ? (
-                    <span className="text-proto-signal">
+                    <span className="text-[#22c55e]">
                       +{points_earned || node.base_points} PTS
                     </span>
                   ) : (
-                    <span className="text-proto-gold">
+                    <span className="text-[#eab308]">
                       {currentScore} PTS
                     </span>
                   )}

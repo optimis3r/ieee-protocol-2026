@@ -7,7 +7,6 @@ import {
   Trophy, 
   Clock, 
   Sparkles, 
-  Users, 
   Layers, 
   ScanLine, 
   Ticket 
@@ -28,7 +27,6 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
   networkStatus,
   activeSeconds,
   discoveriesCount,
-  connectionsCount,
   availableNodesCount,
   onOpenScanner,
 }) => {
@@ -37,126 +35,82 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
   const isActive = agent.check_in_status === 'ACTIVE';
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-[#101713]/95 backdrop-blur-md border-b border-[#223027] font-mono-cyber">
-      {/* Primary Telemetry Strip */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+    <header className="sticky top-0 z-30 w-full bg-[#121513] border-b-2 border-[#28302b] font-mono-cyber select-none shadow-md">
+      {/* Primary High-Density Telemetry Strip */}
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-5 py-2 flex items-center justify-between gap-2">
         
-        {/* Agent ID & Wristband Callout */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#16201a] border border-[#26372d] flex items-center justify-center text-proto-signal font-black text-xs shadow-inner">
-            NW
+        {/* Left: Operative ID & Wristband Tag */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span 
+              className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-[#22c55e]' : 'bg-[#eab308]'}`} 
+              title={isActive ? 'Session Active' : 'Session Paused'}
+            />
+            <span className="font-black text-xs sm:text-sm tracking-wider text-[#f1ede4]">
+              {agent.agent_id}
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-black text-sm tracking-wider text-[#f3f7f4]">
-                {agent.agent_number || agent.agent_id}
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-[#1c2921] border border-proto-gold/40 text-proto-gold font-bold flex items-center gap-1">
-                <Ticket className="w-3 h-3" />
-                <span>Band: {agent.wristband_id || agent.agent_id}</span>
-              </span>
-            </div>
-            <div className="text-[10px] text-[#8ea897] truncate max-w-[180px]">
-              {agent.name}
-            </div>
-          </div>
+
+          <span className="text-[10px] text-[#eab308] font-bold border border-[#eab308]/40 px-1 py-0.2 rounded-sm shrink-0 font-mono">
+            {agent.wristband_id || agent.agent_id}
+          </span>
+
+          <span 
+            className="hidden sm:inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-sm border uppercase"
+            style={{ 
+              color: roleMeta.color || '#38bdf8', 
+              borderColor: `${roleMeta.color || '#38bdf8'}40`,
+              backgroundColor: `${roleMeta.color || '#38bdf8'}10`
+            }}
+          >
+            {roleMeta.title}
+          </span>
         </div>
 
-        {/* Dynamic Metric Badges */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-          {/* Active Play Timer */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141d17] border border-[#223027]">
-            {isActive ? (
-              <span className="w-2 h-2 rounded-full bg-proto-signal animate-pulse" />
-            ) : (
-              <span className="w-2 h-2 rounded-full bg-proto-gold" />
-            )}
-            <Clock className="w-3.5 h-3.5 text-[#8ea897]" />
-            <div>
-              <div className="text-[9px] uppercase text-[#7d9787] leading-none">
-                {isActive ? 'Active Play' : 'Timer Paused'}
-              </div>
-              <div className={`text-xs font-black leading-tight ${isActive ? 'text-proto-signal' : 'text-proto-gold'}`}>
-                {formatActiveTimeClock(activeSeconds)}
-              </div>
-            </div>
+        {/* Center: Live Stopwatch Timer */}
+        <div className="flex items-center gap-1.5 bg-[#0c0e0d] border border-[#28302b] px-2 py-1 rounded-sm shrink-0">
+          <Clock className="w-3 h-3 text-[#8f9e91]" />
+          <span className={`text-xs font-mono font-black ${isActive ? 'text-[#22c55e]' : 'text-[#eab308]'}`}>
+            {formatActiveTimeClock(activeSeconds)}
+          </span>
+        </div>
+
+        {/* Right: Score & Tactical Scan Action */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Circuit Count (Tablet / Desktop) */}
+          <div className="hidden md:flex items-center gap-1 text-[10px] text-[#8f9e91]">
+            <Layers className="w-3 h-3 text-[#38bdf8]" />
+            <span>{availableNodesCount} AVAIL</span>
           </div>
 
-          {/* Discoveries */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#141d17] border border-[#223027]">
-            <Sparkles className="w-3.5 h-3.5 text-proto-obs" />
-            <div>
-              <div className="text-[9px] uppercase text-[#7d9787] leading-none">
-                Discoveries
-              </div>
-              <div className="text-xs font-black text-[#f3f7f4] leading-tight">
-                {discoveriesCount}
-              </div>
-            </div>
+          {/* Score Badge */}
+          <div className="flex items-center gap-1 text-xs font-mono bg-[#0c0e0d] border border-[#eab308]/40 px-2 py-1 rounded-sm text-[#eab308] font-black">
+            <Trophy className="w-3 h-3 text-[#eab308]" />
+            <span>{agent.score}</span>
+            <span className="text-[9px] text-[#8f9e91] font-normal">PTS</span>
           </div>
 
-          {/* Connections */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#141d17] border border-[#223027]">
-            <Users className="w-3.5 h-3.5 text-proto-social" />
-            <div>
-              <div className="text-[9px] uppercase text-[#7d9787] leading-none">
-                Connections
-              </div>
-              <div className="text-xs font-black text-[#f3f7f4] leading-tight">
-                {connectionsCount}
-              </div>
-            </div>
-          </div>
-
-          {/* Available Nodes */}
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#141d17] border border-[#223027]">
-            <Layers className="w-3.5 h-3.5 text-proto-logic" />
-            <div>
-              <div className="text-[9px] uppercase text-[#7d9787] leading-none">
-                Circuits
-              </div>
-              <div className="text-xs font-black text-[#f3f7f4] leading-tight">
-                {availableNodesCount} Avail
-              </div>
-            </div>
-          </div>
-
-          {/* Score */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141d17] border border-proto-gold/50 shadow-[0_0_10px_rgba(255,190,59,0.12)]">
-            <Trophy className="w-4 h-4 text-proto-gold" />
-            <div>
-              <div className="text-[9px] uppercase text-[#8ea897] leading-none">
-                Score
-              </div>
-              <div className="text-sm font-black text-proto-gold leading-tight">
-                {agent.score} <span className="text-[10px] text-[#8ea897] font-normal">PTS</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Scanner Button */}
+          {/* Tactical Scan Action Trigger */}
           <button
             onClick={onOpenScanner}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-[#0a0f0d] font-black text-xs uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow cursor-pointer"
-            title="Scan Physical Node QR or Peer Badge"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm btn-tactile-primary text-[11px] font-black uppercase tracking-wider cursor-pointer"
+            title="Scan Physical Station QR"
           >
-            <ScanLine className="w-4 h-4" />
-            <span>Scan Tag</span>
+            <ScanLine className="w-3.5 h-3.5" />
+            <span className="text-[10px] sm:text-xs">SCAN</span>
           </button>
         </div>
+
       </div>
 
-      {/* Directive Ribbon */}
-      <div className="bg-[#0a0f0d] border-t border-[#1b2620] px-3 sm:px-6 py-1 flex items-center justify-between text-[11px] text-[#8ea897]">
+      {/* Slim 18px Tactical Sub-Strip */}
+      <div className="bg-[#0c0e0d] border-t border-[#28302b] px-2.5 sm:px-5 py-0.5 flex items-center justify-between text-[9px] text-[#8f9e91] font-mono">
         <div className="flex items-center gap-2 truncate">
-          <span className="text-proto-signal font-black">DIRECTIVE:</span>
-          <span className="font-bold text-[#f3f7f4]">{roleMeta.title}</span>
-          <span className="text-[#8ea897] truncate hidden xs:inline">[{roleMeta.subtitle}]</span>
+          <span className="text-[#22c55e] font-bold">CELL:</span>
+          <span className="text-[#f1ede4] truncate">{roleMeta.title} ({roleMeta.subtitle})</span>
         </div>
-        <div className="flex items-center gap-3 shrink-0 text-[10px]">
-          <span>LOCKOUT: <strong className="text-[#f3f7f4]">8:00 PM</strong></span>
-          <span className="hidden sm:inline opacity-40">•</span>
-          <span className="hidden sm:inline">STATE: <strong className="text-proto-signal">{networkStatus}</strong></span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span>NET: <strong className="text-[#f1ede4]">{networkStatus}</strong></span>
         </div>
       </div>
     </header>

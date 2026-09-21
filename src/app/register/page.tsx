@@ -8,27 +8,13 @@ import { ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
 import { sendRegistrationWhatsAppMessages } from '@/lib/whatsapp';
 import { 
-  Terminal, 
   AlertTriangle, 
-  Layers, 
-  Activity, 
-  Eye, 
-  Cpu, 
-  Users, 
   QrCode, 
-  ShieldAlert, 
-  Sparkles, 
   Ticket,
-  MessageSquare
+  MessageSquare,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
-
-const DOMAIN_ICONS: Record<PrimaryDomain, React.ComponentType<{ className?: string }>> = {
-  LOGIC: Layers,
-  SIGNAL: Activity,
-  OBSERVATION: Eye,
-  SYSTEM: Cpu,
-  SOCIAL: Users
-};
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -50,7 +36,7 @@ export default function RegisterPage() {
     setErrorMsg(null);
 
     if (!name.trim() || !rollNumber.trim() || !contact.trim()) {
-      setErrorMsg('Please fill in all required fields.');
+      setErrorMsg('Please complete all required enlistment fields.');
       return;
     }
 
@@ -60,21 +46,21 @@ export default function RegisterPage() {
     // Check if roll number already registered locally
     const existing = Store.findAgentByIdentifier(rollNumber.trim());
     if (existing) {
-      setErrorMsg(`Roll number / ID '${rollNumber.trim()}' is already registered. Please log in.`);
+      setErrorMsg(`Roll No '${rollNumber.trim()}' is already registered. Please log in.`);
       setIsSubmitting(false);
       return;
     }
 
-    // Dynamic pool-balancing reveal animation
+    // Dynamic pool-balancing animation
     soundEffects.playScanChirp();
     setAllocationStep('CONNECTING TO THE PROTOCOL CORE...');
+    await new Promise(r => setTimeout(r, 350));
+
+    setAllocationStep('ANALYZING TACTICAL ROSTER DENSITY...');
     await new Promise(r => setTimeout(r, 400));
 
-    setAllocationStep('ANALYZING OPERATIVE CAPABILITIES & ROSTER DENSITY...');
-    await new Promise(r => setTimeout(r, 450));
-
-    setAllocationStep('ALLOCATING UNIQUE OPERATIVE ID & TACTICAL CELL...');
-    await new Promise(r => setTimeout(r, 400));
+    setAllocationStep('ALLOCATING OPERATIVE ID & CELL...');
+    await new Promise(r => setTimeout(r, 350));
 
     // Execute atomic registration with server-authoritative sequential ID
     const { agent, token, assignedDomain } = await Store.registerAgentAsync({
@@ -84,11 +70,10 @@ export default function RegisterPage() {
       isPreVerified: false
     });
 
-    // Save session in local storage
     localStorage.setItem('ieee_agent_id', agent.agent_id);
     localStorage.setItem('ieee_agent_token', token);
 
-    // Dispatch 2 WhatsApp transmissions: (1) Group Link, (2) Personal QR Pass Image [QR]/[Agent Name]
+    // Dispatch WhatsApp messages
     sendRegistrationWhatsAppMessages({
       recipientPhone: contact.trim(),
       agentName: name.trim(),
@@ -107,181 +92,156 @@ export default function RegisterPage() {
       domain: assignedDomain
     });
 
-    // Forward to standby holding screen (if event not started yet) or badge/game if already active
+    // Route to standby or badge
     setTimeout(() => {
       if (Store.isEventActive()) {
         router.push('/my-badge');
       } else {
         router.push('/standby');
       }
-    }, 2400);
+    }, 2200);
   };
 
   return (
-    <div className="min-h-screen bg-[#0d120f] text-[#eaf2ec] flex flex-col justify-between p-4 sm:p-6 font-mono-cyber selection:bg-proto-signal selection:text-[#0d120f]">
-      {/* Top Header */}
-      <header className="max-w-md w-full mx-auto text-center pt-6 pb-4">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#16201a] border border-[#23332a] text-[#8ea897] text-xs mb-3">
-          <Terminal className="w-3.5 h-3.5 text-proto-signal" />
-          <span>NIT WARANGAL • IEEE THE PROTOCOL</span>
+    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col justify-between p-3 sm:p-5 tactile-grain select-none">
+      {/* Tactical Top Identifier */}
+      <header className="max-w-sm w-full mx-auto flex items-center justify-between text-[11px] text-[#8f9e91] border-b border-[#28302b] pb-2">
+        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[#f1ede4]">
+          <span>NITW</span>
+          <span className="text-[#8f9e91]">/</span>
+          <span>IEEE THE PROTOCOL</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#f3f7f4]">
-          OPERATIVE ENROLLMENT
-        </h1>
-        <p className="text-xs text-[#8ea897] font-sans mt-1">
-          Register to receive your unique Agent ID, physical wristband, and digital QR pass.
-        </p>
+        <div className="text-[10px] uppercase tracking-widest text-[#22c55e] font-bold">
+          [ENLISTMENT]
+        </div>
       </header>
 
-      {/* Main Registration Card */}
-      <main className="max-w-md w-full mx-auto bg-[#141d17] border border-[#223027] rounded-2xl p-6 shadow-2xl space-y-5">
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson text-xs flex items-start gap-2 animate-in fade-in">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
+      {/* Main Commission Docket */}
+      <main className="max-w-sm w-full mx-auto my-auto py-2">
+        <div className="bg-[#121513] border-2 border-[#28302b] rounded-sm p-4 sm:p-5 shadow-2xl space-y-4">
+          
+          <div className="border-b border-[#28302b] pb-2">
+            <div className="text-[9px] uppercase tracking-widest text-[#8f9e91] font-bold">
+              OFFICIAL ENLISTMENT DOCKET
+            </div>
+            <h1 className="text-xl font-black text-[#f1ede4] tracking-tight uppercase">
+              COMMISSION OPERATIVE
+            </h1>
+            <p className="text-[11px] text-[#8f9e91] font-mono mt-0.5">
+              Input operative credentials to generate your personal pass.
+            </p>
           </div>
-        )}
 
-        {/* Dynamic Allocation Reveal State */}
-        {isSubmitting && (
-          <div className="p-5 rounded-xl bg-[#101713] border border-proto-signal/40 text-center space-y-4 animate-in fade-in">
-            {!assignedResult ? (
-              <div className="space-y-3">
-                <div className="w-10 h-10 border-2 border-proto-signal border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-xs font-bold text-proto-signal uppercase tracking-wider animate-pulse">
-                  {allocationStep}
-                </p>
-                <div className="text-[10px] text-[#7d9787]">
-                  Allocating starting role & initial directive from balanced pools...
+          {errorMsg && (
+            <div className="p-2.5 bg-[#dc2626]/10 border border-[#dc2626]/40 text-[#dc2626] text-xs flex items-center gap-2 rounded-sm">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Allocation Reveal State */}
+          {isSubmitting && (
+            <div className="p-4 bg-[#0c0e0d] border border-[#28302b] text-center space-y-3 rounded-sm">
+              {!assignedResult ? (
+                <div className="space-y-2 py-3">
+                  <div className="w-6 h-6 border-2 border-[#22c55e] border-t-transparent animate-spin mx-auto" />
+                  <div className="text-xs font-bold text-[#22c55e] uppercase tracking-wider font-mono">
+                    {allocationStep}
+                  </div>
                 </div>
+              ) : (
+                <div className="space-y-2 py-1 font-mono">
+                  <div className="stamp-box stamp-active text-xs">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>COMMISSIONED: {assignedResult.agentId}</span>
+                  </div>
+                  <div className="text-sm font-black text-[#f1ede4]">
+                    {ROLE_DETAILS[assignedResult.domain].title} Cell
+                  </div>
+                  <div className="text-xs text-[#eab308]">
+                    WRISTBAND: {assignedResult.wristbandId}
+                  </div>
+                  <div className="text-[10px] text-[#8f9e91] pt-1">
+                    Pass dispatched to WhatsApp • Forwarding...
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isSubmitting && (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
+                  Operative Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Alan Turing"
+                  className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] font-sans"
+                />
               </div>
-            ) : (
-              <div className="space-y-3 animate-in zoom-in-95">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-proto-signal/20 text-proto-signal text-[11px] font-black border border-proto-signal/40">
-                  <Sparkles className="w-3.5 h-3.5" /> DIRECTIVE LOCKED
-                </div>
-                <div className="text-lg font-black text-[#f3f7f4]">
-                  {assignedResult.agentNumber}
-                </div>
-                <div className="text-xs text-proto-gold font-bold flex items-center justify-center gap-1">
-                  <Ticket className="w-3.5 h-3.5" /> WRISTBAND: {assignedResult.wristbandId}
-                </div>
-                <div className="p-3 rounded-xl bg-[#17231c] border border-proto-signal/30 text-xs">
-                  <span className="text-proto-signal font-black block text-sm">
-                    {ROLE_DETAILS[assignedResult.domain].title} Operative
-                  </span>
-                  <span className="text-[11px] text-[#96af9f] block">
-                    {ROLE_DETAILS[assignedResult.domain].subtitle}
-                  </span>
-                </div>
 
-                {/* WhatsApp delivery confirmation badge */}
-                <div className="p-2.5 rounded-xl bg-proto-signal/15 border border-proto-signal/40 text-proto-signal text-xs flex items-center justify-center gap-2">
-                  <MessageSquare className="w-4 h-4 shrink-0" />
-                  <span className="font-bold text-[11px]">
-                    2 WhatsApp Transmissions Dispatched: Group Link & QR Pass Pass Image
-                  </span>
-                </div>
-
-                <p className="text-[10px] text-[#7d9787]">
-                  {Store.isEventActive() 
-                    ? 'Transitioning to your digital badge pass...' 
-                    : 'Event commences Sept 24 • Forwarding to Holding Desk...'}
-                </p>
+              <div>
+                <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
+                  Student Roll No / ID * (Account Key)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={rollNumber}
+                  onChange={(e) => setRollNumber(e.target.value)}
+                  placeholder="e.g. 23CSB01"
+                  className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] uppercase font-mono"
+                />
               </div>
-            )}
+
+              <div>
+                <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
+                  Phone / WhatsApp *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  placeholder="Contact number (e.g. 9876543210)"
+                  className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] font-sans"
+                />
+              </div>
+
+              {/* Compact Tactical Notice */}
+              <div className="text-[10px] text-[#8f9e91] flex items-center justify-between border-t border-b border-[#28302b] py-1.5 font-mono">
+                <span>ROLE ALLOCATION:</span>
+                <span className="text-[#eab308] font-bold">[AUTOMATIC BALANCED CELL]</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-2.5 px-3 rounded-sm btn-tactile-primary text-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>COMMISSION OPERATIVE & MINT PASS</span>
+              </button>
+            </form>
+          )}
+
+          <div className="text-center pt-2 border-t border-[#28302b] text-[11px] text-[#8f9e91]">
+            <span>Already commissioned? </span>
+            <Link href="/login" className="text-[#22c55e] hover:underline font-bold">
+              Log in here →
+            </Link>
           </div>
-        )}
-
-        {!isSubmitting && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-                Full Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Alan Turing"
-                className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-                Student Roll No / ID / Email * (Account Key)
-              </label>
-              <input
-                type="text"
-                required
-                value={rollNumber}
-                onChange={(e) => setRollNumber(e.target.value)}
-                placeholder="e.g. 23CSB01 or roll number"
-                className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-[#8ea897] mb-1 uppercase tracking-wider">
-                Phone / WhatsApp *
-              </label>
-              <input
-                type="text"
-                required
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-                placeholder="Contact number (e.g. +91 9876543210)"
-                className="w-full px-3.5 py-2.5 text-xs bg-[#101713] border border-[#283b30] rounded-xl text-[#eaf2ec] focus:outline-none focus:border-proto-signal"
-              />
-            </div>
-
-            {/* Dynamic Role Assignment Explainer */}
-            <div className="p-3.5 rounded-xl bg-[#101713] border border-[#283b30] space-y-2">
-              <div className="flex items-center gap-1.5 text-proto-signal text-[11px] font-bold">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>DYNAMIC ROLE ALLOCATION</span>
-              </div>
-              <p className="text-[10px] text-[#8ea897] leading-relaxed font-sans">
-                To guarantee fair tactical parity, the system will allocate your starting role and initial node cluster from balanced pools upon submission:
-              </p>
-              <div className="grid grid-cols-1 gap-1 pt-1 text-[10px]">
-                {(Object.entries(ROLE_DETAILS) as [PrimaryDomain, typeof ROLE_DETAILS[PrimaryDomain]][]).map(([key, item]) => {
-                  const Icon = DOMAIN_ICONS[key];
-                  return (
-                    <div key={key} className="flex items-center gap-2 py-0.5 text-[#cad3f5]">
-                      <Icon className="w-3 h-3 text-proto-signal shrink-0" />
-                      <span className="font-bold">{item.title}:</span>
-                      <span className="text-[#8ea897] font-sans">{item.subtitle}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-            >
-              <QrCode className="w-4 h-4" />
-              <span>INITIALIZE OPERATIVE & GENERATE PASS</span>
-            </button>
-          </form>
-        )}
-
-        <div className="text-center pt-2 border-t border-[#1b2620] text-xs text-[#7d9787]">
-          <span>Already registered? </span>
-          <Link href="/login" className="text-proto-signal hover:underline font-bold">
-            Log in here →
-          </Link>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="max-w-md w-full mx-auto text-center py-4 text-xs text-[#7d9787]">
-        NIT Warangal IEEE Student Branch // The Protocol
+      {/* Minimal Bottom Stamp */}
+      <footer className="max-w-sm w-full mx-auto text-center text-[9px] text-[#48544c] uppercase tracking-widest pt-1">
+        NIT WARANGAL • IEEE STUDENT BRANCH • SECURE DISPATCH
       </footer>
     </div>
   );
