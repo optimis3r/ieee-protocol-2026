@@ -7,9 +7,12 @@
  * Features:
  * - Direct WhatsApp Web protocol integration (100% Free, Zero Cost)
  * - Visual QR code generation (Base64 PNG) for Admin Web UI display
- * - Multi-Day session persistence (stays linked for 3-4+ days without re-scan)
- * - 25-second WebSocket keep-alive ping to prevent idle disconnections
- * - Safe auto-reconnect on network glitches without wiping credentials
+ * - Multi-Day permanent session persistence (stays linked until explicitly unlinked)
+ * - Dual-layer keep-alive: WebSocket ping (20s) + WhatsApp presence & IQ ping (25s)
+ * - Trusted browser fingerprinting (Ubuntu Chrome) to prevent anti-bot session revocations
+ * - Reconnection guard with clean socket teardown to avoid conflicting sessions (440/401)
+ * - Safe error handling: never purges session cache on transient network glitches
+ * - Self-ping keep-alive for Render cloud hosting
  * 
  * Run via: npm run wa:gateway
  */
@@ -17,7 +20,8 @@
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  Browsers
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode';
 import pino from 'pino';
@@ -43,6 +47,9 @@ let lastQrDataUrl = null;
 let qrGeneratedAt = null;
 let connectionState = 'INITIALIZING';
 let reconnectAttempts = 0;
+let isConnecting = false;
+let heartbeatTimer = null;
+let reconnectTimer = null;
 
 // Format phone number to WhatsApp JID (e.g., 919848011223@s.whatsapp.net)
 function formatToJid(phone) {
@@ -58,17 +65,70 @@ function formatToJid(phone) {
 function printBanner() {
   console.log('\x1b[36m%s\x1b[0m', '==========================================================');
   console.log('\x1b[32m\x1b[1m%s\x1b[0m', '   NIT WARANGAL • IEEE THE PROTOCOL 2026');
-  console.log('\x1b[33m%s\x1b[0m', '   WHATSAPP AUTOMATION GATEWAY (100% FREE / ZERO COST)');
+  console.log('\x1b[33m%s\x1b[0m', '   WHATSAPP AUTOMATION GATEWAY (PERMANENT SESSION MODE)');
   console.log('\x1b[36m%s\x1b[0m', '==========================================================');
   console.log(`[Gateway Server] Listening on http://localhost:${PORT}`);
   console.log(`[Session Cache] Storage folder: ${AUTH_DIR}`);
-  console.log(`[Persistence] Multi-day session keep-alive active (25s ping interval)`);
+  console.log(`[Persistence] Active WhatsApp protocol keep-alive running every 25s`);
+  console.log(`[Browser Engine] Ubuntu Chrome trusted fingerprint active`);
   console.log('----------------------------------------------------------\n');
+}
+
+// Stop Heartbeat
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+// Start active protocol-level keep-alive pinging
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatTimer = setInterval(async () => {
+    if (isConnected && sock) {
+      try {
+        // 1. Send availability presence update to WhatsApp Web servers
+        await sock.sendPresenceUpdate('available');
+
+        // 2. Query ping packet to WhatsApp edge
+        await sock.query({
+          tag: 'iq',
+          attrs: { to: '@s.whatsapp.net', type: 'get', xmlns: 'w:p' },
+          content: [{ tag: 'ping', attrs: {} }]
+        }).catch(() => {});
+      } catch (err) {
+        console.warn('[WhatsApp Gateway] Heartbeat ping warning:', err?.message);
+      }
+    }
+  }, 25_000); // Sends ping every 25s
+}
+
+// Teardown previous socket cleanly to avoid duplicate conflicting connections (code 440/401)
+async function cleanupSocket() {
+  stopHeartbeat();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (sock) {
+    try {
+      sock.ev.removeAllListeners();
+      sock.ws?.close();
+      sock.end(undefined);
+    } catch (_) {}
+    sock = null;
+  }
 }
 
 // Start WhatsApp Socket
 async function startWhatsApp() {
+  if (isConnecting) return;
+  isConnecting = true;
+
   try {
+    await cleanupSocket();
+
     if (!fs.existsSync(AUTH_DIR)) {
       fs.mkdirSync(AUTH_DIR, { recursive: true });
     }
@@ -86,11 +146,11 @@ async function startWhatsApp() {
       auth: state,
       logger,
       printQRInTerminal: false,
-      browser: ['NITW The Protocol', 'Chrome', '122.0.0'],
+      browser: Browsers.ubuntu('Chrome'), // Standard trusted browser signature to prevent anti-bot blocks
       syncFullHistory: false,
       connectTimeoutMs: 60_000,
       defaultQueryTimeoutMs: 60_000,
-      keepAliveIntervalMs: 25_000, // Sends keep-alive ping every 25s so TCP/ISP connections never drop
+      keepAliveIntervalMs: 20_000, // TCP / WebSocket ping
       retryRequestDelayMs: 500,
       markOnlineOnConnect: true
     });
@@ -130,6 +190,7 @@ async function startWhatsApp() {
 
       if (connection === 'open') {
         isConnected = true;
+        isConnecting = false;
         reconnectAttempts = 0;
         connectedUser = sock.user?.id ? sock.user.id.split(':')[0] : 'Linked Device';
         connectionState = 'CONNECTED';
@@ -137,40 +198,81 @@ async function startWhatsApp() {
         lastQrDataUrl = null;
 
         console.log('\x1b[32m\x1b[1m%s\x1b[0m', `\n[SUCCESS] Gateway CONNECTED! Linked to WhatsApp number: +${connectedUser}`);
-        console.log('\x1b[32m%s\x1b[0m', `[PERSISTENCE] Session saved to disk. Will stay linked for 3-4+ days without re-scanning.\n`);
+        console.log('\x1b[32m%s\x1b[0m', `[PERSISTENCE] Session saved to disk. Permanent keep-alive active.\n`);
+
+        startHeartbeat();
       }
 
       if (connection === 'close') {
         isConnected = false;
+        isConnecting = false;
+        stopHeartbeat();
         connectionState = 'DISCONNECTED';
+
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const reason = lastDisconnect?.error?.message || 'Connection closed';
 
         console.log(`[WhatsApp Engine] Connection closed. Reason: ${reason} (Status Code: ${statusCode})`);
 
-        // ONLY delete the stored session if WhatsApp explicitly reports logged out (401)
+        // Handle Restart Required (Code 515) - Common in Baileys on initial sync
+        if (statusCode === DisconnectReason.restartRequired) {
+          console.log('[WhatsApp Engine] Edge restart requested. Reconnecting immediately...');
+          reconnectTimer = setTimeout(() => {
+            isConnecting = false;
+            startWhatsApp();
+          }, 600);
+          return;
+        }
+
+        // Check for 401 loggedOut
         if (statusCode === DisconnectReason.loggedOut) {
-          console.log('\x1b[31m%s\x1b[0m', '[ALERT] Device was logged out from WhatsApp. Purging session cache.');
+          reconnectAttempts++;
+          console.log('\x1b[33m%s\x1b[0m', `[WhatsApp Engine] Received 401 disconnect notification (Attempt #${reconnectAttempts}). Checking session validity...`);
+
+          // Allow 2 re-connection verification attempts before concluding it was removed from phone
+          if (reconnectAttempts <= 2) {
+            reconnectTimer = setTimeout(() => {
+              isConnecting = false;
+              startWhatsApp();
+            }, 2500);
+            return;
+          }
+
+          console.log('\x1b[31m%s\x1b[0m', '[ALERT] WhatsApp session was unlinked from the mobile phone. Clearing cached session.');
           if (fs.existsSync(AUTH_DIR)) {
-            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+            try {
+              fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+            } catch (_) {}
           }
           lastQr = null;
           lastQrDataUrl = null;
           connectedUser = null;
-          startWhatsApp();
-        } else {
-          // Any other disconnect (network blip, router reconnect, server sleep) preserves credentials
-          reconnectAttempts++;
-          const delay = Math.min(reconnectAttempts * 2000, 10000);
-          console.log(`[WhatsApp Engine] Network or socket hiccup. Silently restoring session in ${delay / 1000}s (Attempt #${reconnectAttempts})...`);
-          setTimeout(startWhatsApp, delay);
+          connectionState = 'QR_READY';
+          reconnectAttempts = 0;
+
+          reconnectTimer = setTimeout(() => {
+            isConnecting = false;
+            startWhatsApp();
+          }, 1500);
+          return;
         }
+
+        // All other network / socket closures (408 timedOut, 428 connectionClosed, WiFi switch, sleep):
+        // PRESERVE credentials and auto-reconnect with gentle exponential backoff
+        reconnectAttempts++;
+        const delay = Math.min(reconnectAttempts * 1500, 10000);
+        console.log(`[WhatsApp Engine] Network hiccup. Silently restoring session in ${delay / 1000}s (Attempt #${reconnectAttempts})...`);
+        reconnectTimer = setTimeout(() => {
+          isConnecting = false;
+          startWhatsApp();
+        }, delay);
       }
     });
 
   } catch (err) {
     console.error('[WhatsApp Engine] Error starting socket:', err);
-    setTimeout(startWhatsApp, 5000);
+    isConnecting = false;
+    reconnectTimer = setTimeout(startWhatsApp, 5000);
   }
 }
 
@@ -294,7 +396,7 @@ const server = http.createServer(async (req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -325,7 +427,8 @@ const server = http.createServer(async (req, res) => {
   // Unlink / Logout Endpoint (Allows organizer to deliberately switch linked phones from Admin UI)
   if ((req.method === 'POST' || req.method === 'DELETE') && (url.pathname === '/unlink' || url.pathname === '/logout')) {
     try {
-      console.log('\x1b[33m%s\x1b[0m', '\n[GATEWAY] Unlink request received from Admin UI. Purging credentials...');
+      console.log('\x1b[33m%s\x1b[0m', '\n[GATEWAY] Deliberate Unlink request received from Admin UI. Purging credentials...');
+      stopHeartbeat();
       if (sock) {
         try { await sock.logout(); } catch (_) { try { sock.end(); } catch (__) {} }
       }
@@ -337,7 +440,11 @@ const server = http.createServer(async (req, res) => {
       if (fs.existsSync(AUTH_DIR)) {
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
       }
-      setTimeout(startWhatsApp, 1500);
+      reconnectAttempts = 0;
+      setTimeout(() => {
+        isConnecting = false;
+        startWhatsApp();
+      }, 1500);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, message: 'Unlinked. New QR will be generated.' }));
     } catch (err) {
@@ -388,10 +495,25 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Endpoint not found' }));
 });
 
+// Self-ping to prevent Render.com free-tier instances from idling to sleep
+const cloudUrl = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL;
+if (cloudUrl) {
+  const pingUrl = cloudUrl.endsWith('/') ? `${cloudUrl}health` : `${cloudUrl}/health`;
+  console.log(`[Cloud Keep-Alive] Enabling auto-ping to ${pingUrl} every 10 minutes`);
+  setInterval(async () => {
+    try {
+      await fetch(pingUrl);
+    } catch (_) {}
+  }, 10 * 60 * 1000);
+}
+
 // Clean shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('\n[WhatsApp Gateway] Shutting down cleanly...');
-  if (sock) sock.end();
+  stopHeartbeat();
+  if (sock) {
+    try { sock.end(undefined); } catch (_) {}
+  }
   server.close(() => process.exit(0));
 });
 

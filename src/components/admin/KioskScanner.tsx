@@ -6,6 +6,7 @@ import { Store, formatActiveTime, getAgentActiveSeconds } from '@/lib/store';
 import { soundEffects } from '@/lib/audio';
 import { Agent, AccessLog } from '@/types/database';
 import { RegisterModal } from './RegisterModal';
+import { CheckInOutModal } from './CheckInOutModal';
 import { 
   Camera, 
   CheckCircle2, 
@@ -16,7 +17,9 @@ import {
   Shield, 
   Ticket,
   Pause,
-  Play
+  Play,
+  Activity,
+  Timer
 } from 'lucide-react';
 
 export const KioskScanner: React.FC = () => {
@@ -31,12 +34,50 @@ export const KioskScanner: React.FC = () => {
   const [unregisteredBadgeId, setUnregisteredBadgeId] = useState<string>('');
   const [manualCode, setManualCode] = useState('');
 
+  // Check-In / Check-Out Confirmation Modal State
+  const [selectedAgentForModal, setSelectedAgentForModal] = useState<Agent | null>(null);
+  const [isCheckInOutOpen, setIsCheckInOutOpen] = useState(false);
+
+  // Cooldown & Scan Lock to prevent rapid cycling loops
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+  const isModalOpenRef = useRef<boolean>(false);
+  const cooldownUntilRef = useRef<number>(0);
+  const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const refreshLogs = useCallback(() => {
     setAccessLogs(Store.getAccessLogs());
   }, []);
 
+  const triggerCooldown = useCallback((durationMs = 2500) => {
+    cooldownUntilRef.current = Date.now() + durationMs;
+    setCooldownSeconds(Math.ceil(durationMs / 1000));
+
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    cooldownIntervalRef.current = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((cooldownUntilRef.current - Date.now()) / 1000));
+      setCooldownSeconds(remaining);
+      if (remaining <= 0) {
+        if (cooldownIntervalRef.current) {
+          clearInterval(cooldownIntervalRef.current);
+          cooldownIntervalRef.current = null;
+        }
+        // Safely resume camera scanning once cooldown elapses
+        try {
+          if (scannerRef.current && !isModalOpenRef.current) {
+            scannerRef.current.resume();
+          }
+        } catch (_) {}
+      }
+    }, 200);
+  }, []);
+
   const processBadgeScan = useCallback(
     (scannedText: string) => {
+      // Ignore new scans if modal is already open or during cooldown period
+      if (isModalOpenRef.current || Date.now() < cooldownUntilRef.current) {
+        return;
+      }
+
       let badgeId = scannedText.trim();
 
       // Parse if it's a URL
@@ -60,36 +101,57 @@ export const KioskScanner: React.FC = () => {
       const existingAgent = Store.getAgentById(badgeId) || Store.findAgentByIdentifier(badgeId);
 
       if (existingAgent) {
-        let isCheckingIn = true;
-        if (activeDirection === 'IN') {
-          isCheckingIn = true;
-        } else if (activeDirection === 'OUT') {
-          isCheckingIn = false;
-        } else {
-          // AUTO mode: If currently ACTIVE, toggle to OUT (PAUSED); otherwise IN (ACTIVE)
-          isCheckingIn = existingAgent.check_in_status !== 'ACTIVE';
-        }
-
-        if (isCheckingIn) {
-          Store.checkInAgent(existingAgent.agent_id, 'Kiosk desk camera scan');
-        } else {
-          Store.checkOutAgent(existingAgent.agent_id, 'Kiosk desk camera scan');
-        }
-        soundEffects.playSuccessChime();
-
-        const updated = Store.getAgentById(existingAgent.agent_id);
-        setLastScannedAgent(updated);
-        setLastAction(isCheckingIn ? 'CHECKED IN (ACTIVE - TIMER STARTED)' : 'CHECKED OUT (PAUSED - TIMER FROZEN)');
-        refreshLogs();
-      } else {
-        // Unregistered QR badge
+        // Pause scanner and display the Check-In / Check-Out Confirmation Modal
+        isModalOpenRef.current = true;
         soundEffects.playScanChirp();
+        try {
+          scannerRef.current?.pause(true);
+        } catch (_) {}
+
+        setSelectedAgentForModal(existingAgent);
+        setIsCheckInOutOpen(true);
+      } else {
+        // Unregistered QR badge: Pause scanner and display enrollment modal
+        isModalOpenRef.current = true;
+        soundEffects.playScanChirp();
+        try {
+          scannerRef.current?.pause(true);
+        } catch (_) {}
+
         setUnregisteredBadgeId(badgeId);
         setIsRegisterOpen(true);
       }
     },
-    [activeDirection, refreshLogs]
+    []
   );
+
+  const handleModalCheckIn = (agentId: string) => {
+    Store.checkInAgent(agentId, 'Kiosk desk camera scan');
+    const updated = Store.getAgentById(agentId);
+    setLastScannedAgent(updated);
+    setLastAction('CHECKED IN (ACTIVE - TIMER STARTED)');
+    refreshLogs();
+    setIsCheckInOutOpen(false);
+    isModalOpenRef.current = false;
+    triggerCooldown(2500);
+  };
+
+  const handleModalCheckOut = (agentId: string) => {
+    Store.checkOutAgent(agentId, 'Kiosk desk camera scan');
+    const updated = Store.getAgentById(agentId);
+    setLastScannedAgent(updated);
+    setLastAction('CHECKED OUT (PAUSED - TIMER FROZEN)');
+    refreshLogs();
+    setIsCheckInOutOpen(false);
+    isModalOpenRef.current = false;
+    triggerCooldown(2500);
+  };
+
+  const handleModalClose = () => {
+    setIsCheckInOutOpen(false);
+    isModalOpenRef.current = false;
+    triggerCooldown(1500);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -125,6 +187,9 @@ export const KioskScanner: React.FC = () => {
 
     return () => {
       isMounted = false;
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
       if (scannerRef.current) {
         scannerRef.current
           .stop()
@@ -166,21 +231,30 @@ export const KioskScanner: React.FC = () => {
             </h3>
           </div>
 
-          {/* Direction toggle */}
-          <div className="flex items-center gap-1 bg-proto-surface0 p-1 rounded-xl border border-proto-surface1">
-            {(['AUTO', 'IN', 'OUT'] as const).map((dir) => (
-              <button
-                key={dir}
-                onClick={() => setActiveDirection(dir)}
-                className={`px-3 py-1 rounded-lg text-[11px] font-mono-cyber transition-all cursor-pointer ${
-                  activeDirection === dir
-                    ? 'bg-proto-surface2 text-proto-signal font-bold shadow'
-                    : 'text-proto-subtext hover:text-proto-text'
-                }`}
-              >
-                {dir === 'AUTO' ? 'AUTO-TOGGLE' : dir === 'IN' ? 'CHECK-IN ONLY' : 'CHECK-OUT ONLY'}
-              </button>
-            ))}
+          {/* Scanner Status & Cooldown Pill */}
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-mono-cyber font-bold px-3 py-1 rounded-full flex items-center gap-1.5 border transition-all ${
+              isCheckInOutOpen || isRegisterOpen
+                ? 'bg-proto-gold/20 text-proto-gold border-proto-gold/40'
+                : cooldownSeconds > 0
+                ? 'bg-proto-logic/20 text-proto-logic border-proto-logic/40'
+                : 'bg-proto-signal/20 text-proto-signal border-proto-signal/40'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                isCheckInOutOpen || isRegisterOpen
+                  ? 'bg-proto-gold animate-pulse'
+                  : cooldownSeconds > 0
+                  ? 'bg-proto-logic animate-spin'
+                  : 'bg-proto-signal animate-ping'
+              }`} />
+              <span>
+                {isCheckInOutOpen || isRegisterOpen
+                  ? 'POPUP ACTIVE'
+                  : cooldownSeconds > 0
+                  ? `COOLDOWN (${cooldownSeconds}s)`
+                  : 'SCANNER READY'}
+              </span>
+            </span>
           </div>
         </div>
 
@@ -188,10 +262,28 @@ export const KioskScanner: React.FC = () => {
         <div className="relative aspect-video sm:aspect-[4/3] w-full bg-proto-obsidian rounded-xl overflow-hidden flex items-center justify-center border border-proto-surface1">
           <div id={containerId} className="w-full h-full object-cover" />
 
-          {/* Reticle Overlay */}
+          {/* Reticle Overlay with Dynamic Cooldown Visuals */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="w-56 h-56 border-2 border-dashed border-proto-signal/50 rounded-xl relative">
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-proto-signal animate-pulse shadow-[0_0_10px_#00ff88]" />
+            <div className={`w-56 h-56 border-2 rounded-xl relative transition-all duration-300 ${
+              cooldownSeconds > 0
+                ? 'border-proto-logic/50 shadow-[0_0_15px_rgba(0,180,255,0.2)]'
+                : isCheckInOutOpen
+                ? 'border-proto-gold/50 shadow-[0_0_15px_rgba(255,191,0,0.2)]'
+                : 'border-dashed border-proto-signal/60 shadow-[0_0_20px_rgba(0,255,136,0.25)]'
+            }`}>
+              {cooldownSeconds > 0 ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-proto-obsidian/40 backdrop-blur-[1px] rounded-xl text-center p-2">
+                  <Timer className="w-8 h-8 text-proto-logic animate-pulse mb-1" />
+                  <span className="text-[11px] font-mono-cyber font-bold text-proto-logic uppercase">
+                    COOLDOWN ACTIVE
+                  </span>
+                  <span className="text-[10px] text-white/80 font-mono">
+                    Ready in {cooldownSeconds}s
+                  </span>
+                </div>
+              ) : (
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-proto-signal animate-pulse shadow-[0_0_10px_#00ff88]" />
+              )}
             </div>
           </div>
         </div>
@@ -209,7 +301,7 @@ export const KioskScanner: React.FC = () => {
             type="submit"
             className="px-4 py-2.5 text-xs font-mono-cyber font-bold uppercase bg-proto-signal text-[#0a0f0d] hover:bg-[#00e676] rounded-xl transition-colors cursor-pointer"
           >
-            Check-In / Log
+            Verify Operative
           </button>
         </form>
 
@@ -218,6 +310,7 @@ export const KioskScanner: React.FC = () => {
           <span>Unregistered participant at the desk?</span>
           <button
             onClick={() => {
+              isModalOpenRef.current = true;
               setUnregisteredBadgeId('');
               setIsRegisterOpen(true);
             }}
@@ -319,7 +412,7 @@ export const KioskScanner: React.FC = () => {
               AWAITING OPERATIVE QR SCAN
             </h4>
             <p className="text-[11px] font-sans">
-              Scan an operative&apos;s phone QR code to start their timer on arrival or pause it when they exit.
+              Scan an operative&apos;s phone QR code or enter their ID to open the Check-In / Check-Out confirmation modal.
             </p>
           </div>
         )}
@@ -374,14 +467,34 @@ export const KioskScanner: React.FC = () => {
         </div>
       </div>
 
+      {/* Operative Desk Check-In / Check-Out Confirmation Modal */}
+      <CheckInOutModal
+        isOpen={isCheckInOutOpen}
+        agent={selectedAgentForModal}
+        onClose={handleModalClose}
+        onCheckIn={handleModalCheckIn}
+        onCheckOut={handleModalCheckOut}
+      />
+
       {/* Registration Modal Overlay for unallocated badges */}
       <RegisterModal
         isOpen={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
+        onClose={() => {
+          setIsRegisterOpen(false);
+          isModalOpenRef.current = false;
+          triggerCooldown(1500);
+        }}
         initialAgentId={unregisteredBadgeId}
         onSuccess={(newId) => {
-          processBadgeScan(newId);
+          setIsRegisterOpen(false);
+          isModalOpenRef.current = false;
           refreshLogs();
+          triggerCooldown(2500);
+          const newAgent = Store.getAgentById(newId);
+          if (newAgent) {
+            setLastScannedAgent(newAgent);
+            setLastAction('ENROLLED & CHECKED IN');
+          }
         }}
       />
     </div>
