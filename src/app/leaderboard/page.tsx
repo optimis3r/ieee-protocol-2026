@@ -80,23 +80,24 @@ export default function LeaderboardPage() {
   });
 
   return (
-    <div className="min-h-screen bg-proto-obsidian text-proto-text flex flex-col justify-between scanlines font-mono-cyber selection:bg-proto-gold selection:text-proto-obsidian">
-      {/* Top Navigation */}
-      <header className="w-full bg-proto-base/95 backdrop-blur-md border-b border-proto-surface1 px-4 sm:px-6 py-3.5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between selection:bg-[#c93b2b] selection:text-[#f4f1ea]">
+      {/* Top Editorial Masthead */}
+      <header className="w-full border-b border-[#2d312c] px-4 sm:px-8 py-3.5 bg-[#141514]">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="p-2 rounded-xl bg-proto-surface0 border border-proto-surface1 hover:border-proto-signal text-proto-subtext hover:text-proto-text transition-all"
+              className="p-1.5 border border-[#3f453f] hover:border-[#949e93] text-[#949e93] hover:text-[#f4f1ea] transition-colors rounded-sm"
+              aria-label="Back to home"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div>
-              <div className="font-black text-xs tracking-wider text-proto-text uppercase flex items-center gap-2">
-                NIT WARANGAL // THE PROTOCOL
+              <div className="font-mono-tabular text-[10px] text-[#949e93] tracking-widest uppercase">
+                NIT WARANGAL • THE PROTOCOL 2026
               </div>
-              <div className="text-[10px] text-proto-subtext tracking-widest uppercase">
-                GLOBAL CLEARANCE LEADERBOARD
+              <div className="text-xs font-bold tracking-wider text-[#f4f1ea] uppercase">
+                OFFICIAL STANDINGS REGISTRY
               </div>
             </div>
           </div>
@@ -104,45 +105,45 @@ export default function LeaderboardPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/play"
-              className="px-3.5 py-1.5 rounded-lg bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] text-xs font-bold uppercase transition-colors"
+              className="btn-editorial-outline px-3 py-1.5 text-xs uppercase font-mono-tabular"
             >
-              Enter HUD
+              HUD Portal
             </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 flex-1 flex flex-col justify-center space-y-6">
+      <main className="max-w-5xl w-full mx-auto px-4 sm:px-8 py-8 flex-1">
         {/* IF LEADERBOARD IS HIDDEN BY OPERATIONS: SUSPENSE BLACKOUT SCREEN */}
         {!gameState.leaderboard_visible ? (
-          <div className="max-w-xl w-full mx-auto bg-[#141d17] border border-proto-crimson/50 rounded-2xl p-8 text-center space-y-5 animate-in fade-in duration-300">
-            <div className="w-16 h-16 rounded-full bg-proto-crimson/20 border-2 border-proto-crimson flex items-center justify-center mx-auto text-proto-crimson shadow-[0_0_20px_rgba(255,51,68,0.3)] animate-pulse">
-              <Lock className="w-8 h-8" />
+          <div className="max-w-lg mx-auto border border-[#3f453f] bg-[#1b1d1b] p-8 space-y-6">
+            <div className="flex items-start justify-between">
+              <span className="editorial-stamp border-[#c93b2b] text-[#c93b2b]">
+                [TELEMETRY SEALED]
+              </span>
+              <Lock className="w-5 h-5 text-[#c93b2b]" />
             </div>
 
             <div className="space-y-2">
-              <span className="text-[10px] font-black tracking-widest text-proto-crimson uppercase px-3 py-1 rounded-full bg-proto-crimson/15 border border-proto-crimson/40 inline-block">
-                TELEMETRY BLACKOUT INITIATED
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-proto-text uppercase tracking-tight">
-                STANDINGS TEMPORARILY CONCEALED
+              <h2 className="font-serif-editorial text-3xl font-normal text-[#f4f1ea]">
+                Standings temporarily concealed.
               </h2>
-              <p className="text-xs text-proto-subtext leading-relaxed font-sans max-w-md mx-auto">
-                Operations Desk has sealed live public standings to preserve climactic suspense for the final reveal. Submissions and deductions remain active on your terminal until <strong>8:00 PM</strong>.
+              <p className="font-display-grotesk text-xs text-[#949e93] leading-relaxed">
+                Operations Desk has sealed live public standings to preserve suspense for the final reveal. Submissions and deductions remain active on your terminal until <strong>8:00 PM sharp</strong>.
               </p>
             </div>
 
-            <div className="pt-4 border-t border-proto-surface1 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="pt-4 border-t border-[#2d312c] flex flex-col sm:flex-row items-center gap-2.5 font-mono-tabular text-xs">
               <Link
                 href="/play"
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-[#0a0f0d] font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-all shadow"
+                className="btn-editorial-primary w-full sm:flex-1 py-2.5 px-4 text-center"
               >
                 Access Operative HUD
               </Link>
               <Link
                 href="/my-badge"
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-proto-surface0 border border-proto-surface1 text-proto-text font-bold text-xs uppercase hover:border-proto-surface2 transition-all"
+                className="btn-editorial-outline w-full sm:w-auto py-2.5 px-4 text-center"
               >
                 View My Pass
               </Link>
@@ -151,125 +152,133 @@ export default function LeaderboardPage() {
         ) : (
           /* LEADERBOARD IS ON: ANONYMOUS DISPLAY (AGENT IDs + SCORES ONLY) */
           <div className="space-y-6">
-            {/* Prize & Anonymity Header */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#141d17] via-proto-base to-[#141d17] border border-proto-gold/40 shadow-xl flex flex-wrap items-center justify-between gap-4">
+            {/* Prize & Anonymity Editorial Callout */}
+            <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-proto-gold/20 text-proto-gold border border-proto-gold/40">
-                  <Trophy className="w-6 h-6" />
+                <div className="p-2 border border-[#c28b28] text-[#c28b28]">
+                  <Trophy className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-proto-gold uppercase flex items-center gap-1.5">
-                    <span>CLAUDE PRO SUBSCRIPTION PRIZE</span>
+                  <div className="font-mono-tabular text-xs font-bold text-[#c28b28] uppercase tracking-wider">
+                    CLAUDE PRO SUBSCRIPTION PRIZE
                   </div>
-                  <div className="text-[11px] text-proto-subtext font-sans">
+                  <div className="font-display-grotesk text-xs text-[#949e93]">
                     Awarded to the top operative who solves key circuits & master topology deduction.
                   </div>
                 </div>
               </div>
 
-              <div className="text-[10px] text-[#8ea897] font-mono bg-proto-surface0 px-3 py-1.5 rounded-xl border border-proto-surface1">
-                🔒 ANONYMIZED STANDINGS: Agent IDs only
+              <div className="font-mono-tabular text-[10px] text-[#949e93] border border-[#2d312c] px-2.5 py-1 bg-[#141514]">
+                ANONYMIZED REGISTRY // IDENTIFIERS ONLY
               </div>
             </div>
 
             {/* Filter & Search Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2d312c] pb-3">
               {/* Domain filter buttons */}
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <div className="flex flex-wrap items-center gap-1.5 font-mono-tabular text-xs">
                 {['ALL', 'LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'].map((d) => (
                   <button
                     key={d}
                     onClick={() => setSelectedDomain(d)}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-none text-[11px] uppercase tracking-wider transition-all cursor-pointer ${
                       selectedDomain === d
-                        ? 'bg-proto-surface2 text-proto-signal border border-proto-signal/50 shadow-sm'
-                        : 'bg-proto-surface0/60 text-proto-subtext hover:text-proto-text border border-proto-surface1'
+                        ? 'bg-[#f4f1ea] text-[#141514] font-bold'
+                        : 'text-[#949e93] hover:text-[#f4f1ea] border border-[#2d312c] hover:border-[#3f453f]'
                     }`}
                   >
-                    {d}
+                    [{d}]
                   </button>
                 ))}
               </div>
 
               {/* Search input */}
               <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-proto-subtext absolute left-3 top-2.5" />
+                <Search className="w-3.5 h-3.5 text-[#949e93] absolute left-3 top-2.5" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Agent ID (e.g. Agent 047)..."
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-proto-base border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal"
+                  placeholder="Filter by Agent ID..."
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#1b1d1b] border border-[#2d312c] text-[#f4f1ea] font-mono-tabular focus:outline-none focus:border-[#949e93]"
                 />
               </div>
             </div>
 
-            {/* Standings Table Card (ANONYMOUS: Agent IDs Only, No Names/Roll Numbers) */}
-            <div className="bg-proto-base border border-proto-surface1 rounded-2xl shadow-xl overflow-hidden">
+            {/* Standings Table (Tabular Editorial Ledger) */}
+            <div className="border border-[#2d312c] bg-[#1b1d1b] overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-xs font-mono-tabular">
                   <thead>
-                    <tr className="border-b border-proto-surface1 bg-proto-surface0/60 text-proto-subtext text-[10px] uppercase">
-                      <th className="py-3 px-4">Rank</th>
-                      <th className="py-3 px-4">Agent Identifier</th>
-                      <th className="py-3 px-4">Role Domain</th>
-                      <th className="py-3 px-4">Active Play Time</th>
-                      <th className="py-3 px-4 text-right">Clearance Score</th>
+                    <tr className="border-b border-[#2d312c] bg-[#141514] text-[#949e93] text-[10px] uppercase tracking-wider">
+                      <th className="py-2.5 px-4">Rank</th>
+                      <th className="py-2.5 px-4">Operative Identifier</th>
+                      <th className="py-2.5 px-4">Domain</th>
+                      <th className="py-2.5 px-4">Active Play Time</th>
+                      <th className="py-2.5 px-4 text-right">Clearance Score</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-proto-surface1/60">
-                    {filteredAgents.map((ag, index) => {
-                      const isTop1 = index === 0;
-                      const isTop3 = index < 3;
-                      const activeSecs = getAgentActiveSeconds(ag);
-                      const domainKey = (ag.archetype as PrimaryDomain) || 'LOGIC';
-                      const DomainIcon = DOMAIN_ICONS[domainKey] || Layers;
+                  <tbody className="divide-y divide-[#2d312c]">
+                    {filteredAgents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-xs text-[#949e93]">
+                          No operatives matched the current filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAgents.map((ag, index) => {
+                        const isTop1 = index === 0;
+                        const isTop3 = index < 3;
+                        const activeSecs = getAgentActiveSeconds(ag);
+                        const domainKey = (ag.archetype as PrimaryDomain) || 'LOGIC';
+                        const DomainIcon = DOMAIN_ICONS[domainKey] || Layers;
 
-                      return (
-                        <tr
-                          key={ag.id}
-                          className={`hover:bg-proto-surface0/40 transition-colors ${
-                            isTop1 ? 'bg-proto-gold/5' : ''
-                          }`}
-                        >
-                          <td className="py-3.5 px-4 font-black">
-                            {isTop1 ? (
-                              <span className="text-proto-gold flex items-center gap-1">
-                                👑 #1
+                        return (
+                          <tr
+                            key={ag.id}
+                            className={`hover:bg-[#212421] transition-colors ${
+                              isTop1 ? 'bg-[#1e1c16]' : ''
+                            }`}
+                          >
+                            <td className="py-3 px-4 font-bold">
+                              {isTop1 ? (
+                                <span className="text-[#c28b28]">
+                                  #01
+                                </span>
+                              ) : (
+                                <span className={isTop3 ? 'text-[#f4f1ea] font-bold' : 'text-[#949e93]'}>
+                                  #{String(index + 1).padStart(2, '0')}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-[#f4f1ea] text-xs">
+                                {ag.agent_number || ag.agent_id}
+                              </div>
+                              <div className="text-[10px] text-[#949e93] flex items-center gap-1 mt-0.5">
+                                <Ticket className="w-3 h-3 text-[#c28b28]" />
+                                <span>Band: {ag.wristband_id || ag.agent_id}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 border border-[#2d312c] text-[#f4f1ea] bg-[#141514]">
+                                <DomainIcon className="w-3 h-3 text-[#c28b28]" />
+                                <span>{ag.archetype}</span>
                               </span>
-                            ) : (
-                              <span className={isTop3 ? 'text-proto-text font-bold' : 'text-proto-subtext'}>
-                                #{index + 1}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="text-[11px] text-[#949e93] flex items-center gap-1.5">
+                                <Clock className="w-3 h-3" />
+                                <span>{formatActiveTime(activeSecs)}</span>
                               </span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-proto-text text-sm">
-                              {ag.agent_number || ag.agent_id}
-                            </div>
-                            <div className="text-[10px] text-proto-subtext flex items-center gap-1 font-mono">
-                              <Ticket className="w-3 h-3 text-proto-gold" />
-                              <span>Band: {ag.wristband_id || ag.agent_id}</span>
-                            </div>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-proto-surface0 text-proto-logic border border-proto-logic/30">
-                              <DomainIcon className="w-3 h-3 text-proto-signal" />
-                              <span>{ag.archetype}</span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="text-[11px] text-proto-subtext flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              <span>{formatActiveTime(activeSecs)}</span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-black text-proto-gold text-base">
-                            {ag.score} <span className="text-[10px] text-proto-subtext font-normal">PTS</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                            <td className="py-3 px-4 text-right font-bold text-[#c28b28] text-sm">
+                              {ag.score || 0} <span className="text-[10px] text-[#949e93] font-normal">PTS</span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -278,19 +287,21 @@ export default function LeaderboardPage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="w-full bg-proto-base border-t border-proto-surface1 px-4 sm:px-6 py-4 text-center text-xs text-proto-subtext flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-2">
-        <span>NIT WARANGAL IEEE STUDENT BRANCH // THE PROTOCOL</span>
-        <div className="flex items-center gap-4 text-[11px]">
-          <Link href="/" className="hover:text-proto-text">
-            Home Briefing
-          </Link>
-          <Link href="/play" className="hover:text-proto-text">
-            Agent Terminal
-          </Link>
-          <Link href="/admin" className="hover:text-proto-text">
-            Operations Console
-          </Link>
+      {/* Editorial Footer */}
+      <footer className="w-full border-t border-[#2d312c] px-4 sm:px-8 py-3.5 text-xs text-[#949e93] bg-[#141514]">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-mono-tabular text-[11px]">
+          <span>NIT WARANGAL IEEE STUDENT BRANCH // THE PROTOCOL</span>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="hover:text-[#f4f1ea]">
+              Home
+            </Link>
+            <Link href="/play" className="hover:text-[#f4f1ea]">
+              HUD
+            </Link>
+            <Link href="/admin" className="hover:text-[#f4f1ea]">
+              Operations
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

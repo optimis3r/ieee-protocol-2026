@@ -6,18 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Store, initStore } from '@/lib/store';
 import { Agent, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
-import { 
-  Clock, 
-  CheckCircle2, 
-  MessageSquare, 
-  LogOut, 
-  QrCode, 
-  Radio,
-  ArrowRight,
-  ShieldAlert
-} from 'lucide-react';
 
-// Target launch date: September 24, 2026 at 09:00:00 AM IST
 const TARGET_LAUNCH_DATE = new Date('2026-09-24T09:00:00+05:30').getTime();
 
 export default function StandbyWaitingPage() {
@@ -57,7 +46,6 @@ export default function StandbyWaitingPage() {
 
     const timer = setInterval(updateCountdown, 1000);
 
-    // Network-aware status polling
     let isCancelled = false;
     const pollServerStatus = async () => {
       const activeId = localStorage.getItem('ieee_agent_id');
@@ -76,7 +64,7 @@ export default function StandbyWaitingPage() {
             if (!isCancelled) {
               router.push('/play');
             }
-          }, 1200);
+          }, 1000);
         }
       } catch {
         const localState = Store.getGameState();
@@ -114,122 +102,114 @@ export default function StandbyWaitingPage() {
   const roleMeta = ROLE_DETAILS[domain] || ROLE_DETAILS.LOGIC;
 
   return (
-    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col justify-between p-3 sm:p-5 tactile-grain select-none">
-      {/* Tactical Top Identifier */}
-      <header className="max-w-sm w-full mx-auto flex items-center justify-between text-[11px] text-[#8f9e91] border-b border-[#28302b] pb-2">
-        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[#f1ede4]">
-          <span>NITW</span>
-          <span className="text-[#8f9e91]">/</span>
-          <span>IEEE THE PROTOCOL</span>
+    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between p-4 sm:p-8 font-sans">
+      {/* Top Editorial Masthead */}
+      <header className="max-w-2xl w-full mx-auto rule-double pb-2.5 flex items-baseline justify-between text-xs text-[#949e93] font-mono-tabular">
+        <div>
+          <strong className="text-[#f4f1ea] font-display-grotesk tracking-tight">NIT WARANGAL IEEE</strong>
+          <span className="mx-2">•</span>
+          <span>COMMENCEMENT BULLETIN</span>
         </div>
-        <div className="stamp-box stamp-standby text-[9px] py-0.5 px-1.5">
-          <span>HOLDING</span>
+        <div className="editorial-stamp text-[#c28b28] border-[#c28b28]">
+          HOLDING STATE
         </div>
       </header>
 
-      {/* Main Single-Screen Holding Container */}
-      <main className="max-w-sm w-full mx-auto my-auto py-2 space-y-3">
+      {/* Main Asymmetric Editorial Body */}
+      <main className="max-w-2xl w-full mx-auto my-auto py-6 space-y-6">
         
-        {/* Live Launch Banner when Admin triggers ACTIVE */}
+        {/* Live Launch Banner */}
         {isLiveLaunching && (
-          <div className="p-3.5 bg-[#22c55e] text-[#0c0e0d] font-black text-center space-y-0.5 border-2 border-[#16a34a] rounded-sm">
-            <div className="text-xs uppercase tracking-widest">
-              SYSTEM INITIALIZED // LAUNCHING
-            </div>
-            <div className="text-[10px] font-mono">
-              Opening operative HUD terminal now...
+          <div className="p-4 bg-[#c93b2b] text-[#f4f1ea] font-bold text-center border border-[#a82e20]">
+            <div className="text-sm uppercase tracking-widest font-display-grotesk">
+              NETWORK ACTIVATED // OPENING HUD TERMINAL
             </div>
           </div>
         )}
 
-        {/* Central Tactical Standby Card */}
-        <div className="bg-[#121513] border-2 border-[#28302b] rounded-sm p-4 sm:p-5 shadow-2xl space-y-4 text-center relative">
+        {/* Editorial Headline & Statement */}
+        <div className="space-y-2">
+          <div className="text-[11px] text-[#c28b28] uppercase tracking-widest font-mono-tabular font-bold">
+            SCHEDULED EVENT START: SEPT 24, 2026 // 09:00 IST
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif-editorial tracking-tight text-[#f4f1ea] leading-tight">
+            Please standby for the game to begin.
+          </h1>
+          <p className="text-sm text-[#949e93] font-display-grotesk max-w-lg leading-relaxed pt-1">
+            Station circuits and challenge coordinates are locked until the Operations Desk initializes the network. This terminal will automatically transition to your active HUD upon launch.
+          </p>
+        </div>
+
+        {/* Mechanical Countdown Display */}
+        <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 sm:p-5">
+          <div className="text-[10px] uppercase text-[#949e93] font-mono-tabular tracking-wider rule-hairline pb-2 mb-3">
+            OFFICIAL COMMENCEMENT COUNTDOWN
+          </div>
+          <div className="grid grid-cols-4 gap-2 text-center font-mono-tabular">
+            <div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#f4f1ea] tracking-tight">
+                {String(timeLeft.days).padStart(2, '0')}
+              </div>
+              <div className="text-[10px] uppercase text-[#949e93] mt-1">Days</div>
+            </div>
+            <div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#f4f1ea] tracking-tight">
+                {String(timeLeft.hours).padStart(2, '0')}
+              </div>
+              <div className="text-[10px] uppercase text-[#949e93] mt-1">Hours</div>
+            </div>
+            <div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#f4f1ea] tracking-tight">
+                {String(timeLeft.minutes).padStart(2, '0')}
+              </div>
+              <div className="text-[10px] uppercase text-[#949e93] mt-1">Minutes</div>
+            </div>
+            <div>
+              <div className="text-3xl sm:text-4xl font-bold text-[#c28b28] tracking-tight">
+                {String(timeLeft.seconds).padStart(2, '0')}
+              </div>
+              <div className="text-[10px] uppercase text-[#949e93] mt-1">Seconds</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Two-Column Detail & Action Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start font-display-grotesk text-xs">
           
-          <div className="space-y-1">
-            <div className="text-[9px] uppercase tracking-widest text-[#eab308] font-bold">
-              [SYSTEM STATUS // PRE-COMMENCEMENT]
+          {/* Left: Operative Enrollment Ledger */}
+          <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 space-y-2.5">
+            <div className="rule-hairline pb-1.5 flex items-center justify-between">
+              <span className="text-[10px] uppercase text-[#949e93] font-mono-tabular">ENROLLED OPERATIVE</span>
+              {agent && (
+                <span className="font-mono-tabular font-bold text-[#c28b28]">{agent.agent_id}</span>
+              )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-[#f1ede4] tracking-tight uppercase leading-snug">
-              PLEASE STANDBY FOR THE GAME TO BEGIN
-            </h1>
-            <div className="text-[10px] text-[#8f9e91] font-mono">
-              COMMENCEMENT: SEPTEMBER 24TH, 2026 // 09:00 IST
-            </div>
+
+            {agent ? (
+              <div className="space-y-1">
+                <div className="font-bold text-[#f4f1ea] text-sm truncate">{agent.name}</div>
+                <div className="text-[#949e93] font-serif-editorial italic">Cell: {roleMeta.title} ({roleMeta.subtitle})</div>
+                <div className="text-[11px] text-[#949e93] font-mono-tabular pt-1">
+                  Wristband ID: <strong className="text-[#f4f1ea]">{agent.wristband_id || agent.agent_id}</strong>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[#949e93]">
+                <span>No active enrollment on this device. </span>
+                <Link href="/register" className="text-[#f4f1ea] underline underline-offset-4 font-bold">
+                  Enlist here →
+                </Link>
+              </div>
+            )}
           </div>
 
-          {/* Mechanical Countdown Clock */}
-          <div className="bg-[#0c0e0d] border border-[#28302b] rounded-sm p-3 shadow-inner">
-            <div className="text-[9px] text-[#8f9e91] uppercase tracking-widest font-mono mb-2">
-              COUNTDOWN TO PROTOCOL UNLOCK
-            </div>
-            <div className="grid grid-cols-4 gap-1 text-center font-mono">
-              <div className="bg-[#171b18] border border-[#28302b] p-1.5 rounded-sm">
-                <div className="text-xl font-black text-[#eab308]">
-                  {String(timeLeft.days).padStart(2, '0')}
-                </div>
-                <div className="text-[8px] text-[#8f9e91] uppercase">Days</div>
-              </div>
-              <div className="bg-[#171b18] border border-[#28302b] p-1.5 rounded-sm">
-                <div className="text-xl font-black text-[#eab308]">
-                  {String(timeLeft.hours).padStart(2, '0')}
-                </div>
-                <div className="text-[8px] text-[#8f9e91] uppercase">Hours</div>
-              </div>
-              <div className="bg-[#171b18] border border-[#28302b] p-1.5 rounded-sm">
-                <div className="text-xl font-black text-[#eab308]">
-                  {String(timeLeft.minutes).padStart(2, '0')}
-                </div>
-                <div className="text-[8px] text-[#8f9e91] uppercase">Mins</div>
-              </div>
-              <div className="bg-[#171b18] border border-[#28302b] p-1.5 rounded-sm">
-                <div className="text-xl font-black text-[#eab308]">
-                  {String(timeLeft.seconds).padStart(2, '0')}
-                </div>
-                <div className="text-[8px] text-[#8f9e91] uppercase">Secs</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Operative Registration Status Strip */}
-          {agent ? (
-            <div className="bg-[#171b18] border border-[#28302b] rounded-sm p-2.5 text-left text-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-bold text-[#8f9e91] uppercase font-mono">ENROLLED OPERATIVE</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-sm bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/30 font-bold">
-                  {agent.agent_id}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[#f1ede4] font-bold text-xs pt-0.5">
-                <span className="truncate max-w-[150px]">{agent.name}</span>
-                <span 
-                  className="text-[10px] uppercase font-bold"
-                  style={{ color: roleMeta.color || '#38bdf8' }}
-                >
-                  [{roleMeta.title}]
-                </span>
-              </div>
-              <div className="text-[9px] text-[#8f9e91] font-mono pt-0.5 flex items-center justify-between border-t border-[#28302b]">
-                <span>BAND: <strong className="text-[#eab308]">{agent.wristband_id || agent.agent_id}</strong></span>
-                <span className="text-[#8f9e91]">Circuits Locked</span>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-[#171b18] border border-[#28302b] rounded-sm p-2.5 text-xs text-[#8f9e91]">
-              <span>Unregistered operative? </span>
-              <Link href="/register" className="text-[#22c55e] font-bold underline underline-offset-2">
-                Register here →
-              </Link>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="space-y-2 pt-1">
+          {/* Right: Actions */}
+          <div className="space-y-2">
             <Link
               href="/my-badge"
-              className="w-full py-2.5 px-3 rounded-sm btn-tactile-dark text-xs flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
             >
-              <QrCode className="w-3.5 h-3.5 text-[#eab308]" />
-              <span>SHOW OPERATIVE QR PASS</span>
+              View My Personal QR Pass →
             </Link>
 
             {waGroupLink && (
@@ -237,34 +217,34 @@ export default function StandbyWaitingPage() {
                 href={waGroupLink}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full py-2 px-3 rounded-sm bg-[#171b18] hover:bg-[#1e2320] border border-[#28302b] text-[11px] text-[#22c55e] flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full py-2.5 px-4 bg-[#1b1d1b] hover:bg-[#212421] border border-[#2d312c] text-xs text-[#949e93] hover:text-[#f4f1ea] block text-center transition-colors"
               >
-                <MessageSquare className="w-3 h-3" />
-                <span>OFFICIAL WHATSAPP INTEL GROUP →</span>
+                Official WhatsApp Channel →
               </a>
             )}
           </div>
 
         </div>
 
-        {/* Tactical Footer Strip */}
-        {agent && (
-          <div className="flex items-center justify-between text-[10px] text-[#8f9e91] px-1">
-            <span className="font-mono text-[9px] text-[#48544c]">AUTO-SYNC ACTIVE (2S)</span>
+        {/* Subordinate Links */}
+        <div className="flex items-center justify-between text-xs text-[#949e93] font-display-grotesk pt-2 rule-hairline pb-2">
+          <span>Auto-sync active (2s interval)</span>
+          {agent && (
             <button
               onClick={handleLogout}
-              className="text-[#dc2626] hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-[#c93b2b] hover:underline underline-offset-4 cursor-pointer"
             >
-              <LogOut className="w-3 h-3" />
-              <span>Log Out</span>
+              Sign Out
             </button>
-          </div>
-        )}
+          )}
+        </div>
+
       </main>
 
-      {/* Minimal Bottom Stamp */}
-      <footer className="max-w-sm w-full mx-auto text-center text-[9px] text-[#48544c] uppercase tracking-widest pt-1">
-        NIT WARANGAL • IEEE THE PROTOCOL • LIVE TELEMETRY
+      {/* Editorial Footer */}
+      <footer className="max-w-2xl w-full mx-auto rule-hairline pt-2 flex items-center justify-between text-[10px] text-[#949e93] font-mono-tabular">
+        <span>NIT WARANGAL • THE PROTOCOL 2026</span>
+        <span>AUTONOMOUS DISPATCH SYSTEM</span>
       </footer>
     </div>
   );

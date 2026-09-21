@@ -228,9 +228,9 @@ function AgentHUD() {
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-[#0d120f] flex flex-col items-center justify-center p-4">
-        <div className="w-10 h-10 border-2 border-proto-signal border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="font-mono-cyber text-xs text-[#8ea897] uppercase tracking-wider">
+      <div className="min-h-screen bg-[#141514] flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-[#c28b28] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="font-mono-tabular text-xs text-[#949e93] uppercase tracking-wider">
           AUTHENTICATING OPERATIVE CREDENTIALS...
         </p>
       </div>
@@ -242,8 +242,8 @@ function AgentHUD() {
   const isPaused = agent.check_in_status === 'PAUSED';
 
   return (
-    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col font-mono-cyber tactile-grain select-none">
-      {/* Top Status Ribbon with Agent 047 & Live Telemetry */}
+    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col font-display-grotesk selection:bg-[#c93b2b] selection:text-[#f4f1ea]">
+      {/* Top Status Ribbon with Live Telemetry */}
       <StatusRibbon
         agent={agent}
         networkStatus={gameState.status}
@@ -262,28 +262,28 @@ function AgentHUD() {
 
       {/* Paused Off-Site Status Notice */}
       {isPaused && (
-        <div className="w-full bg-[#eab308]/10 border-b border-[#eab308]/40 px-3 py-2 text-xs text-[#eab308] flex items-center justify-between font-mono">
-          <div className="flex items-center gap-2 max-w-4xl mx-auto w-full">
-            <Pause className="w-3.5 h-3.5 shrink-0 text-[#eab308]" />
+        <div className="w-full bg-[#1c1a14] border-b border-[#c28b28]/40 px-3 py-2 text-xs text-[#c28b28] flex items-center justify-between font-mono-tabular">
+          <div className="flex items-center gap-2 max-w-5xl mx-auto w-full">
+            <Pause className="w-3.5 h-3.5 shrink-0 text-[#c28b28]" />
             <span className="text-[11px]">
-              <strong>[OFF-SITE // TIMER FROZEN]:</strong> Progress preserved. Scan QR at desk to resume active session.
+              <strong>[OFF-SITE // TIMER FROZEN]:</strong> Progress preserved. Scan QR pass at desk to resume active session.
             </span>
           </div>
         </div>
       )}
 
       {/* Main Agent Viewport */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5 space-y-4">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-6 space-y-4">
         {/* Toast alert banner */}
         {toastMessage && (
-          <div className="p-2.5 rounded-sm bg-[#121513] border border-[#38bdf8]/40 text-xs flex items-center justify-between gap-2 animate-in fade-in">
-            <div className="flex items-center gap-2 text-[#38bdf8]">
-              <Radio className="w-3.5 h-3.5 shrink-0 animate-pulse" />
+          <div className="p-2.5 bg-[#1b1d1b] border border-[#3a8ebd] text-xs flex items-center justify-between gap-2 font-mono-tabular">
+            <div className="flex items-center gap-2 text-[#3a8ebd]">
+              <Radio className="w-3.5 h-3.5 shrink-0" />
               <span>{toastMessage}</span>
             </div>
             <button
               onClick={() => setToastMessage(null)}
-              className="text-[10px] text-[#8f9e91] hover:text-[#f1ede4] uppercase font-bold"
+              className="text-[10px] text-[#949e93] hover:text-[#f4f1ea] uppercase font-bold"
             >
               [Dismiss]
             </button>
@@ -291,15 +291,15 @@ function AgentHUD() {
         )}
 
         {/* Action Controls & View Toggles */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#28302b] pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2d312c] pb-2 font-mono-tabular">
           {/* Toggles */}
-          <div className="flex items-center gap-1 bg-[#121513] p-1 rounded-sm border border-[#28302b]">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setActiveView('TERMINAL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase transition-all cursor-pointer ${
                 activeView === 'TERMINAL'
-                  ? 'bg-[#22c55e] text-[#0c0e0d]'
-                  : 'text-[#8f9e91] hover:text-[#f1ede4]'
+                  ? 'bg-[#f4f1ea] text-[#141514]'
+                  : 'text-[#949e93] hover:text-[#f4f1ea] border border-[#2d312c]'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -308,10 +308,10 @@ function AgentHUD() {
 
             <button
               onClick={() => setActiveView('INTEL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase transition-all cursor-pointer ${
                 activeView === 'INTEL'
-                  ? 'bg-[#c084fc] text-[#0c0e0d]'
-                  : 'text-[#8f9e91] hover:text-[#f1ede4]'
+                  ? 'bg-[#f4f1ea] text-[#141514]'
+                  : 'text-[#949e93] hover:text-[#f4f1ea] border border-[#2d312c]'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -323,7 +323,7 @@ function AgentHUD() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsHypothesisOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm btn-tactile-amber text-[11px] font-bold uppercase cursor-pointer"
+              className="btn-editorial-primary flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase cursor-pointer"
             >
               <FileSearch className="w-3.5 h-3.5" />
               <span>DEDUCE (+400)</span>
@@ -331,10 +331,10 @@ function AgentHUD() {
 
             <Link
               href="/my-badge"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-sm btn-tactile-dark text-[11px] font-bold uppercase"
+              className="btn-editorial-outline flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold uppercase"
               title="View Personal QR Pass"
             >
-              <QrCode className="w-3.5 h-3.5 text-[#eab308]" />
+              <QrCode className="w-3.5 h-3.5 text-[#c28b28]" />
               <span className="hidden sm:inline">MY PASS</span>
             </Link>
           </div>
@@ -388,20 +388,20 @@ function AgentHUD() {
       />
 
       {/* Footer */}
-      <footer className="w-full bg-[#101713] border-t border-[#223027] px-4 py-3 text-center text-xs text-[#7d9787] flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-2">
+      <footer className="w-full bg-[#141514] border-t border-[#2d312c] px-4 py-3 text-xs text-[#949e93] flex flex-col sm:flex-row items-center justify-between max-w-5xl mx-auto gap-2 font-mono-tabular text-[11px]">
         <div className="flex items-center gap-2">
           <span>NIT WARANGAL IEEE STUDENT BRANCH</span>
           <span>•</span>
           <span>{agent.agent_number || agent.agent_id}</span>
         </div>
-        <div className="flex items-center gap-4 text-[11px]">
-          <Link href="/my-badge" className="hover:text-[#eaf2ec] transition-colors">
+        <div className="flex items-center gap-4">
+          <Link href="/my-badge" className="hover:text-[#f4f1ea] transition-colors">
             My QR Pass & Band
           </Link>
-          <Link href="/leaderboard" className="hover:text-[#eaf2ec] transition-colors">
+          <Link href="/leaderboard" className="hover:text-[#f4f1ea] transition-colors">
             Live Standings
           </Link>
-          <Link href="/admin" className="text-proto-logic hover:underline flex items-center gap-1">
+          <Link href="/admin" className="text-[#3a8ebd] hover:underline flex items-center gap-1">
             Operations <ExternalLink className="w-3 h-3" />
           </Link>
         </div>

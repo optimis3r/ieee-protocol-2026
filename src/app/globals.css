@@ -1,171 +1,137 @@
 @import "tailwindcss";
 
 @theme {
-  /* The Protocol: NIT Warangal Palette (Tactile Archival Carbon & Analog Dossier) */
-  --color-proto-obsidian: #0c0e0d;
-  --color-proto-base: #121513;
-  --color-proto-mantle: #171b18;
-  --color-proto-surface0: #1e2320;
-  --color-proto-surface1: #28302b;
-  --color-proto-surface2: #364039;
-  --color-proto-stone: #48544c;
+  /* Restrained Editorial Anti-Slop Palette */
+  --color-proto-obsidian: #141514;
+  --color-proto-base: #1b1d1b;
+  --color-proto-mantle: #212421;
+  --color-proto-surface0: #272b27;
+  --color-proto-surface1: #313631;
+  --color-proto-surface2: #3f453f;
+  --color-proto-stone: #4e564e;
   
-  --color-proto-text: #f1ede4;
-  --color-proto-subtext: #8f9e91;
+  --color-proto-text: #f4f1ea;
+  --color-proto-subtext: #949e93;
   
-  /* Tactical Analog Accent Tokens (Single-Source Physical Palette) */
-  --color-proto-logic: #38bdf8;       /* Archival Cyan */
-  --color-proto-signal: #22c55e;      /* Verification Field Green */
-  --color-proto-obs: #c084fc;         /* Archival Violet */
-  --color-proto-system: #f97316;      /* Industrial Orange */
-  --color-proto-social: #2dd4bf;      /* Field Teal */
-  --color-proto-crimson: #dc2626;     /* Stencil Red Stamp */
-  --color-proto-gold: #eab308;        /* Tactical Phosphor Amber */
+  /* Purposeful Single-Source Accents */
+  --color-proto-crimson: #c93b2b;     /* Lacquer Red */
+  --color-proto-gold: #c28b28;        /* Archival Ochre / Amber */
+  --color-proto-signal: #2d9f5d;      /* Field Green Verification */
+  --color-proto-logic: #3a8ebd;       /* Archival Slate Blue */
+  --color-proto-obs: #9368b7;         /* Archival Violet */
+  --color-proto-system: #d96b27;      /* Terra Cotta */
+  --color-proto-social: #2fa596;      /* Deep Teal */
 
-  /* Legacy & Semantic Mapping */
-  --color-cat-base: #121513;
-  --color-cat-mantle: #171b18;
-  --color-cat-crust: #0c0e0d;
-  --color-cat-surface0: #1e2320;
-  --color-cat-surface1: #28302b;
-  --color-cat-surface2: #364039;
-  --color-cat-text: #f1ede4;
-  --color-cat-subtext: #8f9e91;
-  --color-cat-sapphire: #38bdf8;
-  --color-cat-mauve: #c084fc;
-  --color-cat-green: #22c55e;
-  --color-cat-red: #dc2626;
-  --color-cat-peach: #f97316;
-  --color-cat-yellow: #eab308;
-
-  --font-display: var(--font-jetbrains-mono), monospace;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+  --font-display: var(--font-space-grotesk), sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
-  --font-sans: var(--font-inter), sans-serif;
+  --font-sans: var(--font-space-grotesk), sans-serif;
 }
 
 :root {
-  --background: #0c0e0d;
-  --foreground: #f1ede4;
+  --background: #141514;
+  --foreground: #f4f1ea;
 }
 
 body {
-  background-color: #0c0e0d;
-  color: #f1ede4;
-  font-family: var(--font-jetbrains-mono), monospace;
+  background-color: #141514;
+  color: #f4f1ea;
+  font-family: var(--font-space-grotesk), -apple-system, BlinkMacSystemFont, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Monospace font class */
-.font-mono-cyber {
+/* Typographic utility classes */
+.font-serif-editorial {
+  font-family: var(--font-newsreader), Georgia, serif;
+}
+
+.font-display-grotesk {
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+.font-mono-tabular {
   font-family: var(--font-jetbrains-mono), monospace;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Analog Document Texture (Subtle physical grain, NOT an AI gradient mesh) */
-.tactile-grain {
-  background-color: #0c0e0d;
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(241, 237, 228, 0.02) 0%, transparent 75%),
-    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-  background-size: 100% 100%, 32px 32px, 32px 32px;
+/* Clean Editorial Rules (Replaces blurry card drop shadows) */
+.rule-hairline {
+  border-bottom: 1px solid #2d312c;
 }
 
-/* Perforated physical tear-line for cards and tickets */
-.perforated-border {
-  background-image: linear-gradient(to right, #364039 50%, rgba(255,255,255,0) 0%);
-  background-position: bottom;
-  background-size: 8px 1.5px;
-  background-repeat: repeat-x;
+.rule-double {
+  border-bottom: 3px double #3f453f;
 }
 
-/* Authentic physical rubber stamp look (Anti-Slop) */
-.stamp-box {
-  border: 2px dashed currentColor;
+.rule-dashed {
+  border-bottom: 1px dashed #4e564e;
+}
+
+/* Authentic Document Stamp (Anti-AI) */
+.editorial-stamp {
+  border: 1.5px solid currentColor;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-weight: 800;
-  padding: 0.25rem 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border-radius: 2px;
+  font-size: 0.65rem;
+  line-height: 1;
 }
 
-.stamp-active {
-  color: #22c55e;
-  border-color: #22c55e;
-  background: rgba(34, 197, 94, 0.08);
-}
-
-.stamp-standby {
-  color: #eab308;
-  border-color: #eab308;
-  background: rgba(234, 179, 8, 0.08);
-}
-
-.stamp-danger {
-  color: #dc2626;
-  border-color: #dc2626;
-  background: rgba(220, 38, 38, 0.08);
-}
-
-/* Physical tactile button style (Replaces glossy AI startup gradients) */
-.btn-tactile-primary {
-  background-color: #22c55e;
-  color: #0c0e0d;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border: 1px solid #16a34a;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 0 #15803d;
-  transition: all 0.1s ease;
-}
-
-.btn-tactile-primary:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.2);
-}
-
-.btn-tactile-amber {
-  background-color: #eab308;
-  color: #0c0e0d;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border: 1px solid #ca8a04;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 0 #a16207;
-  transition: all 0.1s ease;
-}
-
-.btn-tactile-amber:active {
-  transform: translateY(2px);
-  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.2);
-}
-
-.btn-tactile-dark {
-  background-color: #171b18;
-  color: #f1ede4;
+/* Purposeful Solid Buttons (Replaces glowing AI startup gradients) */
+.btn-editorial-primary {
+  background-color: #c93b2b;
+  color: #f4f1ea;
+  font-family: var(--font-space-grotesk), sans-serif;
   font-weight: 700;
-  border: 1px solid #28302b;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  transition: all 0.1s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid #a82e20;
+  transition: all 0.15s ease;
 }
 
-.btn-tactile-dark:active {
+.btn-editorial-primary:hover {
+  background-color: #b33224;
+}
+
+.btn-editorial-primary:active {
   transform: translateY(1px);
-  background-color: #121513;
 }
 
-/* Custom Scrollbar for Terminal */
+.btn-editorial-outline {
+  background-color: transparent;
+  color: #f4f1ea;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid #3f453f;
+  transition: all 0.15s ease;
+}
+
+.btn-editorial-outline:hover {
+  background-color: #1b1d1b;
+  border-color: #949e93;
+}
+
+.btn-editorial-outline:active {
+  transform: translateY(1px);
+}
+
+/* Minimal Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #0c0e0d;
+  background: #141514;
 }
 ::-webkit-scrollbar-thumb {
-  background: #28302b;
-  border-radius: 1px;
+  background: #2d312c;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f453f;
 }

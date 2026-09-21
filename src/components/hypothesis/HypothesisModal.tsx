@@ -9,7 +9,6 @@ import {
   X, 
   AlertTriangle, 
   Send, 
-  FileSearch,
   ShieldCheck,
   Trophy
 } from 'lucide-react';
@@ -60,51 +59,48 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-proto-obsidian/85 backdrop-blur-md animate-in fade-in duration-200 font-mono-cyber">
-      <div className="relative w-full max-w-xl bg-proto-base border-2 border-proto-gold/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+      <div className="relative w-full max-w-lg bg-[#1b1d1b] border border-[#3f453f] flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-proto-mantle border-b border-proto-surface1">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-proto-gold/20 text-proto-gold">
-              <Trophy className="w-5 h-5 animate-pulse" />
-            </div>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2d312c] bg-[#141514]">
+          <div className="flex items-center gap-2.5">
+            <Trophy className="w-4 h-4 text-[#c28b28]" />
             <div>
-              <h3 className="text-base font-black text-proto-text">
-                THE PROTOCOL TOPOLOGY DEDUCTION
+              <h3 className="font-serif-editorial text-lg text-[#f4f1ea]">
+                Topology Deduction
               </h3>
-              <p className="text-xs text-proto-gold font-bold">
-                Synthesize clues • Deduce the entity • +400 Flat Points
+              <p className="font-mono-tabular text-[10px] text-[#c28b28] uppercase">
+                Synthesize clues • +400 Flat Points
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-proto-subtext hover:text-proto-crimson hover:bg-proto-surface0 rounded-lg transition-colors"
+            className="p-1.5 text-[#949e93] hover:text-[#f4f1ea] border border-[#2d312c] hover:border-[#3f453f] transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4">
           {/* Parity Explainer */}
-          <div className="p-4 rounded-xl bg-proto-surface0 border border-proto-surface1 text-xs space-y-2">
-            <div className="flex items-center gap-2 text-proto-gold font-black">
-              <FileSearch className="w-4 h-4 text-proto-gold" />
-              LATE-ENTRY PARITY MECHANISM (+400 PTS)
+          <div className="p-3 border border-[#2d312c] bg-[#141514] text-xs space-y-1">
+            <div className="font-mono-tabular text-[10px] text-[#c28b28] uppercase font-bold">
+              [PARITY DIRECTIVE // +400 CLEARANCE POINTS]
             </div>
-            <p className="text-proto-subtext leading-relaxed font-sans">
-              Operatives who correctly reconstruct the hidden narrative of The Protocol receive a flat +400 points, boosting their chances to win the <strong>Claude Pro Subscription</strong>. Beware poisoned disinformation from rogue telemetry drops!
+            <p className="font-display-grotesk text-[#949e93] leading-relaxed text-[11px]">
+              Operatives who correctly reconstruct the hidden architecture of The Protocol receive a flat +400 points toward the <strong>Claude Pro Subscription</strong>. Beware disinformation planted in telemetry channels.
             </p>
           </div>
 
           {/* Feedback message */}
           {statusMsg && (
             <div
-              className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+              className={`p-3 border text-xs flex items-start gap-2.5 font-mono-tabular ${
                 statusMsg.type === 'success'
-                  ? 'bg-proto-signal/15 border-proto-signal/40 text-proto-signal'
-                  : 'bg-proto-crimson/15 border-proto-crimson/40 text-proto-crimson'
+                  ? 'bg-[#15241b] border-[#2d9f5d] text-[#2d9f5d]'
+                  : 'bg-[#251515] border-[#c93b2b] text-[#c93b2b]'
               }`}
             >
               {statusMsg.type === 'success' ? (
@@ -117,9 +113,9 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
           )}
 
           {/* Question 1: System Origin */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-proto-text uppercase">
-              1. What is the true origin and nature of The Protocol system?
+          <div className="space-y-1">
+            <label className="block font-mono-tabular text-[10px] text-[#949e93] uppercase">
+              1. What is the true origin and nature of The Protocol?
             </label>
             <input
               type="text"
@@ -127,13 +123,13 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
               value={coreOrigin}
               onChange={(e) => setCoreOrigin(e.target.value)}
               placeholder="e.g. 1994 Autonomic AI routing daemon self-assembling..."
-              className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-gold placeholder:text-proto-subtext/40"
+              className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] font-mono-tabular focus:outline-none focus:border-[#949e93] placeholder:text-[#949e93]/50"
             />
           </div>
 
           {/* Question 2: Evidence Synthesis */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-black text-proto-text uppercase">
+          <div className="space-y-1">
+            <label className="block font-mono-tabular text-[10px] text-[#949e93] uppercase">
               2. Evidence Synthesis & Cross-Operative Correlation:
             </label>
             <textarea
@@ -142,7 +138,7 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
               value={evidence}
               onChange={(e) => setEvidence(e.target.value)}
               placeholder="Synthesize intel across Logic, Signal, Observation, System, and Social domains. Explain why false rumors (like satellite or power transformers) were planted..."
-              className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-gold placeholder:text-proto-subtext/40 font-sans"
+              className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] font-display-grotesk focus:outline-none focus:border-[#949e93] placeholder:text-[#949e93]/50"
             />
           </div>
 
@@ -150,10 +146,10 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-proto-gold to-proto-system text-proto-obsidian font-black text-xs tracking-wider uppercase hover:opacity-95 active:scale-[0.99] transition-all shadow-lg flex items-center justify-center gap-2"
+            className="btn-editorial-primary w-full py-2.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Send className="w-4 h-4" />
-            SUBMIT TOPOLOGY DEDUCTION (+400 PTS)
+            <Send className="w-3.5 h-3.5" />
+            <span>SUBMIT TOPOLOGY DEDUCTION (+400 PTS)</span>
           </button>
         </form>
       </div>

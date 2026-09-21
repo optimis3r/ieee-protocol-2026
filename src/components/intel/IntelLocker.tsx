@@ -14,93 +14,92 @@ export const IntelLocker: React.FC<IntelLockerProps> = ({
   onOpenHypothesis,
 }) => {
   return (
-    <div className="space-y-6 font-mono-cyber">
+    <div className="space-y-5">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-proto-surface1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#2d312c]">
         <div>
-          <h2 className="text-lg font-bold text-proto-text flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-proto-obs" />
-            CLASSIFIED INTEL ARCHIVE
+          <h2 className="font-serif-editorial text-2xl text-[#f4f1ea] flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-[#c28b28]" />
+            Classified Intel Archive
           </h2>
-          <p className="text-xs text-proto-subtext font-sans">
-            Asymmetric intelligence fragments from NIT Warangal sector monoliths. Compare with other players.
+          <p className="font-display-grotesk text-xs text-[#949e93] mt-0.5">
+            Asymmetric intelligence fragments recovered from campus station monoliths.
           </p>
         </div>
 
         <button
           onClick={onOpenHypothesis}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-proto-obs to-proto-system text-proto-obsidian text-xs font-black tracking-wider hover:opacity-95 transition-all shadow-md self-start sm:self-auto"
+          className="btn-editorial-primary inline-flex items-center gap-2 px-3.5 py-2 text-xs self-start sm:self-auto cursor-pointer"
         >
           <FileText className="w-4 h-4" />
-          DRAFT TOPOLOGY HYPOTHESIS (+400 PTS)
+          <span>DRAFT HYPOTHESIS (+400 PTS)</span>
         </button>
       </div>
 
-      {/* Warning Box from Poster: TRUST NO ONE */}
-      <div className="p-4 rounded-xl bg-proto-base border-2 border-proto-crimson glow-crimson flex items-start gap-3 text-xs">
-        <AlertTriangle className="w-5 h-5 text-proto-crimson shrink-0 mt-0.5 animate-pulse" />
-        <div>
-          <span className="font-black text-proto-crimson block mb-0.5 tracking-wider">
-            ⚠️ TRUST NO ONE. SOME AGENTS HAVE OTHER OBJECTIVES.
+      {/* Disinformation Warning Strip */}
+      <div className="p-3.5 border border-[#c93b2b] bg-[#1c1615] flex items-start gap-3 text-xs">
+        <AlertTriangle className="w-4 h-4 text-[#c93b2b] shrink-0 mt-0.5" />
+        <div className="space-y-0.5">
+          <span className="font-mono-tabular font-bold text-[#c93b2b] block tracking-wider text-[11px]">
+            [OPERATIONAL DIRECTIVE: TRUST NO ONE]
           </span>
-          <span className="text-proto-subtext font-sans">
-            Not all fragments in your possession are genuine. A rogue autonomic daemon has poisoned telemetry channels with false rumors to skew your final topology deduction. Cross-reference evidence across multiple archetypes!
-          </span>
+          <p className="font-display-grotesk text-[#f4f1ea]/90 text-[11px] leading-relaxed">
+            Not all fragments in circulation are genuine. A rogue autonomic daemon has planted disinformation to skew the final topology deduction. Cross-reference evidence with other archetypes before submitting.
+          </p>
         </div>
       </div>
 
       {intelList.length === 0 ? (
-        <div className="p-8 text-center rounded-2xl bg-proto-base border border-proto-surface1 text-proto-subtext">
-          <Lock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm font-bold">NO DECRYPTED INTEL IN ARCHIVE</p>
-          <p className="text-xs opacity-75 mt-1 font-sans">Complete circuit nodes to unlock classified data streams.</p>
+        <div className="p-8 text-center border border-[#2d312c] bg-[#1b1d1b] text-[#949e93]">
+          <Lock className="w-6 h-6 mx-auto mb-2 text-[#949e93] opacity-60" />
+          <p className="font-mono-tabular text-xs font-bold text-[#f4f1ea] uppercase">NO DECRYPTED INTEL IN ARCHIVE</p>
+          <p className="font-display-grotesk text-xs text-[#949e93] mt-1">Complete circuit stations to unlock classified data fragments.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {intelList.map(({ intel, revealed_at }, index) => {
             const isDisinfo = intel.is_disinformation;
             return (
               <div
                 key={intel.id}
-                className={`relative rounded-2xl bg-proto-base border p-5 shadow-xl flex flex-col justify-between overflow-hidden transition-all ${
+                className={`border p-4 bg-[#1b1d1b] flex flex-col justify-between transition-colors ${
                   isDisinfo
-                    ? 'border-proto-crimson/50 hover:border-proto-crimson'
-                    : 'border-proto-surface1 hover:border-proto-obs'
+                    ? 'border-[#c93b2b]/60'
+                    : 'border-[#2d312c] hover:border-[#3f453f]'
                 }`}
               >
-                {/* Header ribbon */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div>
+                {/* Header */}
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <span
-                      className={`text-[10px] uppercase px-2 py-0.5 rounded border font-bold ${
+                      className={`font-mono-tabular text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 ${
                         isDisinfo
-                          ? 'bg-proto-crimson/20 text-proto-crimson border-proto-crimson/40'
-                          : 'bg-proto-surface0 text-proto-obs border-proto-obs/30'
+                          ? 'border border-[#c93b2b] text-[#c93b2b] bg-[#141514]'
+                          : 'border border-[#2d312c] text-[#c28b28] bg-[#141514]'
                       }`}
                     >
-                      FRAGMENT #{index + 1} • {intel.id}
+                      FRAGMENT #{String(index + 1).padStart(2, '0')} // {intel.id}
                     </span>
-                    <h3 className="text-sm font-bold text-proto-text mt-1.5 leading-snug">
-                      {intel.title}
-                    </h3>
+                    <FileText className="w-3.5 h-3.5 text-[#949e93] shrink-0" />
                   </div>
-                  <div className="p-1.5 rounded-lg bg-proto-surface0 text-proto-obs shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                </div>
 
-                {/* Content body */}
-                <div className="p-3.5 rounded-xl bg-proto-obsidian/70 border border-proto-surface1 text-xs text-proto-text/90 leading-relaxed my-2 font-mono-cyber">
-                  {intel.content}
+                  <h3 className="font-display-grotesk text-xs font-bold text-[#f4f1ea] mt-1">
+                    {intel.title}
+                  </h3>
+
+                  {/* Body */}
+                  <div className="p-3 bg-[#141514] border border-[#2d312c] text-xs text-[#f4f1ea]/90 leading-relaxed my-2.5 font-mono-tabular">
+                    {intel.content}
+                  </div>
                 </div>
 
                 {/* Footer metadata */}
-                <div className="pt-3 border-t border-proto-surface1 flex items-center justify-between text-[10px] text-proto-subtext">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-proto-signal" />
+                <div className="pt-2.5 border-t border-[#2d312c] flex items-center justify-between font-mono-tabular text-[10px] text-[#949e93]">
+                  <span className="flex items-center gap-1 text-[#2d9f5d]">
+                    <CheckCircle2 className="w-3 h-3" />
                     ACQUIRED
                   </span>
-                  <span className="opacity-75">
+                  <span>
                     {new Date(revealed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -110,9 +109,9 @@ export const IntelLocker: React.FC<IntelLockerProps> = ({
         </div>
       )}
 
-      {/* Footer Slogan from Poster */}
-      <div className="p-3.5 rounded-xl bg-proto-surface0/60 border border-proto-surface1 text-center text-xs text-proto-subtext">
-        <span className="text-proto-signal font-bold">IDEAS. INVESTIGATE FURTHER.</span> — Everyone has a role. Not everyone has the same objective.
+      {/* Slogan strip */}
+      <div className="p-3 border border-[#2d312c] bg-[#141514] text-center font-mono-tabular text-[11px] text-[#949e93]">
+        <span className="text-[#c28b28] font-bold">DISPATCH:</span> Everyone has a role. Not everyone has the same objective.
       </div>
     </div>
   );

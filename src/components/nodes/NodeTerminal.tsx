@@ -39,44 +39,44 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
   const getDomainIcon = (domain?: NodeItem['domain']) => {
     switch (domain) {
       case 'LOGIC':
-        return <Layers className="w-3.5 h-3.5 text-[#38bdf8]" />;
+        return <Layers className="w-3.5 h-3.5 text-[#3a8ebd]" />;
       case 'SIGNAL':
-        return <Activity className="w-3.5 h-3.5 text-[#22c55e]" />;
+        return <Activity className="w-3.5 h-3.5 text-[#2d9f5d]" />;
       case 'OBSERVATION':
-        return <Eye className="w-3.5 h-3.5 text-[#c084fc]" />;
+        return <Eye className="w-3.5 h-3.5 text-[#9368b7]" />;
       case 'SYSTEM':
-        return <Cpu className="w-3.5 h-3.5 text-[#f97316]" />;
+        return <Cpu className="w-3.5 h-3.5 text-[#d96b27]" />;
       case 'SOCIAL':
-        return <Users className="w-3.5 h-3.5 text-[#2dd4bf]" />;
+        return <Users className="w-3.5 h-3.5 text-[#2fa596]" />;
       default:
-        return <Terminal className="w-3.5 h-3.5 text-[#38bdf8]" />;
+        return <Terminal className="w-3.5 h-3.5 text-[#949e93]" />;
     }
   };
 
   return (
-    <div className="space-y-3 font-mono-cyber">
-      {/* Top Banner: RECOVERED Status (Tactile Meter) */}
-      <div className="p-3 bg-[#121513] border-2 border-[#28302b] rounded-sm flex items-center justify-between gap-3">
+    <div className="space-y-4">
+      {/* Top Banner: Restored Status */}
+      <div className="p-3 bg-[#1b1d1b] border border-[#2d312c] flex items-center justify-between gap-3 font-mono-tabular">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-[#8f9e91] uppercase tracking-wider font-bold">
-            CIRCUITS RESTORED:
+          <span className="text-[10px] text-[#949e93] uppercase tracking-wider">
+            CIRCUITS SOLVED:
           </span>
-          <span className="text-sm font-black text-[#22c55e]">
+          <span className="text-xs font-bold text-[#2d9f5d]">
             {String(completedCount).padStart(2, '0')} / {String(nodes.length).padStart(2, '0')}
           </span>
         </div>
 
         {/* Minimal Progress Line */}
-        <div className="h-2 w-32 sm:w-48 bg-[#0c0e0d] border border-[#28302b] rounded-none overflow-hidden p-0.5">
+        <div className="h-1.5 w-32 sm:w-48 bg-[#141514] border border-[#2d312c] overflow-hidden">
           <div 
-            className="h-full bg-[#22c55e] transition-all duration-300" 
+            className="h-full bg-[#2d9f5d] transition-all duration-300" 
             style={{ width: `${Math.max(4, (completedCount / Math.max(1, nodes.length)) * 100)}%` }}
           />
         </div>
       </div>
 
-      {/* Tab Navigation (Tactile Filter Tabs) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#28302b] pb-2">
+      {/* Tab Navigation (Editorial Filter Tabs) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2d312c] pb-2 font-mono-tabular">
         <div className="flex items-center gap-1">
           {(
             [
@@ -89,10 +89,10 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-2.5 py-1 rounded-sm text-[10px] font-bold tracking-wider transition-all cursor-pointer ${
+              className={`px-2.5 py-1 text-[10px] tracking-wider transition-all cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-[#28302b] text-[#f1ede4] border border-[#48544c]'
-                  : 'text-[#8f9e91] hover:text-[#f1ede4] border border-transparent'
+                  ? 'bg-[#f4f1ea] text-[#141514] font-bold'
+                  : 'text-[#949e93] hover:text-[#f4f1ea] border border-[#2d312c]'
               }`}
             >
               [{tab.label}]
@@ -100,8 +100,8 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
           ))}
         </div>
 
-        <div className="text-[10px] text-[#8f9e91] font-mono">
-          {filteredNodes.length} STATIONS LISTED
+        <div className="text-[10px] text-[#949e93]">
+          {filteredNodes.length} STATIONS
         </div>
       </div>
 
@@ -124,43 +124,43 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
             <div
               key={node.id}
               onClick={() => onSelectNode(item)}
-              className={`group rounded-sm bg-[#121513] border-2 p-3.5 cursor-pointer transition-all duration-150 shadow-md flex flex-col justify-between ${
+              className={`group bg-[#1b1d1b] border p-4 cursor-pointer transition-colors flex flex-col justify-between ${
                 is_completed 
-                  ? 'border-[#22c55e]/50 hover:border-[#22c55e]' 
-                  : 'border-[#28302b] hover:border-[#38bdf8]'
+                  ? 'border-[#2d9f5d]/50 hover:border-[#2d9f5d]' 
+                  : 'border-[#2d312c] hover:border-[#3f453f]'
               }`}
             >
               <div>
                 {/* Top Row: Station number + Domain */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-sm bg-[#171b18] border border-[#28302b]">
+                    <div className="p-1 border border-[#2d312c] bg-[#141514]">
                       {getDomainIcon(node.domain)}
                     </div>
                     <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-[#eab308] font-bold">
+                      <div className="flex items-center gap-1.5 font-mono-tabular">
+                        <span className="text-[10px] text-[#c28b28] font-bold">
                           {node.station_number || node.id}
                         </span>
                         {node.domain && (
-                          <span className="text-[9px] font-bold px-1 rounded-sm bg-[#171b18] text-[#8f9e91] border border-[#28302b]">
+                          <span className="text-[9px] px-1 border border-[#2d312c] text-[#949e93] bg-[#141514]">
                             {node.domain}
                           </span>
                         )}
                       </div>
-                      <h4 className="text-xs font-bold text-[#f1ede4] leading-snug group-hover:text-[#38bdf8] transition-colors mt-0.5">
+                      <h4 className="font-display-grotesk text-xs font-bold text-[#f4f1ea] leading-snug group-hover:text-[#c28b28] transition-colors mt-0.5">
                         {node.title}
                       </h4>
                     </div>
                   </div>
 
                   {is_completed ? (
-                    <span className="shrink-0 stamp-box stamp-active text-[9px] py-0.5 px-1">
-                      <CheckCircle2 className="w-3 h-3" />
+                    <span className="editorial-stamp border-[#2d9f5d] text-[#2d9f5d] shrink-0 text-[8px] py-0.5 px-1">
+                      <CheckCircle2 className="w-2.5 h-2.5" />
                       <span>SOLVED</span>
                     </span>
                   ) : (
-                    <span className="shrink-0 p-1 text-[#8f9e91] group-hover:text-[#f1ede4] transition-colors">
+                    <span className="shrink-0 p-1 text-[#949e93] group-hover:text-[#f4f1ea] transition-colors">
                       <ChevronRight className="w-3.5 h-3.5" />
                     </span>
                   )}
@@ -168,35 +168,35 @@ export const NodeTerminal: React.FC<NodeTerminalProps> = ({
 
                 {/* Laptop Station hint */}
                 {node.laptop_label && (
-                  <div className="text-[10px] text-[#eab308] flex items-center gap-1 my-1 font-mono">
+                  <div className="text-[10px] text-[#c28b28] flex items-center gap-1 my-1 font-mono-tabular">
                     <Laptop className="w-3 h-3" />
                     <span className="truncate">{node.laptop_label}</span>
                   </div>
                 )}
 
                 {/* Subtitle / Payload teaser */}
-                <div className="text-[11px] text-[#8f9e91] line-clamp-2 my-1.5 min-h-[28px] font-sans">
+                <div className="text-[11px] text-[#949e93] line-clamp-2 my-2 min-h-[28px] font-display-grotesk">
                   {payloadTeaser}
                 </div>
               </div>
 
               {/* Card Footer Strip */}
-              <div className="pt-2 border-t border-[#28302b] flex items-center justify-between text-[10px]">
-                <div className="flex items-center gap-1.5 text-[#8f9e91]">
+              <div className="pt-2 border-t border-[#2d312c] flex items-center justify-between font-mono-tabular text-[10px]">
+                <div className="flex items-center gap-1.5 text-[#949e93]">
                   <Clock className="w-3 h-3" />
                   <span>{globalSolves} solves</span>
                   {attempts > 0 && !is_completed && (
-                    <span className="text-[#dc2626]">({attempts} tries)</span>
+                    <span className="text-[#c93b2b]">({attempts} tries)</span>
                   )}
                 </div>
 
                 <div className="font-bold">
                   {is_completed ? (
-                    <span className="text-[#22c55e]">
+                    <span className="text-[#2d9f5d]">
                       +{points_earned || node.base_points} PTS
                     </span>
                   ) : (
-                    <span className="text-[#eab308]">
+                    <span className="text-[#c28b28]">
                       {currentScore} PTS
                     </span>
                   )}

@@ -1,9 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Newsreader, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
   display: "swap",
 });
@@ -15,8 +22,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "The Protocol // NIT Warangal IEEE Student Branch",
-  description: "An interactive mystery ARG where every player has a role. Enter. Investigate. Decide.",
+  title: "The Protocol // NIT Warangal IEEE",
+  description: "An interactive mystery investigation by NIT Warangal IEEE Student Branch.",
   applicationName: "The Protocol",
   appleWebApp: {
     capable: true,
@@ -29,7 +36,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0f0d",
+  themeColor: "#141514",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -44,9 +51,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
+      className={`${newsreader.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-proto-obsidian text-proto-text selection:bg-proto-signal selection:text-proto-obsidian font-sans">
+      <body className="min-h-full flex flex-col bg-[#141514] text-[#f4f1ea] font-sans antialiased selection:bg-[#c93b2b] selection:text-[#f4f1ea]">
         {children}
       </body>
     </html>

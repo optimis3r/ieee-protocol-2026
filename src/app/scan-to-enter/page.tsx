@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QRScannerModal, ScanResult } from '@/components/scanner/QRScannerModal';
 import { Store, initStore } from '@/lib/store';
 import { 
   ScanLine, 
-  Terminal, 
-  Lock,
-  AlertTriangle
+  ArrowLeft,
+  Lock
 } from 'lucide-react';
 
 export default function ScanToEnterPage() {
@@ -32,7 +32,7 @@ export default function ScanToEnterPage() {
           : '/standby';
         router.push(destination);
       } else {
-        setErrorMsg(`Badge identifier ${result.id} not registered yet. Please check in at the Admin Operations desk.`);
+        setErrorMsg(`Badge identifier ${result.id} not registered yet. Please check in at the Operations desk.`);
       }
     } else {
       setErrorMsg(`Unrecognized badge format: ${result.raw}`);
@@ -57,57 +57,80 @@ export default function ScanToEnterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-proto-obsidian text-proto-text flex flex-col justify-between p-4 sm:p-6 scanlines font-mono-cyber">
-      {/* Top Header */}
-      <header className="max-w-md w-full mx-auto text-center pt-8 pb-4">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-proto-surface0 border border-proto-signal/40 text-proto-signal text-xs mb-3">
-          <Terminal className="w-3.5 h-3.5" />
-          <span>NIT WARANGAL // IEEE STUDENT BRANCH</span>
+    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between selection:bg-[#c93b2b] selection:text-[#f4f1ea]">
+      {/* Top Masthead */}
+      <header className="w-full border-b border-[#2d312c] px-4 sm:px-8 py-3.5 bg-[#141514]">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="p-1.5 border border-[#3f453f] hover:border-[#949e93] text-[#949e93] hover:text-[#f4f1ea] transition-colors rounded-sm"
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+            <div>
+              <div className="font-mono-tabular text-[10px] text-[#949e93] tracking-widest uppercase">
+                NIT WARANGAL • DEPT OF ECE
+              </div>
+              <div className="text-xs font-bold tracking-wider text-[#f4f1ea] uppercase">
+                OPTICAL SENSOR GATEWAY
+              </div>
+            </div>
+          </div>
+
+          <Link
+            href="/my-badge"
+            className="btn-editorial-outline px-3 py-1.5 text-xs uppercase font-mono-tabular"
+          >
+            My Pass
+          </Link>
         </div>
-        <h1 className="text-3xl font-black tracking-tight text-proto-text">
-          THE PROTOCOL
-        </h1>
-        <p className="text-xs text-proto-gold font-bold tracking-widest uppercase mt-1">
-          ENTER. INVESTIGATE. DECIDE.
-        </p>
       </header>
 
-      {/* Main Authentication Card */}
-      <main className="max-w-md w-full mx-auto bg-proto-base border border-proto-surface1 rounded-2xl p-6 shadow-2xl space-y-6">
-        {/* Warning Callout */}
-        <div className="p-3 rounded-xl bg-proto-surface0 border border-proto-crimson/50 text-proto-crimson text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
-          <span>TRUST NO ONE. Some agents have other objectives.</span>
-        </div>
-
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-proto-crimson/15 border border-proto-crimson/40 text-proto-crimson text-xs flex items-start gap-2">
-            <Lock className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
+      {/* Main Authentication Section */}
+      <main className="max-w-md w-full mx-auto px-4 py-10 flex-1 flex flex-col justify-center">
+        <div className="border border-[#3f453f] bg-[#1b1d1b] p-6 sm:p-7 space-y-6">
+          <div className="space-y-1 border-b border-[#2d312c] pb-4">
+            <span className="font-mono-tabular text-[10px] text-[#c93b2b] uppercase tracking-wider block">
+              [GATEWAY AUTHENTICATION]
+            </span>
+            <h1 className="font-serif-editorial text-3xl font-normal text-[#f4f1ea]">
+              Scan to Enter
+            </h1>
+            <p className="font-display-grotesk text-xs text-[#949e93]">
+              Scan an operative physical badge or enter your assigned Agent ID.
+            </p>
           </div>
-        )}
 
-        {/* Primary Action: Camera Scan */}
-        <button
-          onClick={() => setIsScannerOpen(true)}
-          className="w-full py-4 px-5 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black text-sm tracking-wider uppercase flex items-center justify-center gap-3 hover:opacity-95 active:scale-[0.99] transition-all shadow-[0_0_20px_rgba(0,255,136,0.3)]"
-        >
-          <ScanLine className="w-5 h-5" />
-          <span>SCAN PHYSICAL BADGE QR</span>
-        </button>
+          {errorMsg && (
+            <div className="p-3 border border-[#c93b2b] bg-[#251515] text-[#c93b2b] text-xs flex items-start gap-2 font-mono-tabular">
+              <Lock className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-        <div className="relative flex items-center justify-center">
-          <div className="border-t border-proto-surface1 w-full" />
-          <span className="bg-proto-base px-3 text-[10px] uppercase text-proto-subtext absolute">
-            or manual operative id
-          </span>
-        </div>
+          {/* Primary Action: Camera Scan */}
+          <button
+            onClick={() => setIsScannerOpen(true)}
+            className="btn-editorial-primary w-full py-3.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2.5 cursor-pointer"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span>OPEN CAMERA SCANNER</span>
+          </button>
 
-        {/* Secondary: Manual ID Entry */}
-        <form onSubmit={handleManualLogin} className="space-y-3">
-          <div>
-            <label className="block text-[11px] text-proto-subtext mb-1 uppercase">
-              Agent ID (e.g. AGT-TURING):
+          {/* Divider */}
+          <div className="relative flex items-center justify-center">
+            <div className="border-t border-[#2d312c] w-full" />
+            <span className="bg-[#1b1d1b] px-3 font-mono-tabular text-[10px] uppercase text-[#949e93] absolute">
+              OR MANUAL AGENT ID
+            </span>
+          </div>
+
+          {/* Secondary: Manual ID Entry */}
+          <form onSubmit={handleManualLogin} className="space-y-2 font-mono-tabular">
+            <label className="block text-[10px] text-[#949e93] uppercase">
+              Agent ID (e.g. AGT-001):
             </label>
             <div className="flex gap-2">
               <input
@@ -115,41 +138,43 @@ export default function ScanToEnterPage() {
                 value={manualId}
                 onChange={(e) => setManualId(e.target.value)}
                 placeholder="AGT-XXXX"
-                className="flex-1 px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-logic uppercase"
+                className="flex-1 px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] focus:outline-none focus:border-[#949e93] uppercase placeholder:text-[#949e93]/50"
               />
               <button
                 type="submit"
-                className="px-4 py-2.5 text-xs font-bold uppercase bg-proto-surface1 text-proto-text hover:bg-proto-surface2 rounded-xl transition-colors"
+                className="btn-editorial-outline px-4 py-2 text-xs font-bold uppercase"
               >
                 Access
               </button>
             </div>
-          </div>
-        </form>
+          </form>
 
-        {/* Operative Registration Link */}
-        <div className="pt-2 border-t border-proto-surface1 text-center">
-          <span className="text-xs text-proto-subtext">Not registered in The Protocol yet? </span>
-          <a href="/register" className="text-xs text-proto-signal hover:underline font-bold">
-            Register for operative clearance →
-          </a>
+          {/* Operative Registration Link */}
+          <div className="pt-3 border-t border-[#2d312c] flex items-center justify-between text-xs font-display-grotesk text-[#949e93]">
+            <span>Need an assignment?</span>
+            <Link href="/register" className="text-[#f4f1ea] hover:underline font-bold">
+              Register here →
+            </Link>
+          </div>
         </div>
       </main>
 
       {/* Footer Navigation */}
-      <footer className="max-w-md w-full mx-auto text-center py-6 text-xs text-proto-subtext space-y-2">
-        <div>
-          <span>Operations personnel? </span>
-          <a
-            href="/admin"
-            className="text-proto-logic hover:underline font-bold"
-          >
-            Access Operations Desk →
-          </a>
+      <footer className="w-full border-t border-[#2d312c] px-4 sm:px-8 py-3.5 text-xs text-[#949e93] bg-[#141514]">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-mono-tabular text-[11px]">
+          <span>NIT WARANGAL IEEE STUDENT BRANCH</span>
+          <div className="flex items-center gap-4">
+            <Link href="/my-badge" className="hover:text-[#f4f1ea]">
+              My Pass
+            </Link>
+            <Link href="/login" className="hover:text-[#f4f1ea]">
+              Pass Recovery
+            </Link>
+            <Link href="/admin" className="hover:text-[#f4f1ea]">
+              Operations
+            </Link>
+          </div>
         </div>
-        <p className="opacity-60 text-[11px]">
-          NIT Warangal IEEE Student Branch // The Protocol
-        </p>
       </footer>
 
       {/* Scanner Modal */}
@@ -158,7 +183,7 @@ export default function ScanToEnterPage() {
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
         title="BADGE OPTICAL SENSOR"
-        subtitle="Point camera at operative badge to authenticate"
+        subtitle="Align physical badge QR within reticle"
       />
     </div>
   );

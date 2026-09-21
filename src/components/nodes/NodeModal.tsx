@@ -8,15 +8,15 @@ import confetti from 'canvas-confetti';
 import { 
   X, 
   CheckCircle2, 
-  Cpu, 
   Scan, 
   Users, 
-  Terminal, 
   ArrowRight,
   ShieldAlert,
   Layers,
   Activity,
-  Eye
+  Eye,
+  Cpu,
+  Terminal
 } from 'lucide-react';
 
 interface NodeModalProps {
@@ -99,101 +99,101 @@ export const NodeModal: React.FC<NodeModalProps> = ({
     switch (node.domain) {
       case 'LOGIC':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-proto-logic/15 text-proto-logic border border-proto-logic/30 text-[11px] font-mono-cyber font-bold">
-            <Layers className="w-3.5 h-3.5" /> LOGIC DOMAIN
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#2d312c] text-[#3a8ebd] text-[10px] font-mono-tabular">
+            <Layers className="w-3 h-3" /> LOGIC
           </span>
         );
       case 'SIGNAL':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-proto-signal/15 text-proto-signal border border-proto-signal/30 text-[11px] font-mono-cyber font-bold">
-            <Activity className="w-3.5 h-3.5" /> SIGNAL DOMAIN
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#2d312c] text-[#2d9f5d] text-[10px] font-mono-tabular">
+            <Activity className="w-3 h-3" /> SIGNAL
           </span>
         );
       case 'OBSERVATION':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-proto-obs/15 text-proto-obs border border-proto-obs/30 text-[11px] font-mono-cyber font-bold">
-            <Eye className="w-3.5 h-3.5" /> OBSERVATION DOMAIN
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#2d312c] text-[#9368b7] text-[10px] font-mono-tabular">
+            <Eye className="w-3 h-3" /> OBSERVATION
           </span>
         );
       case 'SYSTEM':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-proto-system/15 text-proto-system border border-proto-system/30 text-[11px] font-mono-cyber font-bold">
-            <Cpu className="w-3.5 h-3.5" /> SYSTEM DOMAIN
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#2d312c] text-[#d96b27] text-[10px] font-mono-tabular">
+            <Cpu className="w-3 h-3" /> SYSTEM
           </span>
         );
       case 'SOCIAL':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-proto-social/15 text-proto-social border border-proto-social/30 text-[11px] font-mono-cyber font-bold">
-            <Users className="w-3.5 h-3.5" /> SOCIAL DOMAIN
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#2d312c] text-[#2fa596] text-[10px] font-mono-tabular">
+            <Users className="w-3 h-3" /> SOCIAL
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-proto-logic/15 text-proto-logic text-[11px] font-mono-cyber font-bold">
-            <Terminal className="w-3.5 h-3.5" /> PROTOCOL CIRCUIT
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-[#2d312c] text-[#949e93] text-[10px] font-mono-tabular">
+            <Terminal className="w-3 h-3" /> CIRCUIT
           </span>
         );
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-proto-obsidian/85 backdrop-blur-md animate-in fade-in duration-200 font-mono-cyber">
-      <div className="relative w-full max-w-lg bg-proto-base border border-proto-surface1 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+      <div className="relative w-full max-w-lg bg-[#1b1d1b] border border-[#3f453f] flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-proto-mantle border-b border-proto-surface1">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2d312c] bg-[#141514]">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs text-proto-subtext">
-                {node.id}
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="font-mono-tabular text-[10px] text-[#c28b28]">
+                {node.station_number || node.id}
               </span>
               {renderDomainHeader()}
             </div>
-            <h3 className="text-base font-bold text-proto-text">
+            <h3 className="font-serif-editorial text-xl text-[#f4f1ea]">
               {node.title}
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-proto-subtext hover:text-proto-crimson hover:bg-proto-surface0 rounded-lg transition-colors"
+            className="p-1.5 text-[#949e93] hover:text-[#f4f1ea] border border-[#2d312c] hover:border-[#3f453f] transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-5">
+        <div className="p-5 overflow-y-auto space-y-4 font-display-grotesk">
           {/* Dynamic Scoring Ribbon */}
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-proto-surface0 border border-proto-surface1 text-xs">
+          <div className="grid grid-cols-4 p-3 bg-[#141514] border border-[#2d312c] text-center font-mono-tabular">
             <div>
-              <span className="text-proto-subtext text-[11px] block">BASE VALUE</span>
-              <span className="font-bold text-proto-text">{node.base_points} PTS</span>
+              <span className="text-[#949e93] text-[9px] block uppercase">BASE</span>
+              <span className="font-bold text-[#f4f1ea] text-xs">{node.base_points} PTS</span>
             </div>
-            <div className="text-center">
-              <span className="text-proto-subtext text-[11px] block">SOLVES</span>
-              <span className="text-proto-logic font-bold">{globalSolves}</span>
+            <div>
+              <span className="text-[#949e93] text-[9px] block uppercase">SOLVES</span>
+              <span className="font-bold text-[#3a8ebd] text-xs">{globalSolves}</span>
             </div>
-            <div className="text-center">
-              <span className="text-proto-subtext text-[11px] block">ATTEMPTS</span>
-              <span className="text-proto-crimson font-bold">{attempts}</span>
+            <div>
+              <span className="text-[#949e93] text-[9px] block uppercase">ATTEMPTS</span>
+              <span className="font-bold text-[#c93b2b] text-xs">{attempts}</span>
             </div>
-            <div className="text-right">
-              <span className="text-proto-subtext text-[11px] block">POTENTIAL REWARD</span>
-              <span className="font-black text-proto-gold text-sm">
-                {is_completed ? `${points_earned || node.base_points} PTS (EARNED)` : `${potentialScore} PTS`}
+            <div>
+              <span className="text-[#949e93] text-[9px] block uppercase">VALUE</span>
+              <span className="font-bold text-[#c28b28] text-xs">
+                {is_completed ? `${points_earned || node.base_points} PTS` : `${potentialScore} PTS`}
               </span>
             </div>
           </div>
 
           {/* Completed Banner */}
           {is_completed && (
-            <div className="p-4 rounded-xl bg-proto-signal/15 border border-proto-signal/40 text-proto-signal flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 shrink-0" />
+            <div className="p-3 border border-[#2d9f5d] bg-[#15241b] text-[#2d9f5d] flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
               <div>
-                <p className="text-xs font-black uppercase">
-                  CIRCUIT ENERGIZED & ACCREDITED
+                <p className="font-mono-tabular text-xs font-bold uppercase">
+                  CIRCUIT SOLVED & ACCREDITED
                 </p>
-                <p className="text-[11px] opacity-90 font-sans">
-                  Operative awarded {points_earned || potentialScore} clearance points.
+                <p className="text-[11px] text-[#f4f1ea]/80">
+                  Operative accredited {points_earned || potentialScore} clearance points.
                 </p>
               </div>
             </div>
@@ -202,10 +202,10 @@ export const NodeModal: React.FC<NodeModalProps> = ({
           {/* Status Message Notification */}
           {statusMsg && (
             <div
-              className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+              className={`p-3 border text-xs flex items-start gap-2.5 font-mono-tabular ${
                 statusMsg.type === 'success'
-                  ? 'bg-proto-signal/15 border-proto-signal/40 text-proto-signal'
-                  : 'bg-proto-crimson/15 border-proto-crimson/40 text-proto-crimson'
+                  ? 'bg-[#15241b] border-[#2d9f5d] text-[#2d9f5d]'
+                  : 'bg-[#251515] border-[#c93b2b] text-[#c93b2b]'
               }`}
             >
               {statusMsg.type === 'success' ? (
@@ -219,48 +219,48 @@ export const NodeModal: React.FC<NodeModalProps> = ({
 
           {/* Workflows */}
           {node.type === 'PHYSICAL_QR' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-proto-surface0 border border-proto-surface1 space-y-2">
-                <div className="text-xs text-proto-subtext">
-                  <span className="text-proto-logic font-bold">PHYSICAL LOCATION: </span>
-                  {node.payload.location || 'Report to designated site coordinates.'}
+            <div className="space-y-3">
+              <div className="p-3 border border-[#2d312c] bg-[#141514] space-y-1.5 text-xs">
+                <div>
+                  <span className="font-mono-tabular text-[#949e93] uppercase block text-[10px]">Location</span>
+                  <span className="text-[#f4f1ea]">{node.payload.location || 'Report to designated campus coordinates.'}</span>
                 </div>
                 {node.payload.sector && (
-                  <div className="text-xs text-proto-subtext">
-                    <span className="text-proto-logic font-bold">SECTOR: </span>
-                    {node.payload.sector}
+                  <div>
+                    <span className="font-mono-tabular text-[#949e93] uppercase block text-[10px]">Sector</span>
+                    <span className="text-[#f4f1ea]">{node.payload.sector}</span>
                   </div>
                 )}
                 {node.payload.hint && (
-                  <div className="text-xs text-proto-subtext">
-                    <span className="text-proto-gold font-bold">RECON HINT: </span>
-                    {node.payload.hint}
+                  <div className="pt-1 border-t border-[#2d312c]">
+                    <span className="font-mono-tabular text-[#c28b28] uppercase block text-[10px]">Recon Hint</span>
+                    <span className="text-[#949e93] text-[11px]">{node.payload.hint}</span>
                   </div>
                 )}
               </div>
 
               {!is_completed && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <button
                     onClick={() => onOpenScannerForNode?.(node.id)}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-proto-logic to-proto-signal text-proto-obsidian font-black text-xs tracking-wider uppercase flex items-center justify-center gap-2 hover:opacity-95 transition-all shadow-lg"
+                    className="btn-editorial-primary w-full py-2.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Scan className="w-4 h-4" />
-                    OPEN OPTICAL RETICLE FOR THIS NODE
+                    <span>Scan Node QR Code</span>
                   </button>
 
-                  <form onSubmit={handleVerifyKey} className="flex gap-2 pt-2">
+                  <form onSubmit={handleVerifyKey} className="flex gap-2 pt-1">
                     <input
                       type="text"
                       value={inputVal}
                       onChange={(e) => setInputVal(e.target.value)}
                       placeholder="e.g. QR-JUNCTION-7741"
-                      className="flex-1 px-3 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-lg text-proto-text focus:outline-none focus:border-proto-logic uppercase"
+                      className="flex-1 px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] font-mono-tabular focus:outline-none focus:border-[#949e93] uppercase"
                     />
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="px-4 py-2 text-xs font-bold uppercase bg-proto-surface1 text-proto-text hover:bg-proto-surface2 rounded-lg transition-colors"
+                      className="btn-editorial-outline px-4 py-2 text-xs font-bold uppercase font-mono-tabular cursor-pointer"
                     >
                       Verify
                     </button>
@@ -271,50 +271,47 @@ export const NodeModal: React.FC<NodeModalProps> = ({
           )}
 
           {node.type === 'TERMINAL_DECRYPT' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-proto-surface0 border border-proto-surface1 space-y-3">
-                <div className="flex items-center justify-between text-xs text-proto-subtext border-b border-proto-surface1 pb-2">
-                  <span className="text-proto-logic font-bold">
-                    ALGORITHM: {node.payload.algorithm || 'UNKNOWN CIPHER'}
-                  </span>
-                  <span className="text-[10px] bg-proto-surface1 px-2 py-0.5 rounded text-proto-text">
-                    PACKET STREAM
-                  </span>
+            <div className="space-y-3">
+              <div className="p-3 border border-[#2d312c] bg-[#141514] space-y-2 text-xs">
+                <div className="flex items-center justify-between font-mono-tabular text-[10px] text-[#949e93] border-b border-[#2d312c] pb-1.5">
+                  <span>ALGORITHM: {node.payload.algorithm || 'UNKNOWN CIPHER'}</span>
+                  <span>PACKET STREAM</span>
                 </div>
 
-                <div className="p-3 rounded-lg bg-proto-obsidian text-xs text-proto-gold break-all border border-proto-surface1">
+                <div className="p-2.5 bg-[#1b1d1b] border border-[#2d312c] font-mono-tabular text-xs text-[#c28b28] break-all">
                   {node.payload.cipher}
                 </div>
 
                 {node.payload.hint && (
-                  <p className="text-xs text-proto-subtext">
-                    <span className="text-proto-gold font-bold">INTEL TIP: </span>
+                  <p className="text-[11px] text-[#949e93]">
+                    <strong className="text-[#c28b28] font-mono-tabular uppercase">Tip: </strong>
                     {node.payload.hint}
                   </p>
                 )}
               </div>
 
               {!is_completed && (
-                <form onSubmit={handleVerifyKey} className="space-y-3">
+                <form onSubmit={handleVerifyKey} className="space-y-2">
                   <div>
-                    <label className="block text-[11px] text-proto-subtext mb-1 uppercase">
-                      Submit Deciphered Payload Token:
+                    <label className="block font-mono-tabular text-[10px] text-[#949e93] mb-1 uppercase">
+                      Decrypted String Token:
                     </label>
                     <input
                       type="text"
                       value={inputVal}
                       onChange={(e) => setInputVal(e.target.value)}
                       placeholder="Enter deciphered string..."
-                      className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-logic"
+                      className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] font-mono-tabular focus:outline-none focus:border-[#949e93]"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3 px-4 rounded-xl bg-proto-logic text-proto-obsidian font-black text-xs tracking-wider uppercase hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
+                    className="btn-editorial-primary w-full py-2.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    TRANSMIT DECRYPTION KEY <ArrowRight className="w-4 h-4" />
+                    <span>Transmit Decryption Key</span>
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
               )}
@@ -322,43 +319,44 @@ export const NodeModal: React.FC<NodeModalProps> = ({
           )}
 
           {node.type === 'DUAL_HANDSHAKE' && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-proto-surface0 border border-proto-surface1 space-y-2.5">
-                <div className="flex items-center gap-2 text-xs text-proto-social font-bold">
+            <div className="space-y-3">
+              <div className="p-3 border border-[#2d312c] bg-[#141514] space-y-2 text-xs">
+                <div className="flex items-center gap-2 font-mono-tabular text-xs text-[#2fa596] font-bold">
                   <Users className="w-4 h-4" />
-                  SOCIAL HANDSHAKE DIRECTIVE
+                  <span>SOCIAL HANDSHAKE DIRECTIVE</span>
                 </div>
-                <p className="text-xs text-proto-subtext">
+                <p className="text-[11px] text-[#949e93]">
                   {node.payload.description}
                 </p>
                 {node.payload.partner_archetype && (
-                  <div className="inline-block text-[11px] px-2.5 py-1 rounded bg-proto-surface1 text-proto-social border border-proto-social/30 font-bold">
-                    TARGET DOMAIN REQUIREMENT: [{node.payload.partner_archetype}]
+                  <div className="inline-block font-mono-tabular text-[10px] px-2 py-0.5 border border-[#2d312c] text-[#2fa596] bg-[#1b1d1b]">
+                    PARTNER REQUIREMENT: [{node.payload.partner_archetype}]
                   </div>
                 )}
               </div>
 
               {!is_completed && (
-                <form onSubmit={handleHandshake} className="space-y-3">
+                <form onSubmit={handleHandshake} className="space-y-2">
                   <div>
-                    <label className="block text-[11px] text-proto-subtext mb-1 uppercase">
-                      Peer Operative Agent ID:
+                    <label className="block font-mono-tabular text-[10px] text-[#949e93] mb-1 uppercase">
+                      Partner Agent ID:
                     </label>
                     <input
                       type="text"
                       value={partnerId}
                       onChange={(e) => setPartnerId(e.target.value)}
-                      placeholder="e.g. AGT-HOPPER or AGT-TURING"
-                      className="w-full px-3.5 py-2.5 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-social uppercase"
+                      placeholder="e.g. AGT-002"
+                      className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] font-mono-tabular focus:outline-none focus:border-[#949e93] uppercase"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3 px-4 rounded-xl bg-proto-social text-proto-obsidian font-black text-xs tracking-wider uppercase hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2"
+                    className="btn-editorial-primary w-full py-2.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    EXECUTE DUAL HANDSHAKE <Users className="w-4 h-4" />
+                    <span>Execute Handshake</span>
+                    <Users className="w-4 h-4" />
                   </button>
                 </form>
               )}

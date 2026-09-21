@@ -14,7 +14,7 @@ export const BroadcastBanner: React.FC<BroadcastBannerProps> = ({
 }) => {
   if (status === 'NETWORK_LOCKED') {
     return (
-      <div className="w-full bg-proto-crimson text-proto-obsidian px-4 py-2.5 flex items-center justify-center gap-3 font-mono-cyber text-xs font-black uppercase tracking-wider shadow-lg animate-pulse">
+      <div className="w-full bg-[#c93b2b] text-[#f4f1ea] px-4 py-2 flex items-center justify-center gap-3 font-mono-tabular text-xs font-bold uppercase tracking-wider">
         <ShieldAlert className="w-4 h-4 shrink-0" />
         <span>CRITICAL PROTOCOL LOCKOUT: ALL CIRCUITS FROZEN BY OPERATIONS DESK.</span>
       </div>
@@ -22,18 +22,18 @@ export const BroadcastBanner: React.FC<BroadcastBannerProps> = ({
   }
 
   return (
-    <div className="w-full bg-proto-surface0/95 border-b border-proto-surface1 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 text-proto-text">
+    <div className="w-full bg-[#1b1d1b] border-b border-[#2d312c] px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 text-[#f4f1ea]">
       <div className="flex items-center gap-2 overflow-hidden">
-        <span className="flex items-center gap-1.5 text-proto-crimson font-mono-cyber font-black shrink-0 animate-pulse">
-          <AlertTriangle className="w-3.5 h-3.5 text-proto-crimson" />
+        <span className="flex items-center gap-1.5 text-[#c93b2b] font-mono-tabular font-bold shrink-0">
+          <AlertTriangle className="w-3.5 h-3.5 text-[#c93b2b]" />
           DIRECTIVE:
         </span>
-        <span className="truncate font-mono-cyber text-proto-text/90 font-medium">
-          {broadcast || 'PROTOCOL ACTIVE: 247 AGENTS DETECTED // TRUST NO ONE. SOME AGENTS HAVE OTHER OBJECTIVES.'}
+        <span className="truncate font-mono-tabular text-[#f4f1ea]/90 text-[11px]">
+          {broadcast || 'PROTOCOL ACTIVE // TRUST NO ONE. SOME AGENTS HAVE OTHER OBJECTIVES.'}
         </span>
       </div>
-      <span className="text-[10px] font-mono-cyber text-proto-signal font-bold shrink-0 hidden md:inline border border-proto-signal/40 px-2 py-0.5 rounded">
-        LEVEL 01 ACCESS
+      <span className="text-[10px] font-mono-tabular text-[#2d9f5d] font-bold shrink-0 hidden md:inline border border-[#2d9f5d]/40 px-2 py-0.5">
+        LEVEL 01 CLEARANCE
       </span>
     </div>
   );

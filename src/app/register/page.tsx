@@ -7,14 +7,6 @@ import { Store, initStore } from '@/lib/store';
 import { ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
 import { sendRegistrationWhatsAppMessages } from '@/lib/whatsapp';
-import { 
-  AlertTriangle, 
-  QrCode, 
-  Ticket,
-  MessageSquare,
-  ArrowRight,
-  ShieldCheck
-} from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,33 +28,27 @@ export default function RegisterPage() {
     setErrorMsg(null);
 
     if (!name.trim() || !rollNumber.trim() || !contact.trim()) {
-      setErrorMsg('Please complete all required enlistment fields.');
+      setErrorMsg('All fields are required.');
       return;
     }
 
     setIsSubmitting(true);
     initStore();
 
-    // Check if roll number already registered locally
     const existing = Store.findAgentByIdentifier(rollNumber.trim());
     if (existing) {
-      setErrorMsg(`Roll No '${rollNumber.trim()}' is already registered. Please log in.`);
+      setErrorMsg(`Roll number '${rollNumber.trim()}' is already registered. Please sign in.`);
       setIsSubmitting(false);
       return;
     }
 
-    // Dynamic pool-balancing animation
     soundEffects.playScanChirp();
-    setAllocationStep('CONNECTING TO THE PROTOCOL CORE...');
+    setAllocationStep('Connecting to The Protocol directory...');
+    await new Promise(r => setTimeout(r, 300));
+
+    setAllocationStep('Allocating operative ID & tactical cell...');
     await new Promise(r => setTimeout(r, 350));
 
-    setAllocationStep('ANALYZING TACTICAL ROSTER DENSITY...');
-    await new Promise(r => setTimeout(r, 400));
-
-    setAllocationStep('ALLOCATING OPERATIVE ID & CELL...');
-    await new Promise(r => setTimeout(r, 350));
-
-    // Execute atomic registration with server-authoritative sequential ID
     const { agent, token, assignedDomain } = await Store.registerAgentAsync({
       name: name.trim(),
       auth_identifier: rollNumber.trim(),
@@ -73,7 +59,6 @@ export default function RegisterPage() {
     localStorage.setItem('ieee_agent_id', agent.agent_id);
     localStorage.setItem('ieee_agent_token', token);
 
-    // Dispatch WhatsApp messages
     sendRegistrationWhatsAppMessages({
       recipientPhone: contact.trim(),
       agentName: name.trim(),
@@ -92,156 +77,147 @@ export default function RegisterPage() {
       domain: assignedDomain
     });
 
-    // Route to standby or badge
     setTimeout(() => {
       if (Store.isEventActive()) {
         router.push('/my-badge');
       } else {
         router.push('/standby');
       }
-    }, 2200);
+    }, 2000);
   };
 
   return (
-    <div className="min-h-screen bg-[#0c0e0d] text-[#f1ede4] flex flex-col justify-between p-3 sm:p-5 tactile-grain select-none">
-      {/* Tactical Top Identifier */}
-      <header className="max-w-sm w-full mx-auto flex items-center justify-between text-[11px] text-[#8f9e91] border-b border-[#28302b] pb-2">
-        <div className="flex items-center gap-1.5 font-bold tracking-wider text-[#f1ede4]">
-          <span>NITW</span>
-          <span className="text-[#8f9e91]">/</span>
-          <span>IEEE THE PROTOCOL</span>
+    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between p-4 sm:p-8 font-sans">
+      {/* Top Editorial Masthead */}
+      <header className="max-w-xl w-full mx-auto rule-double pb-2.5 flex items-baseline justify-between text-xs text-[#949e93] font-mono-tabular">
+        <div>
+          <strong className="text-[#f4f1ea] font-display-grotesk tracking-tight">NIT WARANGAL IEEE</strong>
+          <span className="mx-2">•</span>
+          <span>THE PROTOCOL 2026</span>
         </div>
-        <div className="text-[10px] uppercase tracking-widest text-[#22c55e] font-bold">
-          [ENLISTMENT]
+        <div className="text-[11px] uppercase tracking-wider text-[#c93b2b] font-bold">
+          ENLISTMENT
         </div>
       </header>
 
-      {/* Main Commission Docket */}
-      <main className="max-w-sm w-full mx-auto my-auto py-2">
-        <div className="bg-[#121513] border-2 border-[#28302b] rounded-sm p-4 sm:p-5 shadow-2xl space-y-4">
-          
-          <div className="border-b border-[#28302b] pb-2">
-            <div className="text-[9px] uppercase tracking-widest text-[#8f9e91] font-bold">
-              OFFICIAL ENLISTMENT DOCKET
-            </div>
-            <h1 className="text-xl font-black text-[#f1ede4] tracking-tight uppercase">
-              COMMISSION OPERATIVE
-            </h1>
-            <p className="text-[11px] text-[#8f9e91] font-mono mt-0.5">
-              Input operative credentials to generate your personal pass.
-            </p>
-          </div>
-
-          {errorMsg && (
-            <div className="p-2.5 bg-[#dc2626]/10 border border-[#dc2626]/40 text-[#dc2626] text-xs flex items-center gap-2 rounded-sm">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Allocation Reveal State */}
-          {isSubmitting && (
-            <div className="p-4 bg-[#0c0e0d] border border-[#28302b] text-center space-y-3 rounded-sm">
-              {!assignedResult ? (
-                <div className="space-y-2 py-3">
-                  <div className="w-6 h-6 border-2 border-[#22c55e] border-t-transparent animate-spin mx-auto" />
-                  <div className="text-xs font-bold text-[#22c55e] uppercase tracking-wider font-mono">
-                    {allocationStep}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2 py-1 font-mono">
-                  <div className="stamp-box stamp-active text-xs">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>COMMISSIONED: {assignedResult.agentId}</span>
-                  </div>
-                  <div className="text-sm font-black text-[#f1ede4]">
-                    {ROLE_DETAILS[assignedResult.domain].title} Cell
-                  </div>
-                  <div className="text-xs text-[#eab308]">
-                    WRISTBAND: {assignedResult.wristbandId}
-                  </div>
-                  <div className="text-[10px] text-[#8f9e91] pt-1">
-                    Pass dispatched to WhatsApp • Forwarding...
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!isSubmitting && (
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
-                  Operative Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Alan Turing"
-                  className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] font-sans"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
-                  Student Roll No / ID * (Account Key)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={rollNumber}
-                  onChange={(e) => setRollNumber(e.target.value)}
-                  placeholder="e.g. 23CSB01"
-                  className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] uppercase font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-[#8f9e91] mb-1 uppercase tracking-wider font-bold">
-                  Phone / WhatsApp *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="Contact number (e.g. 9876543210)"
-                  className="w-full px-3 py-2 text-xs bg-[#0c0e0d] border border-[#28302b] rounded-sm text-[#f1ede4] focus:outline-none focus:border-[#22c55e] font-sans"
-                />
-              </div>
-
-              {/* Compact Tactical Notice */}
-              <div className="text-[10px] text-[#8f9e91] flex items-center justify-between border-t border-b border-[#28302b] py-1.5 font-mono">
-                <span>ROLE ALLOCATION:</span>
-                <span className="text-[#eab308] font-bold">[AUTOMATIC BALANCED CELL]</span>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-2.5 px-3 rounded-sm btn-tactile-primary text-xs flex items-center justify-center gap-2 cursor-pointer mt-2"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>COMMISSION OPERATIVE & MINT PASS</span>
-              </button>
-            </form>
-          )}
-
-          <div className="text-center pt-2 border-t border-[#28302b] text-[11px] text-[#8f9e91]">
-            <span>Already commissioned? </span>
-            <Link href="/login" className="text-[#22c55e] hover:underline font-bold">
-              Log in here →
-            </Link>
-          </div>
+      {/* Main Asymmetric Body */}
+      <main className="max-w-xl w-full mx-auto my-auto py-6 space-y-6">
+        
+        {/* Editorial Title */}
+        <div className="space-y-1">
+          <h1 className="text-3xl sm:text-4xl font-serif-editorial tracking-tight text-[#f4f1ea]">
+            Commission your operative pass.
+          </h1>
+          <p className="text-xs text-[#949e93] font-display-grotesk leading-relaxed">
+            Enter your student identity to receive your sequential Call Sign, physical wristband assignment, and authentication QR code.
+          </p>
         </div>
+
+        {errorMsg && (
+          <div className="p-3 border border-[#c93b2b] text-[#c93b2b] text-xs font-display-grotesk bg-[#1b1d1b]">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Allocation Progress State */}
+        {isSubmitting && (
+          <div className="border border-[#2d312c] bg-[#1b1d1b] p-5 text-center space-y-3 font-display-grotesk">
+            {!assignedResult ? (
+              <div className="space-y-2 py-4">
+                <div className="w-5 h-5 border border-[#f4f1ea] border-t-transparent animate-spin mx-auto" />
+                <div className="text-xs text-[#f4f1ea] font-mono-tabular">
+                  {allocationStep}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 py-2">
+                <div className="editorial-stamp text-[#2d9f5d] border-[#2d9f5d]">
+                  COMMISSIONED: {assignedResult.agentId}
+                </div>
+                <div className="text-lg font-serif-editorial text-[#f4f1ea]">
+                  {ROLE_DETAILS[assignedResult.domain].title} Cell
+                </div>
+                <div className="text-xs text-[#c28b28] font-mono-tabular">
+                  Wristband ID: {assignedResult.wristbandId}
+                </div>
+                <div className="text-xs text-[#949e93] pt-1">
+                  Transmitting pass to WhatsApp • Loading terminal...
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isSubmitting && (
+          <form onSubmit={handleSubmit} className="border border-[#2d312c] bg-[#1b1d1b] p-5 sm:p-6 space-y-4">
+            
+            <div className="space-y-1.5">
+              <label className="block text-xs uppercase tracking-wider text-[#949e93] font-mono-tabular font-bold">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Alan Turing"
+                className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] focus:outline-none focus:border-[#f4f1ea] font-display-grotesk"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs uppercase tracking-wider text-[#949e93] font-mono-tabular font-bold">
+                Student Roll No / ID *
+              </label>
+              <input
+                type="text"
+                required
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
+                placeholder="e.g. 23CSB01"
+                className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] focus:outline-none focus:border-[#f4f1ea] uppercase font-mono-tabular"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs uppercase tracking-wider text-[#949e93] font-mono-tabular font-bold">
+                Phone / WhatsApp Contact *
+              </label>
+              <input
+                type="text"
+                required
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="e.g. 9876543210"
+                className="w-full px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] focus:outline-none focus:border-[#f4f1ea] font-display-grotesk"
+              />
+            </div>
+
+            <div className="rule-hairline pt-2" />
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 btn-editorial-primary text-xs block text-center uppercase tracking-wider font-bold cursor-pointer"
+            >
+              Commission Operative & Mint Pass →
+            </button>
+          </form>
+        )}
+
+        <div className="flex items-center justify-between text-xs text-[#949e93] font-display-grotesk pt-1">
+          <span>Already commissioned?</span>
+          <Link href="/login" className="text-[#f4f1ea] underline underline-offset-4 font-bold">
+            Sign in to existing account →
+          </Link>
+        </div>
+
       </main>
 
-      {/* Minimal Bottom Stamp */}
-      <footer className="max-w-sm w-full mx-auto text-center text-[9px] text-[#48544c] uppercase tracking-widest pt-1">
-        NIT WARANGAL • IEEE STUDENT BRANCH • SECURE DISPATCH
+      {/* Editorial Footer */}
+      <footer className="max-w-xl w-full mx-auto rule-hairline pt-2 flex items-center justify-between text-[10px] text-[#949e93] font-mono-tabular">
+        <span>NIT WARANGAL • DEPT OF ECE</span>
+        <span>DISPATCH DIRECTORY</span>
       </footer>
     </div>
   );
