@@ -188,3 +188,14 @@ export interface GameState {
   submission_cutoff_time: string;    // e.g. 2026-09-18T20:00:00 or "20:00"
   updated_at: string;
 }
+
+export interface GoogleFormConfig {
+  enabled: boolean;
+  form_url: string;               // e.g. https://docs.google.com/forms/d/e/.../formResponse or viewform
+  entry_name: string;             // e.g. entry.123456789
+  entry_phone: string;            // e.g. entry.987654321
+  entry_roll_no: string;          // e.g. entry.112233445
+  entry_agent_id?: string;        // e.g. entry.556677889 (optional)
+  last_submitted_at: string | null;
+  total_submissions: number;
+}

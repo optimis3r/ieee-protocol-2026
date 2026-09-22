@@ -272,9 +272,13 @@ export default function MyBadgePage() {
 
         {/* Subordinate Links */}
         <div className="flex items-center justify-between text-xs text-[#949e93] font-display-grotesk pt-1">
-          <Link href="/leaderboard" className="hover:text-[#f4f1ea] underline underline-offset-4">
-            Public Leaderboard
-          </Link>
+          {gameState.leaderboard_visible ? (
+            <Link href="/leaderboard" className="hover:text-[#f4f1ea] underline underline-offset-4 flex items-center gap-1 text-[#c28b28]">
+              Public Standings →
+            </Link>
+          ) : (
+            <span className="text-[#949e93]/50">Standings Concealed</span>
+          )}
           <button
             onClick={handleLogout}
             className="text-[#c93b2b] hover:underline underline-offset-4 cursor-pointer"

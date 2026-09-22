@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Agent, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { formatActiveTimeClock } from '@/lib/store';
 import { 
@@ -16,6 +17,7 @@ interface StatusRibbonProps {
   discoveriesCount: number;
   connectionsCount: number;
   availableNodesCount: number;
+  leaderboardVisible?: boolean;
   onOpenScanner: () => void;
 }
 
@@ -24,6 +26,7 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
   networkStatus,
   activeSeconds,
   availableNodesCount,
+  leaderboardVisible,
   onOpenScanner,
 }) => {
   const roleKey = (agent.archetype as PrimaryDomain) || 'LOGIC';
@@ -78,12 +81,24 @@ export const StatusRibbon: React.FC<StatusRibbonProps> = ({
             <span>{availableNodesCount} CIRCUITS</span>
           </div>
 
-          {/* Score Badge */}
-          <div className="flex items-center gap-1 text-xs font-mono-tabular bg-[#141514] border border-[#2d312c] px-2 py-0.5 text-[#c28b28] font-bold">
-            <Trophy className="w-3 h-3 text-[#c28b28]" />
-            <span>{agent.score}</span>
-            <span className="text-[9px] text-[#949e93] font-normal">PTS</span>
-          </div>
+          {/* Score Badge - Clickable to Leaderboard if enabled by Admin */}
+          {leaderboardVisible ? (
+            <Link
+              href="/leaderboard"
+              className="flex items-center gap-1 text-xs font-mono-tabular bg-[#141514] hover:bg-[#201d16] border border-[#2d312c] hover:border-[#c28b28]/60 px-2 py-0.5 text-[#c28b28] font-bold transition-all cursor-pointer rounded-xs"
+              title="View Official Standings Registry"
+            >
+              <Trophy className="w-3 h-3 text-[#c28b28]" />
+              <span>{agent.score}</span>
+              <span className="text-[9px] text-[#949e93] font-normal">PTS</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-1 text-xs font-mono-tabular bg-[#141514] border border-[#2d312c] px-2 py-0.5 text-[#c28b28] font-bold">
+              <Trophy className="w-3 h-3 text-[#c28b28]" />
+              <span>{agent.score}</span>
+              <span className="text-[9px] text-[#949e93] font-normal">PTS</span>
+            </div>
+          )}
 
           {/* Tactical Scan Action Trigger */}
           <button

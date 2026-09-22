@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       registrationBackup,
       registrationBackupCount: registrationBackup.length,
       gameState,
+      googleFormConfig: ServerStore.getGoogleFormConfig(),
       totalCount: enrichedAgents.length,
       timestamp: new Date().toISOString()
     });
@@ -212,6 +213,27 @@ export async function POST(request: Request) {
       case 'get_backup_csv': {
         const csv = ServerStore.getRegistrationBackupCSV();
         return NextResponse.json({ success: true, csv });
+      }
+
+      case 'get_google_form_config': {
+        const config = ServerStore.getGoogleFormConfig();
+        return NextResponse.json({ success: true, config });
+      }
+
+      case 'update_google_form_config': {
+        const { config } = body;
+        if (!config || typeof config !== 'object') {
+          return NextResponse.json({ error: 'Config object required' }, { status: 400 });
+        }
+        const updated = ServerStore.updateGoogleFormConfig(config);
+        return NextResponse.json({ success: true, config: updated });
+      }
+
+      case 'test_google_form': {
+        const { testPayload } = body;
+        const result = await ServerStore.testGoogleFormSubmission(testPayload);
+        const config = ServerStore.getGoogleFormConfig();
+        return NextResponse.json({ ...result, config });
       }
 
       default:

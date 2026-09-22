@@ -20,7 +20,9 @@ import {
   ExternalLink,
   Layers,
   Sparkles,
-  QrCode
+  QrCode,
+  Trophy,
+  Lock
 } from 'lucide-react';
 
 function AgentHUD() {
@@ -251,6 +253,7 @@ function AgentHUD() {
         discoveriesCount={intel.length}
         connectionsCount={connectionsCount}
         availableNodesCount={availableNodesCount}
+        leaderboardVisible={gameState.leaderboard_visible}
         onOpenScanner={() => setIsScannerOpen(true)}
       />
 
@@ -321,6 +324,18 @@ function AgentHUD() {
 
           {/* Action Triggers */}
           <div className="flex items-center gap-2">
+            {/* View Leaderboard Button - Controlled by Admin leaderboard_visible toggle */}
+            {gameState.leaderboard_visible && (
+              <Link
+                href="/leaderboard"
+                className="btn-editorial-outline flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase transition-all text-[#c28b28] border-[#c28b28]/60 hover:bg-[#c28b28]/15 shadow-sm"
+                title="View Official Standings Registry"
+              >
+                <Trophy className="w-3.5 h-3.5 text-[#c28b28]" />
+                <span>STANDINGS</span>
+              </Link>
+            )}
+
             <button
               onClick={() => setIsHypothesisOpen(true)}
               className="btn-editorial-primary flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold uppercase cursor-pointer"
@@ -398,9 +413,17 @@ function AgentHUD() {
           <Link href="/my-badge" className="hover:text-[#f4f1ea] transition-colors">
             My QR Pass & Band
           </Link>
-          <Link href="/leaderboard" className="hover:text-[#f4f1ea] transition-colors">
-            Live Standings
-          </Link>
+          {gameState.leaderboard_visible ? (
+            <Link href="/leaderboard" className="hover:text-[#c28b28] transition-colors flex items-center gap-1 text-[#c28b28]">
+              <Trophy className="w-3 h-3 text-[#c28b28]" />
+              <span>Live Standings</span>
+            </Link>
+          ) : (
+            <span className="text-[#949e93]/50 flex items-center gap-1 cursor-not-allowed" title="Standings sealed by Operations Desk">
+              <Lock className="w-3 h-3" />
+              <span>Standings Sealed</span>
+            </span>
+          )}
           <Link href="/admin" className="text-[#3a8ebd] hover:underline flex items-center gap-1">
             Operations <ExternalLink className="w-3 h-3" />
           </Link>

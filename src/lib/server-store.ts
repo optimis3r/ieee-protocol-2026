@@ -1,14 +1,15 @@
 import fs from 'fs';
 import path from 'path';
-import { Agent, AgentNode, GameState, NodeItem, RegistrationBackupRecord } from '@/types/database';
+import { Agent, AgentNode, GameState, NodeItem, RegistrationBackupRecord, GoogleFormConfig } from '@/types/database';
 import { SEED_NODES, getAgentActiveSeconds } from './store';
 import { WhatsAppDispatchRecord } from './whatsapp';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
 const STORE_FILE = path.join(DATA_DIR, 'protocol_store.json');
 const BACKUP_FILE = path.join(DATA_DIR, 'registration_backup.json');
+const GOOGLE_FORM_CONFIG_FILE = path.join(DATA_DIR, 'google_form_config.json');
 
-export type { RegistrationBackupRecord };
+export type { RegistrationBackupRecord, GoogleFormConfig };
 
 interface ServerStoreData {
   agents: Agent[];
@@ -139,6 +140,103 @@ function saveServerData(data: ServerStoreData, immediate: boolean = false): void
 // Flush pending disk writes on process exit
 if (typeof process !== 'undefined') {
   process.on('beforeExit', () => flushToDisk());
+}
+
+function getInitialGoogleFormConfig(): GoogleFormConfig {
+  return {
+    enabled: true,
+    form_url: process.env.GOOGLE_FORM_URL || '',
+    entry_name: process.env.GOOGLE_FORM_ENTRY_NAME || '',
+    entry_phone: process.env.GOOGLE_FORM_ENTRY_PHONE || '',
+    entry_roll_no: process.env.GOOGLE_FORM_ENTRY_ROLL_NO || '',
+    entry_agent_id: process.env.GOOGLE_FORM_ENTRY_AGENT_ID || '',
+    last_submitted_at: null,
+    total_submissions: 0,
+  };
+}
+
+function loadGoogleFormConfig(): GoogleFormConfig {
+  try {
+    if (fs.existsSync(GOOGLE_FORM_CONFIG_FILE)) {
+      const raw = fs.readFileSync(GOOGLE_FORM_CONFIG_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return {
+        ...getInitialGoogleFormConfig(),
+        ...parsed,
+      };
+    }
+  } catch (e) {
+    console.error('Failed to read google_form_config.json:', e);
+  }
+  return getInitialGoogleFormConfig();
+}
+
+function saveGoogleFormConfig(config: GoogleFormConfig) {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(GOOGLE_FORM_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to write google_form_config.json:', e);
+  }
+}
+
+export async function submitToGoogleForm(data: {
+  name: string;
+  phone: string;
+  rollNo: string;
+  agentId?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const config = loadGoogleFormConfig();
+  if (!config.enabled || !config.form_url || !config.form_url.trim()) {
+    return { success: false, error: 'Google Form backup is not configured or disabled' };
+  }
+
+  let submitUrl = config.form_url.trim();
+  if (submitUrl.includes('/viewform')) {
+    submitUrl = submitUrl.replace('/viewform', '/formResponse');
+  } else if (submitUrl.includes('/edit')) {
+    submitUrl = submitUrl.replace('/edit', '/formResponse');
+  } else if (!submitUrl.endsWith('/formResponse') && submitUrl.includes('docs.google.com/forms/d/e/')) {
+    submitUrl = submitUrl.split('?')[0].replace(/\/+$/, '') + '/formResponse';
+  }
+
+  try {
+    const params = new URLSearchParams();
+    if (config.entry_name && data.name) {
+      params.append(config.entry_name.trim(), data.name.trim());
+    }
+    if (config.entry_phone && data.phone) {
+      params.append(config.entry_phone.trim(), data.phone.trim());
+    }
+    if (config.entry_roll_no && data.rollNo) {
+      params.append(config.entry_roll_no.trim(), data.rollNo.trim());
+    }
+    if (config.entry_agent_id && data.agentId) {
+      params.append(config.entry_agent_id.trim(), data.agentId.trim());
+    }
+
+    const res = await fetch(submitUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    if (res.ok || res.status === 302 || res.type === 'opaqueredirect') {
+      config.last_submitted_at = new Date().toISOString();
+      config.total_submissions = (config.total_submissions || 0) + 1;
+      saveGoogleFormConfig(config);
+      return { success: true };
+    } else {
+      return { success: false, error: `Google Form responded with HTTP ${res.status}` };
+    }
+  } catch (err: any) {
+    console.warn('Google Form background backup error (non-fatal):', err);
+    return { success: false, error: err.message || 'Network error' };
+  }
 }
 
 export const ServerStore = {
@@ -391,6 +489,15 @@ export const ServerStore = {
     }
 
     saveServerData(data, true);
+
+    // Asynchronous background Google Form backup submission
+    submitToGoogleForm({
+      name: agent.name,
+      phone: agent.contact,
+      rollNo: agent.auth_identifier || '',
+      agentId: agent.agent_id
+    }).catch(() => {});
+
     return agent;
   },
 
@@ -883,12 +990,52 @@ export const ServerStore = {
     });
 
     saveServerData(data, true);
+
+    // Asynchronous background Google Form backup for newly enrolled operatives
+    data.agents.slice(0, registeredCount).forEach(ag => {
+      submitToGoogleForm({
+        name: ag.name,
+        phone: ag.contact,
+        rollNo: ag.auth_identifier || '',
+        agentId: ag.agent_id
+      }).catch(() => {});
+    });
+
     return {
       registeredCount,
       updatedCount,
       agents: data.agents,
       registrationBackup: data.registration_backup
     };
+  },
+
+  getGoogleFormConfig(): GoogleFormConfig {
+    return loadGoogleFormConfig();
+  },
+
+  updateGoogleFormConfig(updates: Partial<GoogleFormConfig>): GoogleFormConfig {
+    const current = loadGoogleFormConfig();
+    const updated: GoogleFormConfig = {
+      ...current,
+      ...updates,
+      form_url: updates.form_url !== undefined ? updates.form_url.trim() : current.form_url,
+      entry_name: updates.entry_name !== undefined ? updates.entry_name.trim() : current.entry_name,
+      entry_phone: updates.entry_phone !== undefined ? updates.entry_phone.trim() : current.entry_phone,
+      entry_roll_no: updates.entry_roll_no !== undefined ? updates.entry_roll_no.trim() : current.entry_roll_no,
+      entry_agent_id: updates.entry_agent_id !== undefined ? updates.entry_agent_id.trim() : current.entry_agent_id,
+      enabled: updates.enabled !== undefined ? updates.enabled : current.enabled,
+    };
+    saveGoogleFormConfig(updated);
+    return updated;
+  },
+
+  async testGoogleFormSubmission(custom?: { name?: string; phone?: string; rollNo?: string }): Promise<{ success: boolean; error?: string }> {
+    return submitToGoogleForm({
+      name: custom?.name || 'Test Operative (Admin Verification)',
+      phone: custom?.phone || '9999999999',
+      rollNo: custom?.rollNo || 'TEST-ROLL-01',
+      agentId: 'AGT-TEST'
+    });
   },
 
   greatReset(): void {

@@ -44,9 +44,19 @@ export default function LeaderboardPage() {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     initStore();
+    setIsAdmin(typeof window !== 'undefined' && sessionStorage.getItem('ieee_admin_auth') === 'true');
+
+    const syncFreshData = async () => {
+      await Store.syncWithServer();
+      setGameState(Store.getGameState());
+      setAgents(Store.getAgents());
+    };
+
+    syncFreshData();
 
     const handleUpdate = () => {
       setGameState(Store.getGameState());
@@ -57,8 +67,8 @@ export default function LeaderboardPage() {
     window.addEventListener('storage', handleUpdate);
 
     const timer = setInterval(() => {
-      setAgents(Store.getAgents());
-    }, 5000);
+      syncFreshData();
+    }, 4000);
 
     return () => {
       window.removeEventListener('ieee_store_update', handleUpdate);
@@ -116,7 +126,7 @@ export default function LeaderboardPage() {
       {/* Main Content Area */}
       <main className="max-w-5xl w-full mx-auto px-4 sm:px-8 py-8 flex-1">
         {/* IF LEADERBOARD IS HIDDEN BY OPERATIONS: SUSPENSE BLACKOUT SCREEN */}
-        {!gameState.leaderboard_visible ? (
+        {!gameState.leaderboard_visible && !isAdmin ? (
           <div className="max-w-lg mx-auto border border-[#3f453f] bg-[#1b1d1b] p-8 space-y-6">
             <div className="flex items-start justify-between">
               <span className="editorial-stamp border-[#c93b2b] text-[#c93b2b]">
@@ -150,8 +160,19 @@ export default function LeaderboardPage() {
             </div>
           </div>
         ) : (
-          /* LEADERBOARD IS ON: ANONYMOUS DISPLAY (AGENT IDs + SCORES ONLY) */
+          /* LEADERBOARD IS ON (OR ADMIN PREVIEW) */
           <div className="space-y-6">
+            {!gameState.leaderboard_visible && isAdmin && (
+              <div className="p-3 bg-[#241e14] border border-[#c28b28]/60 text-[#c28b28] flex items-center justify-between text-xs font-mono-tabular">
+                <span className="font-bold flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-[#c28b28]" />
+                  [ADMIN PREVIEW MODE]: Public standings are currently concealed from participants.
+                </span>
+                <Link href="/admin" className="underline hover:text-[#f4f1ea]">
+                  Admin Dashboard →
+                </Link>
+              </div>
+            )}
             {/* Prize & Anonymity Editorial Callout */}
             <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">

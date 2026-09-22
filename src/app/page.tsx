@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Store, initStore } from '@/lib/store';
-import { Agent } from '@/types/database';
+import { Agent, GameState } from '@/types/database';
 import { 
   ArrowRight,
   QrCode,
@@ -17,6 +17,7 @@ import {
 
 export default function HomePage() {
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
+  const [gameState, setGameState] = useState<GameState>(() => Store.getGameState());
   const [sessionStatus, setSessionStatus] = useState<{ canPlay: boolean; status: string; activeSeconds: number }>({
     canPlay: false,
     status: 'AWAITING_CHECKIN',
@@ -26,6 +27,7 @@ export default function HomePage() {
   useEffect(() => {
     initStore();
     const syncCurrent = () => {
+      setGameState(Store.getGameState());
       const storedId = localStorage.getItem('ieee_agent_id');
       if (storedId) {
         const ag = Store.getAgentById(storedId);
@@ -65,13 +67,15 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 text-xs">
-            <Link
-              href="/leaderboard"
-              className="px-3 py-1.5 rounded-sm border border-[#3f453f] hover:border-[#c28b28] text-[#c28b28] hover:text-[#f4f1ea] transition-colors flex items-center gap-1.5 font-mono-tabular text-[11px]"
-            >
-              <Trophy className="w-3.5 h-3.5" />
-              <span>STANDINGS</span>
-            </Link>
+            {gameState?.leaderboard_visible && (
+              <Link
+                href="/leaderboard"
+                className="px-3 py-1.5 rounded-sm border border-[#3f453f] hover:border-[#c28b28] text-[#c28b28] hover:text-[#f4f1ea] transition-colors flex items-center gap-1.5 font-mono-tabular text-[11px]"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span>STANDINGS</span>
+              </Link>
+            )}
             <Link
               href="/admin"
               className="px-3 py-1.5 rounded-sm border border-[#3f453f] hover:border-[#949e93] text-[#949e93] hover:text-[#f4f1ea] transition-colors flex items-center gap-1.5 font-mono-tabular text-[11px]"
@@ -299,9 +303,11 @@ export default function HomePage() {
             NIT WARANGAL • IEEE STUDENT BRANCH © 2026
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/leaderboard" className="hover:text-[#f4f1ea] transition-colors">
-              Standings
-            </Link>
+            {gameState?.leaderboard_visible && (
+              <Link href="/leaderboard" className="hover:text-[#f4f1ea] transition-colors">
+                Standings
+              </Link>
+            )}
             <Link href="/my-badge" className="hover:text-[#f4f1ea] transition-colors">
               Pass Retrieval
             </Link>

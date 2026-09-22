@@ -8,7 +8,8 @@ import {
   NetworkConnection, 
   NodeItem,
   PrimaryDomain,
-  RegistrationBackupRecord
+  RegistrationBackupRecord,
+  GoogleFormConfig
 } from '@/types/database';
 import { WhatsAppDispatchRecord } from './whatsapp';
 
@@ -286,6 +287,7 @@ const KEY_CONNECTIONS = `${STORAGE_PREFIX}connections`;
 const KEY_WA_LOGS = `${STORAGE_PREFIX}wa_logs`;
 const KEY_WA_CONFIG = `${STORAGE_PREFIX}wa_config`;
 const KEY_REGISTRATION_BACKUP = `${STORAGE_PREFIX}registration_backup`;
+const KEY_GOOGLE_FORM_CONFIG = `${STORAGE_PREFIX}google_form_config`;
 
 // Calculate Anti-Grind Dynamic Score
 export function calculateDynamicScore(
@@ -436,6 +438,19 @@ export function initStore(): void {
 
   if (!localStorage.getItem(KEY_REGISTRATION_BACKUP)) {
     setStored(KEY_REGISTRATION_BACKUP, []);
+  }
+
+  if (!localStorage.getItem(KEY_GOOGLE_FORM_CONFIG)) {
+    setStored(KEY_GOOGLE_FORM_CONFIG, {
+      enabled: true,
+      form_url: '',
+      entry_name: '',
+      entry_phone: '',
+      entry_roll_no: '',
+      entry_agent_id: '',
+      last_submitted_at: null,
+      total_submissions: 0
+    });
   }
 }
 
@@ -1843,6 +1858,11 @@ export const Store = {
           setStored(KEY_REGISTRATION_BACKUP, data.registrationBackup, false);
         }
 
+        // Sync Google Form Config
+        if (data.googleFormConfig) {
+          setStored(KEY_GOOGLE_FORM_CONFIG, data.googleFormConfig, false);
+        }
+
         if (Array.isArray(data.agents)) {
           const localAgents = this.getAgents();
           if (data.agents.length === 0 && localAgents.length > 0) {
@@ -1856,6 +1876,74 @@ export const Store = {
       console.warn('Sync with server failed, fallback to local store:', e);
     }
     return this.getAgents();
+  },
+
+  getGoogleFormConfig(): GoogleFormConfig {
+    return getStored<GoogleFormConfig>(KEY_GOOGLE_FORM_CONFIG, {
+      enabled: true,
+      form_url: '',
+      entry_name: '',
+      entry_phone: '',
+      entry_roll_no: '',
+      entry_agent_id: '',
+      last_submitted_at: null,
+      total_submissions: 0
+    });
+  },
+
+  async getGoogleFormConfigAsync(): Promise<GoogleFormConfig> {
+    try {
+      const res = await fetch('/api/participants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_google_form_config' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) {
+          setStored(KEY_GOOGLE_FORM_CONFIG, data.config, true);
+          return data.config;
+        }
+      }
+    } catch (_) {}
+    return this.getGoogleFormConfig();
+  },
+
+  async updateGoogleFormConfigAsync(config: Partial<GoogleFormConfig>): Promise<GoogleFormConfig> {
+    try {
+      const res = await fetch('/api/participants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_google_form_config', config })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) {
+          setStored(KEY_GOOGLE_FORM_CONFIG, data.config, true);
+          return data.config;
+        }
+      }
+    } catch (_) {}
+    const local = { ...this.getGoogleFormConfig(), ...config };
+    setStored(KEY_GOOGLE_FORM_CONFIG, local, true);
+    return local;
+  },
+
+  async testGoogleFormAsync(testPayload?: { name?: string; phone?: string; rollNo?: string }): Promise<{ success: boolean; error?: string; config?: GoogleFormConfig }> {
+    try {
+      const res = await fetch('/api/participants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_google_form', testPayload })
+      });
+      const data = await res.json();
+      if (data.config) {
+        setStored(KEY_GOOGLE_FORM_CONFIG, data.config, true);
+      }
+      return data;
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network request failed' };
+    }
   },
 
   greatReset(): void {
