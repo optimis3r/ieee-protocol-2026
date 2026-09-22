@@ -858,17 +858,28 @@ export const ServerStore = {
     let updatedCount = 0;
     const processedAgents: Agent[] = [];
 
+    const matchPhone = (p1: string, p2: string) => {
+      const d1 = (p1 || '').replace(/\D/g, '');
+      const d2 = (p2 || '').replace(/\D/g, '');
+      if (!d1 || !d2) return false;
+      if (d1 === d2) return true;
+      const s1 = (d1.length === 12 && d1.startsWith('91')) ? d1.slice(2) : (d1.length === 11 && d1.startsWith('0')) ? d1.slice(1) : d1;
+      const s2 = (d2.length === 12 && d2.startsWith('91')) ? d2.slice(2) : (d2.length === 11 && d2.startsWith('0')) ? d2.slice(1) : d2;
+      return s1 === s2;
+    };
+
     for (const op of operatives) {
       if (!op.name && !op.auth_identifier && !op.contact && !op.agent_id) continue;
 
-      const cleanRoll = (op.auth_identifier || '').trim();
-      const cleanPhone = (op.contact || '').replace(/\D/g, '');
+      const rawRoll = (op.auth_identifier || '').trim();
+      const cleanRoll = rawRoll.toLowerCase();
+      const cleanPhone = (op.contact || '').trim();
       const cleanId = (op.agent_id || '').trim().toUpperCase();
 
-      // Check if operative already exists
+      // Check if operative already exists by Roll Number, Phone, or Call Sign
       const existingIdx = data.agents.findIndex(a => {
-        if (cleanRoll && a.auth_identifier && a.auth_identifier.toLowerCase() === cleanRoll.toLowerCase()) return true;
-        if (cleanPhone && a.contact && a.contact.replace(/\D/g, '') === cleanPhone) return true;
+        if (cleanRoll && a.auth_identifier && a.auth_identifier.trim().toLowerCase() === cleanRoll) return true;
+        if (cleanPhone && a.contact && matchPhone(a.contact, cleanPhone)) return true;
         if (cleanId && a.agent_id.toUpperCase() === cleanId) return true;
         return false;
       });
@@ -880,7 +891,7 @@ export const ServerStore = {
           ...existing,
           name: op.name?.trim() || existing.name,
           contact: op.contact?.trim() || existing.contact,
-          auth_identifier: op.auth_identifier?.trim() || existing.auth_identifier,
+          auth_identifier: rawRoll || existing.auth_identifier,
           wristband_id: op.wristband_id?.trim() || existing.wristband_id,
           archetype: (op.archetype as any) || existing.archetype,
           check_in_status: op.check_in_status || existing.check_in_status,
@@ -911,6 +922,7 @@ export const ServerStore = {
         const archetype = op.archetype || this.getNextArchetype(data);
         const isPreVerified = Boolean(op.is_active || op.check_in_status === 'ACTIVE');
         const now = new Date().toISOString();
+        const createdAt = op.created_at || now;
 
         const newAgent: Agent = {
           id: `agent-uuid-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -920,7 +932,7 @@ export const ServerStore = {
           token: op.token || `sec_tok_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
           name: op.name?.trim() || `Operative ${idToUse}`,
           contact: op.contact?.trim() || '',
-          auth_identifier: cleanRoll,
+          auth_identifier: rawRoll,
           archetype: archetype as any,
           score: op.score || 0,
           is_active: isPreVerified,
@@ -932,7 +944,7 @@ export const ServerStore = {
           last_host_verified_at: isPreVerified ? now : null,
           last_active_at: now,
           logged_out_at: null,
-          created_at: now
+          created_at: createdAt
         };
 
         data.agents.push(newAgent);
@@ -992,16 +1004,6 @@ export const ServerStore = {
     });
 
     saveServerData(data, true);
-
-    // Asynchronous background Google Form backup for newly enrolled operatives
-    data.agents.slice(0, registeredCount).forEach(ag => {
-      submitToGoogleForm({
-        name: ag.name,
-        phone: ag.contact,
-        rollNo: ag.auth_identifier || '',
-        agentId: ag.agent_id
-      }).catch(() => {});
-    });
 
     return {
       registeredCount,

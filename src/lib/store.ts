@@ -1539,18 +1539,102 @@ export const Store = {
       return row;
     };
 
-    const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
-    const findIdx = (keywords: string[]) => {
-      return headers.findIndex(h => keywords.some(k => h.includes(k)));
+    const rawHeaders = parseRow(lines[0]);
+    const headers = rawHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+    const findIdx = (exactMatches: string[], partialKeywords: string[] = []) => {
+      const exactIdx = headers.findIndex(h => exactMatches.includes(h));
+      if (exactIdx !== -1) return exactIdx;
+      if (partialKeywords.length > 0) {
+        return headers.findIndex(h => partialKeywords.some(k => h.includes(k)));
+      }
+      return -1;
     };
 
-    const idIdx = findIdx(['agentid', 'callsign', 'agtid', 'badgeid', 'id']);
-    const nameIdx = findIdx(['operativename', 'fullname', 'name', 'studentname', 'participant']);
-    const rollIdx = findIdx(['rollnumber', 'rollno', 'roll', 'authidentifier', 'studentid', 'accountid']);
-    const phoneIdx = findIdx(['phone', 'contact', 'whatsapp', 'mobile', 'cell', 'number']);
-    const domainIdx = findIdx(['tacticaldomain', 'domain', 'role', 'archetype', 'cell']);
-    const bandIdx = findIdx(['wristbandid', 'wristband', 'bandid', 'band']);
-    const statusIdx = findIdx(['checkinstatus', 'status', 'checkin']);
+    // Robust field index mappings (specifically tuned for Google Forms CSV exports)
+    const idIdx = findIdx(
+      ['agentid', 'callsign', 'agtid', 'badgeid', 'operativeid'],
+      ['agentid', 'callsign', 'agtid', 'badgeid']
+    );
+
+    const nameIdx = findIdx(
+      ['name', 'operativename', 'studentname', 'fullname', 'participant', 'registrant'],
+      ['name', 'participant']
+    );
+
+    const rollIdx = findIdx(
+      ['rollnumber', 'rollno', 'roll', 'authidentifier', 'studentid', 'registrationnumber', 'regnumber', 'regno', 'accountid', 'idnumber'],
+      ['rollnumber', 'rollno', 'roll', 'authidentifier', 'studentid', 'regno']
+    );
+
+    const phoneIdx = findIdx(
+      ['phonenumberwhatsappavailable', 'phonenumber', 'phoneno', 'phone', 'whatsappnumber', 'whatsapp', 'contactnumber', 'contact', 'mobile', 'cell'],
+      ['phonenumber', 'phone', 'whatsapp', 'mobile', 'contact', 'cell']
+    );
+
+    const timeIdx = findIdx(
+      ['timestamp', 'time', 'date', 'registeredat', 'submissiontime'],
+      ['timestamp', 'time', 'date']
+    );
+
+    const domainIdx = findIdx(
+      ['tacticaldomain', 'domain', 'role', 'archetype', 'cell', 'discipline'],
+      ['tacticaldomain', 'archetype', 'discipline']
+    );
+
+    const bandIdx = findIdx(
+      ['wristbandid', 'wristband', 'bandid', 'band'],
+      ['wristband']
+    );
+
+    const statusIdx = findIdx(
+      ['checkinstatus', 'status', 'checkin'],
+      ['checkin', 'status']
+    );
+
+    // Get current agents & backup to project sequential auto-allotment in preview
+    const existingAgents = this.getAgents();
+    const existingBackups = this.getRegistrationBackup();
+    let maxNum = 0;
+    const checkMax = (id?: string) => {
+      if (!id) return;
+      const m = id.match(/AGT-(\d+)/i);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!isNaN(n) && n > maxNum) maxNum = n;
+      }
+    };
+    existingAgents.forEach(a => checkMax(a.agent_id));
+    existingBackups.forEach(b => checkMax(b.agent_id));
+
+    // Cell counts for balanced round-robin projection
+    const disciplineCounts: Record<string, number> = {
+      LOGIC: 0,
+      SIGNAL: 0,
+      OBSERVATION: 0,
+      SYSTEM: 0,
+      SOCIAL: 0
+    };
+    existingAgents.forEach(a => {
+      const arch = String(a.archetype);
+      if (disciplineCounts[arch] !== undefined) {
+        disciplineCounts[arch]++;
+      }
+    });
+
+    const domainsOrder: PrimaryDomain[] = ['LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'];
+    const getNextBalancedDomain = (): PrimaryDomain => {
+      let minVal = Infinity;
+      let selected: PrimaryDomain = 'LOGIC';
+      for (const d of domainsOrder) {
+        if (disciplineCounts[d] < minVal) {
+          minVal = disciplineCounts[d];
+          selected = d;
+        }
+      }
+      disciplineCounts[selected]++;
+      return selected;
+    };
 
     const operatives: Array<Partial<Agent>> = [];
 
@@ -1558,34 +1642,76 @@ export const Store = {
       const cells = parseRow(lines[i]);
       if (cells.length === 0 || cells.every(c => !c)) continue;
 
-      const name = nameIdx >= 0 && cells[nameIdx] ? cells[nameIdx] : '';
-      const roll = rollIdx >= 0 && cells[rollIdx] ? cells[rollIdx] : '';
-      const phone = phoneIdx >= 0 && cells[phoneIdx] ? cells[phoneIdx] : '';
-      const customId = idIdx >= 0 && cells[idIdx] ? cells[idIdx].toUpperCase() : '';
-      const domainRaw = domainIdx >= 0 && cells[domainIdx] ? cells[domainIdx].toUpperCase() : '';
-      const wristband = bandIdx >= 0 && cells[bandIdx] ? cells[bandIdx] : '';
-      const statusRaw = statusIdx >= 0 && cells[statusIdx] ? cells[statusIdx].toUpperCase() : '';
+      const name = nameIdx >= 0 && cells[nameIdx] ? cells[nameIdx].trim() : '';
+      const roll = rollIdx >= 0 && cells[rollIdx] ? cells[rollIdx].trim() : '';
+      const phone = phoneIdx >= 0 && cells[phoneIdx] ? cells[phoneIdx].trim() : '';
+      const customId = idIdx >= 0 && cells[idIdx] ? cells[idIdx].trim().toUpperCase() : '';
+      const domainRaw = domainIdx >= 0 && cells[domainIdx] ? cells[domainIdx].trim().toUpperCase() : '';
+      const wristband = bandIdx >= 0 && cells[bandIdx] ? cells[bandIdx].trim() : '';
+      const statusRaw = statusIdx >= 0 && cells[statusIdx] ? cells[statusIdx].trim().toUpperCase() : '';
 
-      const validDomains = ['LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'];
-      const archetype = validDomains.includes(domainRaw) ? (domainRaw as PrimaryDomain) : undefined;
+      let createdAt: string | undefined = undefined;
+      if (timeIdx >= 0 && cells[timeIdx]) {
+        try {
+          const parsedDate = new Date(cells[timeIdx]);
+          if (!isNaN(parsedDate.getTime())) {
+            createdAt = parsedDate.toISOString();
+          }
+        } catch (_) {}
+      }
+
+      if (!name && !roll && !phone && !customId) continue;
+
+      // Check if already registered
+      const cleanRoll = roll.toLowerCase();
+      const cleanPhone = phone.replace(/\D/g, '');
+      const existing = existingAgents.find(a => {
+        if (cleanRoll && a.auth_identifier && a.auth_identifier.trim().toLowerCase() === cleanRoll) return true;
+        if (cleanPhone && a.contact && a.contact.replace(/\D/g, '').endsWith(cleanPhone.slice(-10))) return true;
+        if (customId && a.agent_id.toUpperCase() === customId) return true;
+        return false;
+      });
+
+      let allottedId = customId;
+      let allottedDomain: any = undefined;
+
+      const validDomains: PrimaryDomain[] = ['LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'];
+      if (domainRaw && validDomains.includes(domainRaw as PrimaryDomain)) {
+        allottedDomain = domainRaw as PrimaryDomain;
+      }
+
+      if (existing) {
+        allottedId = existing.agent_id;
+        allottedDomain = existing.archetype as any;
+      } else {
+        if (!allottedId) {
+          maxNum++;
+          const padded = String(maxNum).padStart(3, '0');
+          allottedId = `AGT-${padded}`;
+        }
+        if (!allottedDomain) {
+          allottedDomain = getNextBalancedDomain();
+        }
+      }
+
       const check_in_status = statusRaw.includes('ACTIVE') || statusRaw === 'IN'
         ? 'ACTIVE'
         : statusRaw.includes('PAUSE')
         ? 'PAUSED'
         : 'AWAITING_CHECKIN';
 
-      if (name || roll || phone || customId) {
-        operatives.push({
-          name: name || (customId ? `Operative ${customId}` : 'Operative'),
-          auth_identifier: roll || undefined,
-          contact: phone || undefined,
-          agent_id: customId || undefined,
-          wristband_id: wristband || undefined,
-          archetype,
-          check_in_status,
-          is_active: check_in_status === 'ACTIVE'
-        });
-      }
+      operatives.push({
+        name: name || `Operative ${allottedId}`,
+        auth_identifier: roll || undefined,
+        contact: phone || undefined,
+        agent_id: allottedId,
+        agent_number: `Agent ${allottedId.replace(/^AGT-/i, '')}`,
+        wristband_id: wristband || allottedId,
+        archetype: allottedDomain,
+        check_in_status,
+        is_active: check_in_status === 'ACTIVE',
+        created_at: createdAt
+      });
     }
 
     return operatives;

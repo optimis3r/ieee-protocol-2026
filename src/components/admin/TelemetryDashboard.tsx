@@ -97,6 +97,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
 
   // Bulk CSV Upload Auto-Register State
   const [isCsvUploadOpen, setIsCsvUploadOpen] = useState(false);
+  const [csvTab, setCsvTab] = useState<'FILE' | 'PASTE'>('FILE');
   const [csvFileContent, setCsvFileContent] = useState<string | null>(null);
   const [csvFileName, setCsvFileName] = useState<string>('');
   const [csvPreviewOperatives, setCsvPreviewOperatives] = useState<Array<Partial<Agent>>>([]);
@@ -413,6 +414,18 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
       setCsvPreviewOperatives(parsed);
     };
     reader.readAsText(file);
+  };
+
+  const handleCsvTextChange = (text: string) => {
+    setCsvFileContent(text);
+    if (text.trim()) {
+      setCsvFileName('Pasted CSV / Google Forms Export');
+      const parsed = Store.parseCSVToOperatives(text);
+      setCsvPreviewOperatives(parsed);
+    } else {
+      setCsvFileName('');
+      setCsvPreviewOperatives([]);
+    }
   };
 
   const handleExecuteBulkCsvRegister = async () => {
@@ -1422,49 +1435,93 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
               <div className="p-3.5 rounded-xl bg-proto-surface0 border border-proto-surface1 space-y-2">
                 <div className="text-[11px] font-bold text-proto-gold uppercase flex items-center gap-1.5">
                   <FileSpreadsheet className="w-4 h-4" />
-                  <span>CSV File Format Specification</span>
+                  <span>Google Forms & Attendee CSV Auto-Allotment</span>
                 </div>
                 <p className="text-proto-subtext font-sans leading-relaxed">
-                  Upload a standard CSV file containing registered participants. The system automatically reads columns for 
-                  <strong className="text-proto-text"> Name, Roll Number, Phone / WhatsApp, Tactical Domain, and Wristband ID</strong>.
+                  Directly accepts Google Forms CSV exports with columns for 
+                  <strong className="text-proto-text"> &quot;Timestamp&quot;, &quot;Name&quot;, &quot;Roll Number&quot;, and &quot;Phone Number (Whatsapp available)&quot;</strong>.
                 </p>
-                <p className="text-[11px] text-proto-signal font-sans">
-                  💡 If an operative does NOT have an AGT-XXX ID in the CSV, sequential Call Signs (e.g. AGT-001, AGT-002...) are automatically allotted based on the master backup list. Initial station questions and intel fragments will be allocated automatically.
+                <p className="text-[11px] text-emerald-400 font-sans">
+                  ✓ Sequential Call Signs (<code className="text-proto-gold">AGT-001</code>, <code className="text-proto-gold">AGT-002</code>...) and balanced tactical Cells (<code className="text-proto-logic">LOGIC</code>, <code className="text-proto-signal">SIGNAL</code>, <code className="text-proto-gold">OBSERVATION</code>, <code className="text-cyan-400">SYSTEM</code>, <code className="text-pink-400">SOCIAL</code>) are automatically allotted upon enrollment.
                 </p>
               </div>
 
-              {/* File Input Selection */}
-              <div className="border-2 border-dashed border-proto-surface2 hover:border-proto-logic/60 rounded-xl p-6 text-center transition-colors bg-proto-surface0/30">
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  id="csv-file-upload-input"
-                  onChange={handleCsvFileSelect}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="csv-file-upload-input"
-                  className="cursor-pointer flex flex-col items-center justify-center gap-2"
+              {/* Upload Method Tabs */}
+              <div className="flex border-b border-proto-surface1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCsvTab('FILE')}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase transition-colors border-b-2 cursor-pointer ${
+                    csvTab === 'FILE'
+                      ? 'border-proto-logic text-proto-logic'
+                      : 'border-transparent text-proto-subtext hover:text-proto-text'
+                  }`}
                 >
-                  <Upload className="w-8 h-8 text-proto-logic animate-bounce" />
-                  <span className="font-bold text-sm text-proto-text">
-                    {csvFileName ? `Selected: ${csvFileName}` : 'Click to choose or drop a CSV file'}
-                  </span>
-                  <span className="text-[11px] text-proto-subtext">
-                    Accepts exported registration backups or custom attendee spreadsheets
-                  </span>
-                </label>
+                  Upload CSV File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCsvTab('PASTE')}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase transition-colors border-b-2 cursor-pointer ${
+                    csvTab === 'PASTE'
+                      ? 'border-proto-logic text-proto-logic'
+                      : 'border-transparent text-proto-subtext hover:text-proto-text'
+                  }`}
+                >
+                  Paste CSV Text
+                </button>
               </div>
+
+              {/* Tab 1: File Input Selection */}
+              {csvTab === 'FILE' && (
+                <div className="border-2 border-dashed border-proto-surface2 hover:border-proto-logic/60 rounded-xl p-6 text-center transition-colors bg-proto-surface0/30">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    id="csv-file-upload-input"
+                    onChange={handleCsvFileSelect}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="csv-file-upload-input"
+                    className="cursor-pointer flex flex-col items-center justify-center gap-2"
+                  >
+                    <Upload className="w-8 h-8 text-proto-logic animate-bounce" />
+                    <span className="font-bold text-sm text-proto-text">
+                      {csvFileName ? `Selected: ${csvFileName}` : 'Click to choose or drop a CSV file'}
+                    </span>
+                    <span className="text-[11px] text-proto-subtext">
+                      Accepts Google Forms exports, registration backups, or attendee spreadsheets
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* Tab 2: Direct Paste Textarea */}
+              {csvTab === 'PASTE' && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-proto-subtext block">
+                    Paste raw CSV lines (including headers):
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={csvFileContent || ''}
+                    onChange={(e) => handleCsvTextChange(e.target.value)}
+                    placeholder={`"Timestamp","Name","Roll Number","Phone Number (Whatsapp available)"\n"2026/09/22 6:48:09 pm GMT+5:30","Sumedh","2487218974","9886497529"\n"2026/09/22 6:48:28 pm GMT+5:30","Konan","1i723897","9901499224"`}
+                    className="w-full px-3 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text font-mono focus:outline-none focus:border-proto-logic"
+                  />
+                </div>
+              )}
 
               {/* Parsed Preview Table */}
               {csvPreviewOperatives.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold uppercase text-proto-signal text-[11px]">
-                      DETECTED {csvPreviewOperatives.length} OPERATIVE RECORDS:
+                      READY TO ALLOT {csvPreviewOperatives.length} OPERATIVE PASSES:
                     </span>
                     <span className="text-[10px] text-proto-subtext">
-                      Preview of first 5 rows
+                      Sequential AGT & Balanced Cell Preview
                     </span>
                   </div>
 
@@ -1472,39 +1529,57 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
                     <table className="w-full text-[11px] text-left border-collapse">
                       <thead className="bg-proto-surface0 border-b border-proto-surface1 text-proto-subtext uppercase">
                         <tr>
-                          <th className="py-2 px-3">Call Sign</th>
+                          <th className="py-2 px-3">Allotted Call Sign</th>
                           <th className="py-2 px-3">Name</th>
                           <th className="py-2 px-3">Roll No</th>
                           <th className="py-2 px-3">Phone</th>
-                          <th className="py-2 px-3">Domain</th>
+                          <th className="py-2 px-3">Tactical Cell</th>
+                          <th className="py-2 px-3">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-proto-surface1">
-                        {csvPreviewOperatives.slice(0, 5).map((op, i) => (
-                          <tr key={i} className="hover:bg-proto-surface0/40">
-                            <td className="py-2 px-3 font-bold text-proto-gold font-mono">
-                              {op.agent_id || 'AUTO-ALLOT'}
-                            </td>
-                            <td className="py-2 px-3 font-semibold text-proto-text">
-                              {op.name || 'Unnamed'}
-                            </td>
-                            <td className="py-2 px-3 text-proto-subtext font-mono">
-                              {op.auth_identifier || '—'}
-                            </td>
-                            <td className="py-2 px-3 text-proto-subtext font-mono">
-                              {op.contact || '—'}
-                            </td>
-                            <td className="py-2 px-3 text-proto-logic font-bold">
-                              {op.archetype || 'BALANCED'}
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody className="divide-y divide-proto-surface1 font-mono">
+                        {csvPreviewOperatives.slice(0, 8).map((op, i) => {
+                          const isExisting = agents.some(a => 
+                            (op.auth_identifier && a.auth_identifier && a.auth_identifier.toLowerCase() === op.auth_identifier.toLowerCase()) ||
+                            (op.contact && a.contact && a.contact.replace(/\D/g, '') === (op.contact || '').replace(/\D/g, ''))
+                          );
+                          return (
+                            <tr key={i} className="hover:bg-proto-surface0/40">
+                              <td className="py-2 px-3 font-bold text-proto-gold">
+                                {op.agent_id || 'AGT-???'}
+                              </td>
+                              <td className="py-2 px-3 font-semibold text-proto-text font-sans">
+                                {op.name || 'Unnamed'}
+                              </td>
+                              <td className="py-2 px-3 text-proto-subtext">
+                                {op.auth_identifier || '—'}
+                              </td>
+                              <td className="py-2 px-3 text-proto-subtext">
+                                {op.contact || '—'}
+                              </td>
+                              <td className="py-2 px-3 text-proto-logic font-bold">
+                                {op.archetype || 'BALANCED'}
+                              </td>
+                              <td className="py-2 px-3 text-[10px]">
+                                {isExisting ? (
+                                  <span className="px-1.5 py-0.5 rounded bg-proto-gold/20 text-proto-gold border border-proto-gold/40 font-sans font-bold">
+                                    UPDATE
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-sans font-bold">
+                                    NEW ENROLLMENT
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
-                  {csvPreviewOperatives.length > 5 && (
+                  {csvPreviewOperatives.length > 8 && (
                     <div className="text-[10px] text-proto-subtext text-center italic">
-                      + {csvPreviewOperatives.length - 5} additional operative records will be registered...
+                      + {csvPreviewOperatives.length - 8} additional operative records will be registered...
                     </div>
                   )}
                 </div>
@@ -1535,7 +1610,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
                 <span>
                   {isUploadingCsv 
                     ? 'AUTO-REGISTERING OPERATIVES...' 
-                    : `REGISTER ${csvPreviewOperatives.length} OPERATIVES`}
+                    : `REGISTER & ALLOT ${csvPreviewOperatives.length} OPERATIVES`}
                 </span>
               </button>
             </div>
