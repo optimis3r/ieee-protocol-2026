@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Store, formatActiveTime, getAgentActiveSeconds } from '@/lib/store';
-import { Agent, GameStatus, GameState, GoogleFormConfig } from '@/types/database';
+import { Agent, GameStatus, GameState } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
 import { 
   sendRegistrationWhatsAppMessages, 
@@ -45,8 +45,7 @@ import {
   Globe,
   AlertTriangle,
   Upload,
-  FileSpreadsheet,
-  FileText
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface TelemetryDashboardProps {
@@ -103,20 +102,11 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   const [csvPreviewOperatives, setCsvPreviewOperatives] = useState<Array<Partial<Agent>>>([]);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
 
-  // Google Forms Live Backup State
-  const [isGoogleFormModalOpen, setIsGoogleFormModalOpen] = useState(false);
-  const [googleFormConfig, setGoogleFormConfig] = useState<GoogleFormConfig>(() => Store.getGoogleFormConfig());
-  const [googleFormSmartUrl, setGoogleFormSmartUrl] = useState('');
-  const [isSavingGoogleForm, setIsSavingGoogleForm] = useState(false);
-  const [isTestingGoogleForm, setIsTestingGoogleForm] = useState(false);
-  const [googleFormTestResult, setGoogleFormTestResult] = useState<{ success: boolean; message: string } | null>(null);
-
   const refreshDashboard = useCallback(async () => {
     setGameState(Store.getGameState());
     const syncedAgents = await Store.syncWithServer();
     setAgents(syncedAgents);
     setTelemetry(Store.getTelemetry());
-    setGoogleFormConfig(Store.getGoogleFormConfig());
 
     // Fetch central WhatsApp logs so all automatic registrations from phones appear
     const centralLogs = await fetchCentralWhatsAppLogs();
@@ -469,115 +459,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
     }
   };
 
-  const handleSmartExtractGoogleForm = () => {
-    if (!googleFormSmartUrl.trim()) return;
-    const raw = googleFormSmartUrl.trim();
-    try {
-      let formUrl = raw.split('?')[0];
-      if (formUrl.includes('/viewform')) {
-        formUrl = formUrl.replace('/viewform', '/formResponse');
-      } else if (formUrl.includes('/edit')) {
-        formUrl = formUrl.replace('/edit', '/formResponse');
-      } else if (!formUrl.endsWith('/formResponse') && formUrl.includes('docs.google.com/forms/d/e/')) {
-        formUrl = formUrl.replace(/\/+$/, '') + '/formResponse';
-      }
 
-      let entryName = googleFormConfig.entry_name;
-      let entryPhone = googleFormConfig.entry_phone;
-      let entryRollNo = googleFormConfig.entry_roll_no;
-      let entryAgentId = googleFormConfig.entry_agent_id;
-
-      if (raw.includes('?')) {
-        const queryPart = raw.split('?')[1];
-        const searchParams = new URLSearchParams(queryPart);
-        const entries: Array<{ key: string; val: string }> = [];
-        searchParams.forEach((value, key) => {
-          if (key.startsWith('entry.')) {
-            entries.push({ key, val: value.toLowerCase() });
-          }
-        });
-
-        // Match by label heuristics
-        entries.forEach(e => {
-          if (/name|student|participant/i.test(e.val)) entryName = e.key;
-          else if (/phone|mobile|contact|whatsapp|phno|number/i.test(e.val)) entryPhone = e.key;
-          else if (/roll|reg|id|auth/i.test(e.val)) entryRollNo = e.key;
-          else if (/agent/i.test(e.val)) entryAgentId = e.key;
-        });
-
-        // Positional fallback
-        if (!entryName && entries[0]) entryName = entries[0].key;
-        if (!entryPhone && entries[1]) entryPhone = entries[1].key;
-        if (!entryRollNo && entries[2]) entryRollNo = entries[2].key;
-      }
-
-      setGoogleFormConfig(prev => ({
-        ...prev,
-        form_url: formUrl,
-        entry_name: entryName,
-        entry_phone: entryPhone,
-        entry_roll_no: entryRollNo,
-        entry_agent_id: entryAgentId
-      }));
-
-      soundEffects.playSuccessChime();
-      setActionNotice('GOOGLE FORM SMART-EXTRACT COMPLETE: Form URL & Entry IDs auto-mapped.');
-    } catch (_) {
-      soundEffects.playLockoutBuzz();
-      setActionNotice('FAILED TO PARSE GOOGLE FORM LINK: Please verify URL format.');
-    }
-  };
-
-  const handleSaveGoogleFormConfig = async () => {
-    setIsSavingGoogleForm(true);
-    try {
-      const updated = await Store.updateGoogleFormConfigAsync(googleFormConfig);
-      setGoogleFormConfig(updated);
-      soundEffects.playSuccessChime();
-      setActionNotice('GOOGLE FORM BACKUP CONFIGURATION SAVED & ACTIVE.');
-      setTimeout(() => setActionNotice(null), 3500);
-    } catch (e: any) {
-      soundEffects.playLockoutBuzz();
-      setActionNotice('FAILED TO SAVE GOOGLE FORM CONFIG: ' + (e.message || 'Error'));
-    } finally {
-      setIsSavingGoogleForm(false);
-    }
-  };
-
-  const handleTestGoogleFormSubmission = async () => {
-    setIsTestingGoogleForm(true);
-    setGoogleFormTestResult(null);
-    try {
-      await Store.updateGoogleFormConfigAsync(googleFormConfig);
-      const res = await Store.testGoogleFormAsync({
-        name: 'Test Operative (Admin Verification)',
-        phone: '9876543210',
-        rollNo: 'TEST-ROLL-01'
-      });
-      if (res.success) {
-        soundEffects.playSuccessChime();
-        setGoogleFormTestResult({
-          success: true,
-          message: '✓ Test record successfully submitted to Google Form! Check your linked Google Sheet.'
-        });
-        if (res.config) setGoogleFormConfig(res.config);
-      } else {
-        soundEffects.playLockoutBuzz();
-        setGoogleFormTestResult({
-          success: false,
-          message: `Submission Failed: ${res.error || 'Check form URL and entry IDs'}`
-        });
-      }
-    } catch (_) {
-      soundEffects.playLockoutBuzz();
-      setGoogleFormTestResult({
-        success: false,
-        message: 'Network error submitting test record to Google Form'
-      });
-    } finally {
-      setIsTestingGoogleForm(false);
-    }
-  };
 
   const sortedAgents = [...agents].sort((a, b) => (b.score || 0) - (a.score || 0));
 
@@ -1132,32 +1014,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
               </span>
             </button>
 
-            {/* Google Form Live Backup Button */}
-            <button
-              onClick={() => {
-                setGoogleFormSmartUrl('');
-                setGoogleFormTestResult(null);
-                setIsGoogleFormModalOpen(true);
-              }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow cursor-pointer border ${
-                googleFormConfig.enabled && googleFormConfig.form_url
-                  ? 'bg-emerald-950/40 border-emerald-500/60 hover:bg-emerald-950/60 text-emerald-400'
-                  : 'bg-proto-surface0 border-proto-surface1 hover:border-proto-gold/50 text-proto-gold'
-              }`}
-              title="Configure Google Form live background backup for participant registrations"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Google Form Backup</span>
-              <span className={`px-1.5 py-0.5 rounded text-[10px] border ml-0.5 font-mono ${
-                googleFormConfig.enabled && googleFormConfig.form_url
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : 'bg-proto-gold/20 text-proto-gold border-proto-gold/30'
-              }`}>
-                {googleFormConfig.enabled && googleFormConfig.form_url
-                  ? `${googleFormConfig.total_submissions || 0} SYNCED`
-                  : 'SETUP'}
-              </span>
-            </button>
+
 
             <button
               onClick={handleExportCSV}
@@ -1686,219 +1543,6 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
         </div>
       )}
 
-      {/* GOOGLE FORMS LIVE BACKUP MODAL */}
-      {isGoogleFormModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-          <div 
-            className="w-full max-w-2xl bg-proto-base border border-proto-surface2 rounded-2xl p-6 shadow-2xl space-y-5 text-proto-text font-mono-cyber max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-proto-surface1 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-400">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black uppercase text-proto-text">
-                      GOOGLE FORMS LIVE BACKUP SYSTEM
-                    </h3>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase ${
-                      googleFormConfig.enabled && googleFormConfig.form_url
-                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                        : 'bg-proto-gold/20 text-proto-gold border-proto-gold/40'
-                    }`}>
-                      {googleFormConfig.enabled && googleFormConfig.form_url ? 'CONNECTED // LIVE' : 'UNCONFIGURED'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-proto-subtext font-sans mt-0.5">
-                    Automatically duplicates every registration (Name, Phone, Roll Number) into your Google Form / Sheet.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsGoogleFormModalOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-proto-surface1 text-proto-subtext hover:text-proto-text transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Telemetry Stats Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 bg-proto-surface0 border border-proto-surface1 rounded-xl">
-                <span className="text-[10px] text-proto-subtext uppercase block">Total Submissions</span>
-                <span className="text-base font-bold text-proto-signal">{googleFormConfig.total_submissions || 0} Records</span>
-              </div>
-              <div className="p-3 bg-proto-surface0 border border-proto-surface1 rounded-xl">
-                <span className="text-[10px] text-proto-subtext uppercase block">Last Sync Status</span>
-                <span className="text-xs font-bold text-proto-text truncate block">
-                  {googleFormConfig.last_submitted_at ? new Date(googleFormConfig.last_submitted_at).toLocaleTimeString() : 'No entries yet'}
-                </span>
-              </div>
-              <div className="p-3 bg-proto-surface0 border border-proto-surface1 rounded-xl col-span-2 sm:col-span-1">
-                <span className="text-[10px] text-proto-subtext uppercase block">Integration Mode</span>
-                <span className="text-xs font-bold text-emerald-400">Background Non-Blocking</span>
-              </div>
-            </div>
-
-            {/* Quick Pre-Filled Link Auto-Detector */}
-            <div className="p-4 rounded-xl bg-proto-surface0 border border-proto-surface1 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase text-proto-logic flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>Quick Setup: Paste Google Form or Pre-Filled Link</span>
-                </span>
-                <span className="text-[10px] text-proto-subtext">Auto-Maps Field IDs</span>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={googleFormSmartUrl}
-                  onChange={(e) => setGoogleFormSmartUrl(e.target.value)}
-                  placeholder="https://docs.google.com/forms/d/e/.../viewform?usp=pp_url&entry.123=Name..."
-                  className="flex-1 px-3 py-2 text-xs bg-proto-base border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-logic font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={handleSmartExtractGoogleForm}
-                  className="px-3.5 py-2 rounded-xl bg-proto-logic hover:bg-proto-logic/80 text-black font-bold text-xs uppercase cursor-pointer transition-all"
-                >
-                  Auto-Detect
-                </button>
-              </div>
-              <p className="text-[11px] text-proto-subtext font-sans">
-                💡 Tip: In Google Forms, click the 3 dots (top right) → &quot;Get pre-filled link&quot; → type &quot;Name&quot;, &quot;Phone&quot;, &quot;Roll&quot; into the fields → click &quot;Get Link&quot; and paste it here!
-              </p>
-            </div>
-
-            {/* Configuration Form Fields */}
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-proto-text block">
-                  Google Form Response URL:
-                </label>
-                <input
-                  type="text"
-                  value={googleFormConfig.form_url}
-                  onChange={(e) => setGoogleFormConfig(prev => ({ ...prev, form_url: e.target.value }))}
-                  placeholder="https://docs.google.com/forms/d/e/[FORM_ID]/formResponse"
-                  className="w-full px-3 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal font-mono"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-proto-subtext block">
-                    Name Field ID:
-                  </label>
-                  <input
-                    type="text"
-                    value={googleFormConfig.entry_name}
-                    onChange={(e) => setGoogleFormConfig(prev => ({ ...prev, entry_name: e.target.value }))}
-                    placeholder="entry.123456789"
-                    className="w-full px-3 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-proto-subtext block">
-                    Phone Field ID (Phno):
-                  </label>
-                  <input
-                    type="text"
-                    value={googleFormConfig.entry_phone}
-                    onChange={(e) => setGoogleFormConfig(prev => ({ ...prev, entry_phone: e.target.value }))}
-                    placeholder="entry.987654321"
-                    className="w-full px-3 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-proto-subtext block">
-                    Roll No Field ID (RollNo):
-                  </label>
-                  <input
-                    type="text"
-                    value={googleFormConfig.entry_roll_no}
-                    onChange={(e) => setGoogleFormConfig(prev => ({ ...prev, entry_roll_no: e.target.value }))}
-                    placeholder="entry.112233445"
-                    className="w-full px-3 py-2 text-xs bg-proto-surface0 border border-proto-surface1 rounded-xl text-proto-text focus:outline-none focus:border-proto-signal font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-proto-surface0 border border-proto-surface1">
-                <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-proto-text block">
-                    Automatic Form Submission on Registration
-                  </span>
-                  <span className="text-[11px] text-proto-subtext block font-sans">
-                    When active, every operative registering on phone or at desk is backed up to this form.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setGoogleFormConfig(prev => ({ ...prev, enabled: !prev.enabled }))}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold uppercase transition-colors cursor-pointer ${
-                    googleFormConfig.enabled
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                      : 'bg-proto-surface1 text-proto-subtext border border-proto-surface2'
-                  }`}
-                >
-                  {googleFormConfig.enabled ? 'ENABLED' : 'DISABLED'}
-                </button>
-              </div>
-            </div>
-
-            {/* Test Record Result Feedback */}
-            {googleFormTestResult && (
-              <div className={`p-3 rounded-xl border text-xs font-mono flex items-center gap-2 ${
-                googleFormTestResult.success 
-                  ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-400' 
-                  : 'bg-red-950/30 border-red-500/50 text-red-400'
-              }`}>
-                {googleFormTestResult.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-                <span>{googleFormTestResult.message}</span>
-              </div>
-            )}
-
-            {/* Modal Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-proto-surface1">
-              <button
-                type="button"
-                onClick={handleTestGoogleFormSubmission}
-                disabled={!googleFormConfig.form_url || isTestingGoogleForm}
-                className="px-4 py-2 rounded-xl bg-proto-surface0 hover:bg-proto-surface1 text-proto-gold border border-proto-gold/40 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-xs uppercase cursor-pointer transition-all flex items-center gap-1.5"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{isTestingGoogleForm ? 'SENDING TEST...' : 'SEND TEST SUBMISSION'}</span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsGoogleFormModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-proto-surface0 hover:bg-proto-surface1 text-proto-subtext font-bold text-xs uppercase cursor-pointer"
-                >
-                  Close
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveGoogleFormConfig}
-                  disabled={isSavingGoogleForm}
-                  className="px-5 py-2 rounded-xl bg-proto-signal text-black hover:opacity-90 font-black text-xs uppercase tracking-wider transition-all shadow cursor-pointer flex items-center gap-2"
-                >
-                  <span>{isSavingGoogleForm ? 'SAVING...' : 'SAVE CONFIGURATION'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* THE GREAT RESET Security Confirmation Modal */}
       {isGreatResetModalOpen && (

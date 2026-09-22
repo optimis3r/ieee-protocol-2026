@@ -145,10 +145,10 @@ if (typeof process !== 'undefined') {
 function getInitialGoogleFormConfig(): GoogleFormConfig {
   return {
     enabled: true,
-    form_url: process.env.GOOGLE_FORM_URL || '',
-    entry_name: process.env.GOOGLE_FORM_ENTRY_NAME || '',
-    entry_phone: process.env.GOOGLE_FORM_ENTRY_PHONE || '',
-    entry_roll_no: process.env.GOOGLE_FORM_ENTRY_ROLL_NO || '',
+    form_url: process.env.GOOGLE_FORM_URL || 'https://docs.google.com/forms/d/e/1FAIpQLScKFfelKxXfuFFkeiD3R05oSVM28QOeMIS8vR9KL8mjQbv0Ng/formResponse',
+    entry_name: process.env.GOOGLE_FORM_ENTRY_NAME || 'entry.371560776',
+    entry_phone: process.env.GOOGLE_FORM_ENTRY_PHONE || 'entry.754048162',
+    entry_roll_no: process.env.GOOGLE_FORM_ENTRY_ROLL_NO || 'entry.2112393183',
     entry_agent_id: process.env.GOOGLE_FORM_ENTRY_AGENT_ID || '',
     last_submitted_at: null,
     total_submissions: 0,
@@ -189,11 +189,12 @@ export async function submitToGoogleForm(data: {
   agentId?: string;
 }): Promise<{ success: boolean; error?: string }> {
   const config = loadGoogleFormConfig();
-  if (!config.enabled || !config.form_url || !config.form_url.trim()) {
-    return { success: false, error: 'Google Form backup is not configured or disabled' };
+  if (!config.enabled) {
+    return { success: false, error: 'Google Form backup is disabled' };
   }
 
-  let submitUrl = config.form_url.trim();
+  const rawUrl = config.form_url || 'https://docs.google.com/forms/d/e/1FAIpQLScKFfelKxXfuFFkeiD3R05oSVM28QOeMIS8vR9KL8mjQbv0Ng/formResponse';
+  let submitUrl = rawUrl.trim();
   if (submitUrl.includes('/viewform')) {
     submitUrl = submitUrl.replace('/viewform', '/formResponse');
   } else if (submitUrl.includes('/edit')) {
@@ -202,19 +203,20 @@ export async function submitToGoogleForm(data: {
     submitUrl = submitUrl.split('?')[0].replace(/\/+$/, '') + '/formResponse';
   }
 
+  const entryName = (config.entry_name && config.entry_name.trim()) || 'entry.371560776';
+  const entryPhone = (config.entry_phone && config.entry_phone.trim()) || 'entry.754048162';
+  const entryRollNo = (config.entry_roll_no && config.entry_roll_no.trim()) || 'entry.2112393183';
+
   try {
     const params = new URLSearchParams();
-    if (config.entry_name && data.name) {
-      params.append(config.entry_name.trim(), data.name.trim());
+    if (data.name) {
+      params.append(entryName, data.name.trim());
     }
-    if (config.entry_phone && data.phone) {
-      params.append(config.entry_phone.trim(), data.phone.trim());
+    if (data.rollNo) {
+      params.append(entryRollNo, data.rollNo.trim());
     }
-    if (config.entry_roll_no && data.rollNo) {
-      params.append(config.entry_roll_no.trim(), data.rollNo.trim());
-    }
-    if (config.entry_agent_id && data.agentId) {
-      params.append(config.entry_agent_id.trim(), data.agentId.trim());
+    if (data.phone) {
+      params.append(entryPhone, data.phone.trim());
     }
 
     const res = await fetch(submitUrl, {
@@ -234,7 +236,7 @@ export async function submitToGoogleForm(data: {
       return { success: false, error: `Google Form responded with HTTP ${res.status}` };
     }
   } catch (err: any) {
-    console.warn('Google Form background backup error (non-fatal):', err);
+    console.warn('[GoogleFormBackup] Background backup error (non-fatal):', err);
     return { success: false, error: err.message || 'Network error' };
   }
 }
