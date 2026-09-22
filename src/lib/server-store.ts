@@ -1,17 +1,21 @@
 import fs from 'fs';
 import path from 'path';
-import { Agent, AgentNode, GameState, NodeItem } from '@/types/database';
+import { Agent, AgentNode, GameState, NodeItem, RegistrationBackupRecord } from '@/types/database';
 import { SEED_NODES, getAgentActiveSeconds } from './store';
 import { WhatsAppDispatchRecord } from './whatsapp';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
 const STORE_FILE = path.join(DATA_DIR, 'protocol_store.json');
+const BACKUP_FILE = path.join(DATA_DIR, 'registration_backup.json');
+
+export type { RegistrationBackupRecord };
 
 interface ServerStoreData {
   agents: Agent[];
   agent_nodes: AgentNode[];
   wa_logs: WhatsAppDispatchRecord[];
   game_state: GameState;
+  registration_backup: RegistrationBackupRecord[];
   updated_at: string;
 }
 
@@ -33,6 +37,7 @@ function getInitialServerData(): ServerStoreData {
       submission_cutoff_time: '20:00',
       updated_at: now
     },
+    registration_backup: [],
     updated_at: now
   };
 }
@@ -49,6 +54,33 @@ function loadServerData(): ServerStoreData {
       const raw = fs.readFileSync(STORE_FILE, 'utf-8');
       const parsed = JSON.parse(raw) as ServerStoreData;
       if (parsed && Array.isArray(parsed.agents)) {
+        if (!Array.isArray(parsed.registration_backup)) {
+          // Check if standalone BACKUP_FILE exists
+          if (fs.existsSync(BACKUP_FILE)) {
+            try {
+              const bRaw = fs.readFileSync(BACKUP_FILE, 'utf-8');
+              const bParsed = JSON.parse(bRaw);
+              if (Array.isArray(bParsed)) {
+                parsed.registration_backup = bParsed;
+              }
+            } catch (_) {}
+          }
+          // If still empty, seed from current agents
+          if (!Array.isArray(parsed.registration_backup)) {
+            parsed.registration_backup = parsed.agents.map(a => ({
+              agent_id: a.agent_id,
+              agent_number: a.agent_number || a.agent_id,
+              name: a.name,
+              auth_identifier: a.auth_identifier || '',
+              contact: a.contact || '',
+              archetype: a.archetype,
+              wristband_id: a.wristband_id || a.agent_id,
+              check_in_status: a.check_in_status,
+              registered_at: a.created_at || new Date().toISOString(),
+              token: a.token
+            }));
+          }
+        }
         memoryState = parsed;
         return memoryState;
       }
@@ -73,6 +105,12 @@ function flushToDisk(): void {
     const tmpFile = `${STORE_FILE}.tmp.${Date.now()}`;
     fs.writeFileSync(tmpFile, JSON.stringify(memoryState, null, 2), 'utf-8');
     fs.renameSync(tmpFile, STORE_FILE);
+
+    if (Array.isArray(memoryState.registration_backup) && memoryState.registration_backup.length > 0) {
+      const tmpBackup = `${BACKUP_FILE}.tmp.${Date.now()}`;
+      fs.writeFileSync(tmpBackup, JSON.stringify(memoryState.registration_backup, null, 2), 'utf-8');
+      fs.renameSync(tmpBackup, BACKUP_FILE);
+    }
   } catch (err) {
     console.warn('[ServerStore] Failed to persist data to disk:', err);
   }
@@ -159,9 +197,15 @@ export const ServerStore = {
       submission_cutoff_time: '20:00',
       updated_at: new Date().toISOString()
     };
+    const sanitizedUpdates: Partial<GameState> = {};
+    if (updates.status !== undefined) sanitizedUpdates.status = updates.status;
+    if (updates.global_broadcast !== undefined) sanitizedUpdates.global_broadcast = updates.global_broadcast;
+    if (updates.leaderboard_visible !== undefined) sanitizedUpdates.leaderboard_visible = updates.leaderboard_visible;
+    if (updates.submission_cutoff_time !== undefined) sanitizedUpdates.submission_cutoff_time = updates.submission_cutoff_time;
+
     const updated: GameState = {
       ...current,
-      ...updates,
+      ...sanitizedUpdates,
       updated_at: new Date().toISOString()
     };
     data.game_state = updated;
@@ -178,6 +222,15 @@ export const ServerStore = {
         if (!isNaN(n) && n > maxNum) maxNum = n;
       }
     });
+    if (Array.isArray(data.registration_backup)) {
+      data.registration_backup.forEach(b => {
+        const match = b.agent_id.match(/AGT-(\d+)/i);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      });
+    }
     const nextNum = maxNum + 1;
     const padded = String(nextNum).padStart(3, '0');
     return {
@@ -207,16 +260,31 @@ export const ServerStore = {
   registerAgent(agentData: Partial<Agent>): Agent {
     const data = loadServerData();
     const cleanPhone = agentData.contact ? agentData.contact.replace(/\D/g, '') : '';
-    
-    // Find existing operative by phone contact or exact ID
+    const cleanRoll = agentData.auth_identifier ? agentData.auth_identifier.trim().toLowerCase() : '';
+    const cleanId = agentData.agent_id ? agentData.agent_id.trim().toUpperCase() : '';
+
+    // Find existing operative by roll number, phone contact, or exact ID
     const existingIndex = data.agents.findIndex(a => {
+      const aRoll = a.auth_identifier ? a.auth_identifier.trim().toLowerCase() : '';
+      if (cleanRoll && aRoll && cleanRoll === aRoll) return true;
       const aPhone = a.contact ? a.contact.replace(/\D/g, '') : '';
       if (cleanPhone && aPhone && cleanPhone === aPhone) return true;
-      if (agentData.agent_id && a.agent_id.toUpperCase() === agentData.agent_id.toUpperCase()) {
-        return !cleanPhone || !aPhone || cleanPhone === aPhone;
-      }
+      if (cleanId && a.agent_id.toUpperCase() === cleanId) return true;
       return false;
     });
+
+    // Also check registration_backup for previous allocation
+    let existingBackup: RegistrationBackupRecord | undefined;
+    if (existingIndex === -1 && Array.isArray(data.registration_backup)) {
+      existingBackup = data.registration_backup.find(b => {
+        const bRoll = b.auth_identifier ? b.auth_identifier.trim().toLowerCase() : '';
+        if (cleanRoll && bRoll && cleanRoll === bRoll) return true;
+        const bPhone = b.contact ? b.contact.replace(/\D/g, '') : '';
+        if (cleanPhone && bPhone && cleanPhone === bPhone) return true;
+        if (cleanId && b.agent_id.toUpperCase() === cleanId) return true;
+        return false;
+      });
+    }
 
     const now = new Date().toISOString();
     let agent: Agent;
@@ -227,33 +295,34 @@ export const ServerStore = {
       agent = {
         ...existing,
         ...agentData,
-        agent_id: (agentData.agent_id && agentData.agent_id.trim()) || existing.agent_id,
+        name: (agentData.name && agentData.name.trim()) || existing.name,
+        contact: (agentData.contact && agentData.contact.trim()) || existing.contact,
+        auth_identifier: (agentData.auth_identifier && agentData.auth_identifier.trim()) || existing.auth_identifier,
+        agent_id: (agentData.agent_id && agentData.agent_id.trim().toUpperCase()) || existing.agent_id,
         agent_number: (agentData.agent_number && agentData.agent_number.trim()) || existing.agent_number,
         last_active_at: now
       };
       data.agents[existingIndex] = agent;
     } else {
       // Assign sequential unique ID to prevent multi-device collision
-      const isCustomId = agentData.agent_id && 
-                         !agentData.agent_id.match(/^AGT-001$/i) && 
-                         !data.agents.some(a => a.agent_id.toUpperCase() === agentData.agent_id?.toUpperCase());
+      const targetId = existingBackup?.agent_id || (cleanId && !cleanId.match(/^AGT-001$/i) && !data.agents.some(a => a.agent_id.toUpperCase() === cleanId) ? cleanId : null);
       
-      const { agentId, agentNumber } = isCustomId && agentData.agent_id
-        ? { agentId: agentData.agent_id.trim().toUpperCase(), agentNumber: agentData.agent_number || agentData.agent_id.trim() }
+      const { agentId, agentNumber } = targetId
+        ? { agentId: targetId, agentNumber: existingBackup?.agent_number || agentData.agent_number || targetId }
         : this.getNextAgentId(data);
 
-      const archetype = agentData.archetype || this.getNextArchetype(data);
+      const archetype = agentData.archetype || (existingBackup?.archetype as any) || this.getNextArchetype(data);
       const isPreVerified = Boolean(agentData.is_active || agentData.check_in_status === 'ACTIVE');
 
       agent = {
         id: `agent-uuid-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         agent_id: agentId,
-        wristband_id: agentData.wristband_id || agentId,
+        wristband_id: agentData.wristband_id || existingBackup?.wristband_id || agentId,
         agent_number: agentNumber,
-        token: agentData.token || `sec_tok_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
-        name: agentData.name || `Operative ${agentId}`,
-        contact: agentData.contact || '',
-        auth_identifier: agentData.auth_identifier || '',
+        token: agentData.token || existingBackup?.token || `sec_tok_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+        name: agentData.name || existingBackup?.name || `Operative ${agentId}`,
+        contact: agentData.contact || existingBackup?.contact || '',
+        auth_identifier: agentData.auth_identifier?.trim() || existingBackup?.auth_identifier || '',
         archetype,
         score: agentData.score || 0,
         is_active: isPreVerified,
@@ -265,7 +334,7 @@ export const ServerStore = {
         last_host_verified_at: isPreVerified ? now : null,
         last_active_at: now,
         logged_out_at: null,
-        created_at: now
+        created_at: existingBackup?.registered_at || now
       };
       data.agents.unshift(agent);
 
@@ -297,6 +366,30 @@ export const ServerStore = {
       });
     }
 
+    // Persist to registration_backup
+    if (!data.registration_backup) data.registration_backup = [];
+    const bIdx = data.registration_backup.findIndex(b => 
+      b.agent_id.toUpperCase() === agent.agent_id.toUpperCase() ||
+      (cleanRoll && b.auth_identifier && b.auth_identifier.toLowerCase() === cleanRoll)
+    );
+    const bRec: RegistrationBackupRecord = {
+      agent_id: agent.agent_id,
+      agent_number: agent.agent_number,
+      name: agent.name,
+      auth_identifier: agent.auth_identifier || '',
+      contact: agent.contact || '',
+      archetype: agent.archetype,
+      wristband_id: agent.wristband_id || agent.agent_id,
+      check_in_status: agent.check_in_status,
+      registered_at: agent.created_at || now,
+      token: agent.token
+    };
+    if (bIdx >= 0) {
+      data.registration_backup[bIdx] = bRec;
+    } else {
+      data.registration_backup.push(bRec);
+    }
+
     saveServerData(data, true);
     return agent;
   },
@@ -309,10 +402,18 @@ export const ServerStore = {
     const data = loadServerData();
     let index = data.agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
 
-    // Auto-create in ServerStore if not yet synchronized from client
+    // Auto-create in ServerStore if not yet synchronized from client or if in backup
     if (index === -1) {
-      if (agentData) {
-        this.registerAgent({ ...agentData, agent_id: agentId, check_in_status: status });
+      const fromBackup = (data.registration_backup || []).find(b => b.agent_id.toUpperCase() === agentId.toUpperCase());
+      if (fromBackup || agentData) {
+        this.registerAgent({ 
+          ...fromBackup, 
+          ...agentData, 
+          archetype: ((agentData && agentData.archetype) || (fromBackup && fromBackup.archetype)) as any,
+          agent_id: agentId, 
+          check_in_status: status,
+          is_active: status === 'ACTIVE'
+        });
         const refreshed = loadServerData();
         index = refreshed.agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
         if (index === -1) return null;
@@ -352,6 +453,15 @@ export const ServerStore = {
     }
 
     data.agents[index] = agent;
+
+    // Keep registration_backup in sync
+    if (data.registration_backup) {
+      const bIdx = data.registration_backup.findIndex(b => b.agent_id.toUpperCase() === agent.agent_id.toUpperCase());
+      if (bIdx >= 0) {
+        data.registration_backup[bIdx].check_in_status = agent.check_in_status;
+      }
+    }
+
     saveServerData(data, true);
     return agent;
   },
@@ -579,6 +689,208 @@ export const ServerStore = {
     saveServerData(data);
   },
 
+  getRegistrationBackup(): RegistrationBackupRecord[] {
+    const data = loadServerData();
+    if (Array.isArray(data.registration_backup) && data.registration_backup.length > 0) {
+      return data.registration_backup;
+    }
+    // Fallback if not yet populated
+    return data.agents.map(ag => ({
+      agent_id: ag.agent_id,
+      agent_number: ag.agent_number || ag.agent_id,
+      name: ag.name,
+      auth_identifier: ag.auth_identifier || '',
+      contact: ag.contact || '',
+      archetype: ag.archetype,
+      wristband_id: ag.wristband_id || ag.agent_id,
+      check_in_status: ag.check_in_status,
+      registered_at: ag.created_at || new Date().toISOString(),
+      token: ag.token
+    }));
+  },
+
+  getRegistrationBackupCSV(): string {
+    const backup = this.getRegistrationBackup();
+    const headers = [
+      'Agent ID',
+      'Agent Number',
+      'Operative Name',
+      'Roll Number',
+      'Phone / Contact',
+      'Tactical Domain',
+      'Wristband ID',
+      'Check-In Status',
+      'Registration Timestamp'
+    ];
+
+    const rows = backup.map(r => [
+      `"${r.agent_id}"`,
+      `"${r.agent_number}"`,
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      `"${(r.auth_identifier || '').replace(/"/g, '""')}"`,
+      `"${(r.contact || '').replace(/"/g, '""')}"`,
+      `"${r.archetype}"`,
+      `"${r.wristband_id || r.agent_id}"`,
+      `"${r.check_in_status}"`,
+      `"${r.registered_at}"`
+    ].join(','));
+
+    return [headers.join(','), ...rows].join('\n');
+  },
+
+  bulkRegister(operatives: Array<Partial<Agent>>): {
+    registeredCount: number;
+    updatedCount: number;
+    agents: Agent[];
+    registrationBackup: RegistrationBackupRecord[];
+  } {
+    const data = loadServerData();
+    let registeredCount = 0;
+    let updatedCount = 0;
+    const processedAgents: Agent[] = [];
+
+    for (const op of operatives) {
+      if (!op.name && !op.auth_identifier && !op.contact && !op.agent_id) continue;
+
+      const cleanRoll = (op.auth_identifier || '').trim();
+      const cleanPhone = (op.contact || '').replace(/\D/g, '');
+      const cleanId = (op.agent_id || '').trim().toUpperCase();
+
+      // Check if operative already exists
+      const existingIdx = data.agents.findIndex(a => {
+        if (cleanRoll && a.auth_identifier && a.auth_identifier.toLowerCase() === cleanRoll.toLowerCase()) return true;
+        if (cleanPhone && a.contact && a.contact.replace(/\D/g, '') === cleanPhone) return true;
+        if (cleanId && a.agent_id.toUpperCase() === cleanId) return true;
+        return false;
+      });
+
+      if (existingIdx >= 0) {
+        // Update existing record
+        const existing = data.agents[existingIdx];
+        const updated: Agent = {
+          ...existing,
+          name: op.name?.trim() || existing.name,
+          contact: op.contact?.trim() || existing.contact,
+          auth_identifier: op.auth_identifier?.trim() || existing.auth_identifier,
+          wristband_id: op.wristband_id?.trim() || existing.wristband_id,
+          archetype: (op.archetype as any) || existing.archetype,
+          check_in_status: op.check_in_status || existing.check_in_status,
+          is_active: op.check_in_status === 'ACTIVE' ? true : existing.is_active,
+          last_active_at: new Date().toISOString()
+        };
+        data.agents[existingIdx] = updated;
+        processedAgents.push(updated);
+        updatedCount++;
+      } else {
+        // Create new operative with sequential AGT-XXX or specified ID
+        const targetId = cleanId && cleanId.startsWith('AGT-') && !data.agents.some(a => a.agent_id.toUpperCase() === cleanId)
+          ? cleanId
+          : null;
+
+        let idToUse: string;
+        let numToUse: string;
+        if (targetId) {
+          idToUse = targetId;
+          const m = targetId.match(/AGT-(\d+)/i);
+          numToUse = m ? `Agent ${m[1].padStart(3, '0')}` : `Agent ${targetId}`;
+        } else {
+          const next = this.getNextAgentId(data);
+          idToUse = next.agentId;
+          numToUse = next.agentNumber;
+        }
+
+        const archetype = op.archetype || this.getNextArchetype(data);
+        const isPreVerified = Boolean(op.is_active || op.check_in_status === 'ACTIVE');
+        const now = new Date().toISOString();
+
+        const newAgent: Agent = {
+          id: `agent-uuid-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          agent_id: idToUse,
+          wristband_id: op.wristband_id?.trim() || idToUse,
+          agent_number: numToUse,
+          token: op.token || `sec_tok_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+          name: op.name?.trim() || `Operative ${idToUse}`,
+          contact: op.contact?.trim() || '',
+          auth_identifier: cleanRoll,
+          archetype: archetype as any,
+          score: op.score || 0,
+          is_active: isPreVerified,
+          check_in_status: isPreVerified ? 'ACTIVE' : 'AWAITING_CHECKIN',
+          total_active_seconds: op.total_active_seconds || 0,
+          session_start_time: isPreVerified ? now : null,
+          initial_check_in_at: isPreVerified ? now : null,
+          last_check_in: isPreVerified ? now : null,
+          last_host_verified_at: isPreVerified ? now : null,
+          last_active_at: now,
+          logged_out_at: null,
+          created_at: now
+        };
+
+        data.agents.push(newAgent);
+        processedAgents.push(newAgent);
+        registeredCount++;
+
+        // Initial nodes
+        const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
+        candidateNodes.slice(0, 3).forEach((n) => {
+          data.agent_nodes.push({
+            id: `srv-an-${newAgent.agent_id}-${n.id}`,
+            agent_id: newAgent.agent_id,
+            node_id: n.id,
+            is_unlocked: true,
+            is_completed: false,
+            completed_at: null,
+            attempts: 0,
+            points_earned: 0,
+            first_accessed_at: null
+          });
+        });
+        data.agent_nodes.push({
+          id: `srv-an-${newAgent.agent_id}-NODE-OMEGA-HYPOTHESIS`,
+          agent_id: newAgent.agent_id,
+          node_id: 'NODE-OMEGA-HYPOTHESIS',
+          is_unlocked: true,
+          is_completed: false,
+          completed_at: null,
+          attempts: 0,
+          points_earned: 0,
+          first_accessed_at: null
+        });
+      }
+    }
+
+    // Refresh registration_backup from all processed
+    if (!data.registration_backup) data.registration_backup = [];
+    processedAgents.forEach(ag => {
+      const bIdx = data.registration_backup.findIndex(b => b.agent_id.toUpperCase() === ag.agent_id.toUpperCase());
+      const bRec: RegistrationBackupRecord = {
+        agent_id: ag.agent_id,
+        agent_number: ag.agent_number,
+        name: ag.name,
+        auth_identifier: ag.auth_identifier || '',
+        contact: ag.contact || '',
+        archetype: ag.archetype,
+        wristband_id: ag.wristband_id || ag.agent_id,
+        check_in_status: ag.check_in_status,
+        registered_at: ag.created_at || new Date().toISOString(),
+        token: ag.token
+      };
+      if (bIdx >= 0) {
+        data.registration_backup[bIdx] = bRec;
+      } else {
+        data.registration_backup.push(bRec);
+      }
+    });
+
+    saveServerData(data, true);
+    return {
+      registeredCount,
+      updatedCount,
+      agents: data.agents,
+      registrationBackup: data.registration_backup
+    };
+  },
+
   greatReset(): void {
     const now = new Date().toISOString();
     const data: ServerStoreData = {
@@ -593,6 +905,7 @@ export const ServerStore = {
         submission_cutoff_time: '20:00',
         updated_at: now
       },
+      registration_backup: [],
       updated_at: now
     };
     saveServerData(data, true);

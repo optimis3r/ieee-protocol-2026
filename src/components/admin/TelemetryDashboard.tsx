@@ -43,7 +43,9 @@ import {
   LogOut,
   Zap,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface TelemetryDashboardProps {
@@ -89,6 +91,16 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   // WhatsApp Baileys Gateway Status
   const [gatewayInfo, setGatewayInfo] = useState<WhatsAppGatewayStatus | null>(null);
   const [isUnlinkingWa, setIsUnlinkingWa] = useState(false);
+
+  // Global State Shift Lock (prevent multi-click jitter & race condition)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
+
+  // Bulk CSV Upload Auto-Register State
+  const [isCsvUploadOpen, setIsCsvUploadOpen] = useState(false);
+  const [csvFileContent, setCsvFileContent] = useState<string | null>(null);
+  const [csvFileName, setCsvFileName] = useState<string>('');
+  const [csvPreviewOperatives, setCsvPreviewOperatives] = useState<Array<Partial<Agent>>>([]);
+  const [isUploadingCsv, setIsUploadingCsv] = useState(false);
 
   const refreshDashboard = useCallback(async () => {
     setGameState(Store.getGameState());
@@ -230,12 +242,18 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   }, [refreshDashboard]);
 
   const handleStateChange = async (newStatus: GameStatus) => {
-    const updated = await Store.setGameStateAsync(newStatus);
-    setGameState(updated);
+    if (isUpdatingStatus) return;
+    setIsUpdatingStatus(newStatus);
     soundEffects.playScanChirp();
-    setActionNotice(`PROTOCOL STATE SHIFTED TO: ${newStatus}`);
-    await refreshDashboard();
-    setTimeout(() => setActionNotice(null), 3500);
+    try {
+      const updated = await Store.setGameStateAsync(newStatus);
+      setGameState(updated);
+      setActionNotice(`PROTOCOL STATE SHIFTED TO: ${newStatus}`);
+      await refreshDashboard();
+    } finally {
+      setIsUpdatingStatus(null);
+      setTimeout(() => setActionNotice(null), 3500);
+    }
   };
 
   const handleToggleLeaderboard = async () => {
@@ -287,8 +305,11 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   };
 
   const handleToggleCheckIn = async (agentId: string) => {
+    soundEffects.playScanChirp();
     const res = await Store.toggleCheckInAsync(agentId);
-    soundEffects.playSuccessChime();
+    if (res.success) {
+      soundEffects.playSuccessChime();
+    }
     setActionNotice(res.message);
     await refreshDashboard();
     setTimeout(() => setActionNotice(null), 3500);
@@ -361,8 +382,59 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
     link.click();
     document.body.removeChild(link);
     soundEffects.playSuccessChime();
-    setActionNotice('CSV REPORT EXPORTED SUCCESSFULLY');
+    setActionNotice('FULL TOURNAMENT RESULTS CSV EXPORTED');
     setTimeout(() => setActionNotice(null), 3500);
+  };
+
+  const handleDownloadBackupCSV = () => {
+    const csvContent = Store.exportRegistrationBackupCSV();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `protocol_registration_backup_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    soundEffects.playSuccessChime();
+    setActionNotice('REGISTRATION BACKUP CSV DOWNLOADED');
+    setTimeout(() => setActionNotice(null), 3500);
+  };
+
+  const handleCsvFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvFileContent(text);
+      const parsed = Store.parseCSVToOperatives(text);
+      setCsvPreviewOperatives(parsed);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteBulkCsvRegister = async () => {
+    if (!csvFileContent) return;
+    setIsUploadingCsv(true);
+    soundEffects.playScanChirp();
+
+    const res = await Store.bulkRegisterFromCSV(csvFileContent);
+    setIsUploadingCsv(false);
+    if (res.success) {
+      soundEffects.playSuccessChime();
+      setActionNotice(res.message);
+      setIsCsvUploadOpen(false);
+      setCsvFileContent(null);
+      setCsvFileName('');
+      setCsvPreviewOperatives([]);
+      await refreshDashboard();
+      setTimeout(() => setActionNotice(null), 5000);
+    } else {
+      soundEffects.playErrorBuzz();
+      alert(res.message);
+    }
   };
 
   const handleApplyScoreAdjustment = (e: React.FormEvent) => {
@@ -523,20 +595,22 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
               ] as const
             ).map((item) => {
               const isCurrent = gameState.status === item.status;
+              const isPending = isUpdatingStatus === item.status;
               const Icon = item.icon;
               return (
                 <button
                   key={item.status}
                   onClick={() => handleStateChange(item.status)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  disabled={isUpdatingStatus !== null}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 ${
                     isCurrent
                       ? `bg-proto-surface0 ${item.color} border-2 border-current shadow-lg`
                       : 'bg-proto-surface0/40 border-proto-surface1 hover:border-proto-surface2 text-proto-subtext'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} />
                   <span className="text-[11px] font-bold">
-                    {item.label}
+                    {isPending ? 'SHIFTING...' : item.label}
                   </span>
                 </button>
               );
@@ -915,12 +989,36 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
               <span>Enroll Operative</span>
             </button>
 
+            {/* Upload CSV for Automatic Bulk Registration */}
+            <button
+              onClick={() => setIsCsvUploadOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-proto-logic/20 border border-proto-logic/40 hover:bg-proto-logic/30 text-proto-logic font-bold text-xs uppercase tracking-wider transition-all shadow cursor-pointer"
+              title="Upload CSV backup roster to automatically register and allocate AGT-XXX numbers"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Upload CSV (Auto-Register)</span>
+            </button>
+
+            {/* Download Registration Backup CSV */}
+            <button
+              onClick={handleDownloadBackupCSV}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-proto-surface0 border border-proto-surface1 hover:border-proto-gold/50 text-proto-gold font-bold text-xs uppercase tracking-wider transition-all shadow cursor-pointer"
+              title="Download clean CSV backup list of everyone who registered (independent of WhatsApp delivery)"
+            >
+              <Download className="w-4 h-4" />
+              <span>Backup Roster (CSV)</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-proto-gold/20 text-proto-gold border border-proto-gold/30 ml-0.5">
+                {Store.getRegistrationBackup().length || agents.length}
+              </span>
+            </button>
+
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-proto-surface0 border border-proto-surface1 hover:border-proto-surface2 text-proto-text font-bold text-xs uppercase tracking-wider transition-all shadow cursor-pointer"
+              title="Export complete mission results and solve telemetry"
             >
-              <Download className="w-4 h-4 text-proto-gold" />
-              <span>Export CSV</span>
+              <FileSpreadsheet className="w-4 h-4 text-proto-subtext" />
+              <span>Results CSV</span>
             </button>
 
             {/* THE GREAT RESET Button */}
@@ -1288,6 +1386,158 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
           }
         }}
       />
+
+      {/* CSV Bulk Auto-Register Modal */}
+      {isCsvUploadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="w-full max-w-2xl bg-proto-base border border-proto-logic/40 rounded-2xl p-6 shadow-2xl space-y-5 text-proto-text font-mono-cyber flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-proto-surface1 pb-3">
+              <div className="flex items-center gap-2 text-proto-logic">
+                <Upload className="w-5 h-5" />
+                <h3 className="text-base font-black uppercase tracking-wider">
+                  BULK AUTO-REGISTRATION // CSV IMPORT
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsCsvUploadOpen(false);
+                  setCsvFileContent(null);
+                  setCsvFileName('');
+                  setCsvPreviewOperatives([]);
+                }}
+                className="text-proto-subtext hover:text-proto-text p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto pr-1 text-xs">
+              <div className="p-3.5 rounded-xl bg-proto-surface0 border border-proto-surface1 space-y-2">
+                <div className="text-[11px] font-bold text-proto-gold uppercase flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>CSV File Format Specification</span>
+                </div>
+                <p className="text-proto-subtext font-sans leading-relaxed">
+                  Upload a standard CSV file containing registered participants. The system automatically reads columns for 
+                  <strong className="text-proto-text"> Name, Roll Number, Phone / WhatsApp, Tactical Domain, and Wristband ID</strong>.
+                </p>
+                <p className="text-[11px] text-proto-signal font-sans">
+                  💡 If an operative does NOT have an AGT-XXX ID in the CSV, sequential Call Signs (e.g. AGT-001, AGT-002...) are automatically allotted based on the master backup list. Initial station questions and intel fragments will be allocated automatically.
+                </p>
+              </div>
+
+              {/* File Input Selection */}
+              <div className="border-2 border-dashed border-proto-surface2 hover:border-proto-logic/60 rounded-xl p-6 text-center transition-colors bg-proto-surface0/30">
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  id="csv-file-upload-input"
+                  onChange={handleCsvFileSelect}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="csv-file-upload-input"
+                  className="cursor-pointer flex flex-col items-center justify-center gap-2"
+                >
+                  <Upload className="w-8 h-8 text-proto-logic animate-bounce" />
+                  <span className="font-bold text-sm text-proto-text">
+                    {csvFileName ? `Selected: ${csvFileName}` : 'Click to choose or drop a CSV file'}
+                  </span>
+                  <span className="text-[11px] text-proto-subtext">
+                    Accepts exported registration backups or custom attendee spreadsheets
+                  </span>
+                </label>
+              </div>
+
+              {/* Parsed Preview Table */}
+              {csvPreviewOperatives.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold uppercase text-proto-signal text-[11px]">
+                      DETECTED {csvPreviewOperatives.length} OPERATIVE RECORDS:
+                    </span>
+                    <span className="text-[10px] text-proto-subtext">
+                      Preview of first 5 rows
+                    </span>
+                  </div>
+
+                  <div className="border border-proto-surface1 rounded-xl overflow-hidden">
+                    <table className="w-full text-[11px] text-left border-collapse">
+                      <thead className="bg-proto-surface0 border-b border-proto-surface1 text-proto-subtext uppercase">
+                        <tr>
+                          <th className="py-2 px-3">Call Sign</th>
+                          <th className="py-2 px-3">Name</th>
+                          <th className="py-2 px-3">Roll No</th>
+                          <th className="py-2 px-3">Phone</th>
+                          <th className="py-2 px-3">Domain</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-proto-surface1">
+                        {csvPreviewOperatives.slice(0, 5).map((op, i) => (
+                          <tr key={i} className="hover:bg-proto-surface0/40">
+                            <td className="py-2 px-3 font-bold text-proto-gold font-mono">
+                              {op.agent_id || 'AUTO-ALLOT'}
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-proto-text">
+                              {op.name || 'Unnamed'}
+                            </td>
+                            <td className="py-2 px-3 text-proto-subtext font-mono">
+                              {op.auth_identifier || '—'}
+                            </td>
+                            <td className="py-2 px-3 text-proto-subtext font-mono">
+                              {op.contact || '—'}
+                            </td>
+                            <td className="py-2 px-3 text-proto-logic font-bold">
+                              {op.archetype || 'BALANCED'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {csvPreviewOperatives.length > 5 && (
+                    <div className="text-[10px] text-proto-subtext text-center italic">
+                      + {csvPreviewOperatives.length - 5} additional operative records will be registered...
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-proto-surface1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCsvUploadOpen(false);
+                  setCsvFileContent(null);
+                  setCsvFileName('');
+                  setCsvPreviewOperatives([]);
+                }}
+                className="px-4 py-2 rounded-xl bg-proto-surface0 hover:bg-proto-surface1 text-proto-subtext font-bold text-xs uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteBulkCsvRegister}
+                disabled={csvPreviewOperatives.length === 0 || isUploadingCsv}
+                className="px-5 py-2 rounded-xl bg-proto-logic text-[#0a0f0d] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed font-black text-xs uppercase tracking-wider transition-all shadow cursor-pointer flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                <span>
+                  {isUploadingCsv 
+                    ? 'AUTO-REGISTERING OPERATIVES...' 
+                    : `REGISTER ${csvPreviewOperatives.length} OPERATIVES`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* THE GREAT RESET Security Confirmation Modal */}
       {isGreatResetModalOpen && (

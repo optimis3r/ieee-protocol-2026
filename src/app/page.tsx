@@ -25,16 +25,29 @@ export default function HomePage() {
 
   useEffect(() => {
     initStore();
-    const storedId = localStorage.getItem('ieee_agent_id');
-    if (storedId) {
-      const ag = Store.getAgentById(storedId);
-      if (ag) {
-        setTimeout(() => {
+    const syncCurrent = () => {
+      const storedId = localStorage.getItem('ieee_agent_id');
+      if (storedId) {
+        const ag = Store.getAgentById(storedId);
+        if (ag) {
           setCurrentAgent(ag);
           setSessionStatus(Store.checkSessionStatus(ag.agent_id));
-        }, 0);
+        }
       }
-    }
+    };
+
+    syncCurrent();
+
+    const handleUpdate = () => {
+      syncCurrent();
+    };
+
+    window.addEventListener('ieee_store_update', handleUpdate);
+    Store.syncWithServer().then(() => syncCurrent());
+
+    return () => {
+      window.removeEventListener('ieee_store_update', handleUpdate);
+    };
   }, []);
 
   return (
@@ -71,10 +84,139 @@ export default function HomePage() {
       </header>
 
       {/* Main Editorial Body */}
-      <main className="max-w-5xl w-full mx-auto px-4 sm:px-8 py-10 sm:py-14 flex-1">
-        {/* Asymmetric 2-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-14 items-start">
-          
+      <main className="max-w-5xl w-full mx-auto px-4 sm:px-8 py-8 sm:py-12 flex-1 space-y-10">
+        {/* Top: Operative Action Dossier / Enlistment Docket (PLACED ON TOP BEFORE OVERVIEW) */}
+        <section aria-label="Operative Enlistment and Status">
+          {currentAgent ? (
+            /* Authenticated Operative Status Sheet */
+            <div className="border border-[#3f453f] bg-[#1b1d1b] p-5 sm:p-6 space-y-5 rounded-sm shadow-xl">
+              <div className="flex items-start justify-between gap-3 border-b border-[#2d312c] pb-3">
+                <div>
+                  <span className="font-mono-tabular text-[10px] text-[#949e93] uppercase block">
+                    ASSIGNED OPERATIVE
+                  </span>
+                  <span className="font-serif-editorial text-2xl text-[#f4f1ea]">
+                    {currentAgent.name}
+                  </span>
+                  <div className="font-mono-tabular text-xs text-[#c28b28] mt-0.5">
+                    {currentAgent.agent_number || currentAgent.agent_id}{currentAgent.auth_identifier ? ` • ${currentAgent.auth_identifier}` : ''}
+                  </div>
+                </div>
+
+                <span className={`editorial-stamp ${
+                  sessionStatus.canPlay
+                    ? 'border-[#2d9f5d] text-[#2d9f5d]'
+                    : 'border-[#c28b28] text-[#c28b28]'
+                }`}>
+                  {sessionStatus.canPlay ? 'ACTIVE' : 'STANDBY'}
+                </span>
+              </div>
+
+              <div className="space-y-2 text-xs font-display-grotesk text-[#949e93]">
+                <div className="flex justify-between py-1 border-b border-[#2d312c]">
+                  <span>Clearance Score</span>
+                  <span className="font-mono-tabular text-[#f4f1ea] font-bold">{currentAgent.score || 0} PTS</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-[#2d312c]">
+                  <span>Wristband / Band ID</span>
+                  <span className="font-mono-tabular text-[#f4f1ea]">{currentAgent.wristband_id || 'UNLINKED'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-[#2d312c]">
+                  <span>Desk Check-in</span>
+                  <span className="font-mono-tabular text-[#f4f1ea]">
+                    {sessionStatus.canPlay ? 'VERIFIED' : 'PENDING GATE SCAN'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                {!Store.isEventActive() ? (
+                  <Link
+                    href="/standby"
+                    className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Standby Holding Page</span>
+                  </Link>
+                ) : sessionStatus.canPlay ? (
+                  <Link
+                    href="/play"
+                    className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+                  >
+                    <span>Enter Mission Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                ) : (
+                  <Link
+                    href="/my-badge"
+                    className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Present Pass at Desk</span>
+                  </Link>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/my-badge"
+                    className="btn-editorial-outline py-2.5 px-3 text-xs uppercase flex items-center justify-center gap-1.5 text-center font-mono-tabular"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-[#c28b28]" />
+                    <span>QR Pass</span>
+                  </Link>
+
+                  <Link
+                    href="/login"
+                    className="btn-editorial-outline py-2.5 px-3 text-xs uppercase flex items-center justify-center text-center font-mono-tabular"
+                  >
+                    <span>Switch</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Enlistment / Login Callout - Prominent Top Card */
+            <div className="border border-[#3f453f] bg-[#1b1d1b] p-6 sm:p-8 rounded-sm shadow-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-xl">
+                  <span className="font-mono-tabular text-[11px] text-[#c93b2b] uppercase tracking-wider block font-bold">
+                    [ENLISTMENT DOCKET // PRIORITY ENROLLMENT]
+                  </span>
+                  <h2 className="font-serif-editorial text-2xl sm:text-3xl text-[#f4f1ea]">
+                    Join the Investigation
+                  </h2>
+                  <p className="font-display-grotesk text-xs sm:text-sm text-[#949e93] leading-relaxed">
+                    Registration is open to all NITW students. Register below to receive your cryptographic agent pass, then bring your phone to the event desk to scan in and receive your physical wristband.
+                  </p>
+                  <div className="pt-1 text-[11px] text-[#949e93] font-mono-tabular">
+                    Linked directly to institute roll number • No passwords required.
+                  </div>
+                </div>
+
+                <div className="w-full md:w-80 shrink-0 space-y-2.5">
+                  <Link
+                    href="/register"
+                    className="btn-editorial-primary w-full py-3.5 px-4 text-xs sm:text-sm font-bold uppercase flex items-center justify-center gap-2 text-center shadow-lg"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Register as Operative</span>
+                  </Link>
+
+                  <Link
+                    href="/login"
+                    className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular"
+                  >
+                    <LogIn className="w-4 h-4 text-[#c28b28]" />
+                    <span>Retrieve Pass (Roll Number)</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Section: Overview & Disciplines alongside Dispatch Parameters */}
+        <section aria-label="Campus Overview and Disciplines" className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-14 items-start pt-2">
           {/* Left Column: Editorial Headline & Copy */}
           <div className="lg:col-span-7 space-y-6">
             <div className="space-y-3">
@@ -121,140 +263,13 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Column: Operative Action Dossier */}
+          {/* Right Column: Event Dispatch Information */}
           <div className="lg:col-span-5 space-y-6">
-            {currentAgent ? (
-              /* Authenticated Operative Status Sheet */
-              <div className="border border-[#3f453f] bg-[#1b1d1b] p-5 sm:p-6 space-y-5">
-                <div className="flex items-start justify-between gap-3 border-b border-[#2d312c] pb-3">
-                  <div>
-                    <span className="font-mono-tabular text-[10px] text-[#949e93] uppercase block">
-                      ASSIGNED OPERATIVE
-                    </span>
-                    <span className="font-serif-editorial text-2xl text-[#f4f1ea]">
-                      {currentAgent.name}
-                    </span>
-                    <div className="font-mono-tabular text-xs text-[#c28b28] mt-0.5">
-                      {currentAgent.agent_number || currentAgent.agent_id}{currentAgent.auth_identifier ? ` • ${currentAgent.auth_identifier}` : ''}
-                    </div>
-                  </div>
-
-                  <span className={`editorial-stamp ${
-                    sessionStatus.canPlay
-                      ? 'border-[#2d9f5d] text-[#2d9f5d]'
-                      : 'border-[#c28b28] text-[#c28b28]'
-                  }`}>
-                    {sessionStatus.canPlay ? 'ACTIVE' : 'STANDBY'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs font-display-grotesk text-[#949e93]">
-                  <div className="flex justify-between py-1 border-b border-[#2d312c]">
-                    <span>Clearance Score</span>
-                    <span className="font-mono-tabular text-[#f4f1ea] font-bold">{currentAgent.score || 0} PTS</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#2d312c]">
-                    <span>Wristband / Band ID</span>
-                    <span className="font-mono-tabular text-[#f4f1ea]">{currentAgent.wristband_id || 'UNLINKED'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-[#2d312c]">
-                    <span>Desk Check-in</span>
-                    <span className="font-mono-tabular text-[#f4f1ea]">
-                      {sessionStatus.canPlay ? 'VERIFIED' : 'PENDING GATE SCAN'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 pt-2">
-                  {!Store.isEventActive() ? (
-                    <Link
-                      href="/standby"
-                      className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
-                    >
-                      <Clock className="w-4 h-4" />
-                      <span>Standby Holding Page</span>
-                    </Link>
-                  ) : sessionStatus.canPlay ? (
-                    <Link
-                      href="/play"
-                      className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
-                    >
-                      <span>Enter Mission Dashboard</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  ) : (
-                    <Link
-                      href="/my-badge"
-                      className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      <span>Present Pass at Desk</span>
-                    </Link>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link
-                      href="/my-badge"
-                      className="btn-editorial-outline py-2.5 px-3 text-xs uppercase flex items-center justify-center gap-1.5 text-center font-mono-tabular"
-                    >
-                      <QrCode className="w-3.5 h-3.5 text-[#c28b28]" />
-                      <span>QR Pass</span>
-                    </Link>
-
-                    <Link
-                      href="/login"
-                      className="btn-editorial-outline py-2.5 px-3 text-xs uppercase flex items-center justify-center text-center font-mono-tabular"
-                    >
-                      <span>Switch</span>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Enlistment / Login Callout */
-              <div className="border border-[#3f453f] bg-[#1b1d1b] p-5 sm:p-6 space-y-5">
-                <div className="space-y-1 border-b border-[#2d312c] pb-3">
-                  <span className="font-mono-tabular text-[10px] text-[#c93b2b] uppercase tracking-wider block">
-                    [ENLISTMENT DOCKET]
-                  </span>
-                  <h2 className="font-serif-editorial text-2xl text-[#f4f1ea]">
-                    Join the Investigation
-                  </h2>
-                  <p className="font-display-grotesk text-xs text-[#949e93]">
-                    Registration is open to all NITW students. Bring your phone to the event desk to scan in.
-                  </p>
-                </div>
-
-                <div className="space-y-2.5">
-                  <Link
-                    href="/register"
-                    className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>Register as Operative</span>
-                  </Link>
-
-                  <Link
-                    href="/login"
-                    className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular"
-                  >
-                    <LogIn className="w-4 h-4 text-[#c28b28]" />
-                    <span>Retrieve Pass (Roll Number)</span>
-                  </Link>
-                </div>
-
-                <div className="pt-2 text-[11px] text-[#949e93] font-display-grotesk border-t border-[#2d312c]">
-                  Your pass is linked directly to your roll number. No passwords required.
-                </div>
-              </div>
-            )}
-
-            {/* Event Dispatch Information */}
-            <div className="border border-[#2d312c] p-4 text-xs font-mono-tabular space-y-2 bg-[#141514]">
-              <div className="text-[10px] text-[#949e93] uppercase tracking-widest">
+            <div className="border border-[#2d312c] p-5 text-xs font-mono-tabular space-y-3 bg-[#141514]">
+              <div className="text-[10px] text-[#949e93] uppercase tracking-widest border-b border-[#2d312c] pb-2">
                 DISPATCH PARAMETERS
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-3 text-[11px]">
                 <div>
                   <span className="text-[#949e93] block">DATE</span>
                   <span className="text-[#f4f1ea] font-bold">24 September 2026</span>
@@ -269,12 +284,12 @@ export default function HomePage() {
                 </div>
                 <div>
                   <span className="text-[#949e93] block">CLEARANCE AWARD</span>
-                  <span className="text-[#c28b28] font-bold">Claude Pro 1-Yr</span>
+                  <span className="text-[#c28b28] font-bold">Claude Pro</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </main>
 
       {/* Understated Editorial Colophon */}

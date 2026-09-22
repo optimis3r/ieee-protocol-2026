@@ -62,6 +62,19 @@ export type CheckInDirection = 'IN' | 'OUT';
 export type CheckInStatus = 'AWAITING_CHECKIN' | 'ACTIVE' | 'PAUSED';
 export type GameStatus = 'STANDBY' | 'NETWORK_ACTIVE' | 'NETWORK_LOCKED';
 
+export interface RegistrationBackupRecord {
+  agent_id: string;
+  agent_number: string;
+  name: string;
+  auth_identifier: string;
+  contact: string;
+  archetype: string;
+  wristband_id: string;
+  check_in_status: string;
+  registered_at: string;
+  token?: string;
+}
+
 export interface Agent {
   id: string;
   agent_id: string;                  // System ID e.g. AGT-047

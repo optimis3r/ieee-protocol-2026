@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { Store, initStore, getAgentActiveSeconds, formatActiveTime } from '@/lib/store';
-import { Agent, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
+import { Agent, GameState, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
 
 export default function MyBadgePage() {
   const router = useRouter();
   const [agent, setAgent] = useState<Agent | null>(null);
+  const [gameState, setGameState] = useState<GameState>(() => Store.getGameState());
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [activeSeconds, setActiveSeconds] = useState<number>(0);
 
@@ -19,6 +20,7 @@ export default function MyBadgePage() {
     if (!current) return;
     setAgent(current);
     setActiveSeconds(getAgentActiveSeconds(current));
+    setGameState(Store.getGameState());
   }, []);
 
   useEffect(() => {
@@ -57,24 +59,27 @@ export default function MyBadgePage() {
 
     const pollLiveStatus = async () => {
       try {
-        const { agent: serverAg, gameState } = await Store.syncAgentWithServer(current.agent_id);
+        const { agent: serverAg, gameState: serverState } = await Store.syncAgentWithServer(current.agent_id);
         if (isCancelled || !serverAg) return;
 
         setAgent({ ...serverAg });
+        if (serverState) {
+          setGameState(serverState);
+        }
         setActiveSeconds(getAgentActiveSeconds(serverAg));
+
+        const isLiveActive = (serverState?.status || Store.getGameState().status) === 'NETWORK_ACTIVE';
 
         if (serverAg.check_in_status === 'ACTIVE' && prevCheckInStatus !== 'ACTIVE') {
           prevCheckInStatus = 'ACTIVE';
           soundEffects.playSuccessChime();
-          setTimeout(() => {
-            if (!isCancelled) {
-              if (gameState?.status === 'NETWORK_ACTIVE' || Store.isEventActive()) {
+          if (isLiveActive) {
+            setTimeout(() => {
+              if (!isCancelled) {
                 router.push('/play');
-              } else {
-                router.push('/standby');
               }
-            }
-          }, 600);
+            }, 600);
+          }
         } else {
           prevCheckInStatus = serverAg.check_in_status;
         }
@@ -86,7 +91,10 @@ export default function MyBadgePage() {
     pollLiveStatus();
     const interval = setInterval(pollLiveStatus, 2000);
 
-    const handleStoreUpdate = () => pollLiveStatus();
+    const handleStoreUpdate = () => {
+      setGameState(Store.getGameState());
+      pollLiveStatus();
+    };
     window.addEventListener('ieee_store_update', handleStoreUpdate);
     window.addEventListener('storage', handleStoreUpdate);
 
@@ -215,13 +223,32 @@ export default function MyBadgePage() {
 
         {/* Primary Action Button */}
         <div>
-          {!Store.isEventActive() ? (
-            <Link
-              href="/standby"
-              className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
-            >
-              Event in Standby • View Launch Countdown →
-            </Link>
+          {gameState.status !== 'NETWORK_ACTIVE' ? (
+            isActive ? (
+              <div className="space-y-2">
+                <div className="p-3 border border-[#2d9f5d]/40 bg-[#15241b] text-center rounded-sm">
+                  <span className="text-xs font-bold text-[#2d9f5d] font-mono-tabular block">
+                    ✓ DESK VERIFICATION COMPLETE • PASS ACTIVE
+                  </span>
+                  <span className="text-[11px] text-[#949e93] font-display-grotesk block mt-0.5">
+                    Terminal access unlocks as soon as operations desk activates the network.
+                  </span>
+                </div>
+                <Link
+                  href="/standby"
+                  className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
+                >
+                  Event in Standby • View Launch Countdown →
+                </Link>
+              </div>
+            ) : (
+              <Link
+                href="/standby"
+                className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
+              >
+                Event in Standby • View Launch Countdown →
+              </Link>
+            )
           ) : isActive ? (
             <Link
               href="/play"

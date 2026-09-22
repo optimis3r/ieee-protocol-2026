@@ -160,7 +160,7 @@ export default function LeaderboardPage() {
                 </div>
                 <div>
                   <div className="font-mono-tabular text-xs font-bold text-[#c28b28] uppercase tracking-wider">
-                    CLAUDE PRO SUBSCRIPTION PRIZE
+                    CLAUDE PRO PRIZE
                   </div>
                   <div className="font-display-grotesk text-xs text-[#949e93]">
                     Awarded to the top operative who solves key circuits & master topology deduction.

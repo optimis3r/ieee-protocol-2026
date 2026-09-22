@@ -79,6 +79,10 @@ class SoundSystem {
   }
 
   // Low saw buzz for invalid decodes or lockouts
+  playErrorBuzz() {
+    this.playLockoutBuzz();
+  }
+
   playLockoutBuzz() {
     try {
       const ctx = this.getContext();

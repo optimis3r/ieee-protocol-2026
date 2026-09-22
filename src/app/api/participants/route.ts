@@ -6,6 +6,19 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const agentId = searchParams.get('agentId');
+    const format = searchParams.get('format');
+
+    // Allow direct CSV download
+    if (format === 'csv') {
+      const csv = ServerStore.getRegistrationBackupCSV();
+      return new Response(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="protocol_operatives_backup_${new Date().toISOString().slice(0, 10)}.csv"`
+        }
+      });
+    }
 
     const gameState = ServerStore.getGameState();
 
@@ -31,9 +44,12 @@ export async function GET(request: Request) {
     }
 
     const enrichedAgents = ServerStore.getEnrichedAgents();
+    const registrationBackup = ServerStore.getRegistrationBackup();
     return NextResponse.json({
       success: true,
       agents: enrichedAgents,
+      registrationBackup,
+      registrationBackupCount: registrationBackup.length,
       gameState,
       totalCount: enrichedAgents.length,
       timestamp: new Date().toISOString()
@@ -173,6 +189,29 @@ export async function POST(request: Request) {
           success: true,
           message: 'THE GREAT RESET executed. All participant records and logs purged successfully.'
         });
+      }
+
+      case 'bulk_register': {
+        const { operatives } = body;
+        if (!Array.isArray(operatives) || operatives.length === 0) {
+          return NextResponse.json({ error: 'Array of operative records required' }, { status: 400 });
+        }
+        const result = ServerStore.bulkRegister(operatives);
+        const gameState = ServerStore.getGameState();
+        return NextResponse.json({
+          success: true,
+          registeredCount: result.registeredCount,
+          updatedCount: result.updatedCount,
+          agents: result.agents,
+          registrationBackup: result.registrationBackup,
+          registrationBackupCount: result.registrationBackup.length,
+          gameState
+        });
+      }
+
+      case 'get_backup_csv': {
+        const csv = ServerStore.getRegistrationBackupCSV();
+        return NextResponse.json({ success: true, csv });
       }
 
       default:

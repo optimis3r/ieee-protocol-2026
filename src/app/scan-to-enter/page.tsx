@@ -19,11 +19,19 @@ export default function ScanToEnterPage() {
 
   useEffect(() => {
     initStore();
+    Store.syncWithServer();
   }, []);
 
-  const handleScanSuccess = (result: ScanResult) => {
+  const handleScanSuccess = async (result: ScanResult) => {
     if (result.type === 'BADGE' || result.id.startsWith('AGT-')) {
-      const agent = Store.getAgentById(result.id);
+      let agent = Store.getAgentById(result.id) || Store.findAgentByIdentifier(result.id);
+      if (!agent) {
+        try {
+          const synced = await Store.syncAgentWithServer(result.id);
+          if (synced?.agent) agent = synced.agent;
+        } catch (_) {}
+      }
+
       if (agent) {
         localStorage.setItem('ieee_agent_id', agent.agent_id);
         localStorage.setItem('ieee_agent_token', agent.token);
@@ -39,11 +47,19 @@ export default function ScanToEnterPage() {
     }
   };
 
-  const handleManualLogin = (e: React.FormEvent) => {
+  const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualId.trim()) return;
 
-    const agent = Store.getAgentById(manualId.trim());
+    const id = manualId.trim();
+    let agent = Store.getAgentById(id) || Store.findAgentByIdentifier(id);
+    if (!agent) {
+      try {
+        const synced = await Store.syncAgentWithServer(id);
+        if (synced?.agent) agent = synced.agent;
+      } catch (_) {}
+    }
+
     if (agent) {
       localStorage.setItem('ieee_agent_id', agent.agent_id);
       localStorage.setItem('ieee_agent_token', agent.token);
@@ -52,7 +68,7 @@ export default function ScanToEnterPage() {
         : '/standby';
       router.push(destination);
     } else {
-      setErrorMsg(`Operative ${manualId.toUpperCase()} not found in Protocol directory.`);
+      setErrorMsg(`Operative ${id.toUpperCase()} not found in Protocol directory.`);
     }
   };
 

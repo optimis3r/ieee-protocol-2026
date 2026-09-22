@@ -72,7 +72,7 @@ export const KioskScanner: React.FC = () => {
   }, []);
 
   const processBadgeScan = useCallback(
-    (scannedText: string) => {
+    async (scannedText: string) => {
       // Ignore new scans if modal is already open or during cooldown period
       if (isModalOpenRef.current || Date.now() < cooldownUntilRef.current) {
         return;
@@ -98,7 +98,17 @@ export const KioskScanner: React.FC = () => {
         badgeId = match[1].toUpperCase();
       }
 
-      const existingAgent = Store.getAgentById(badgeId) || Store.findAgentByIdentifier(badgeId);
+      let existingAgent = Store.getAgentById(badgeId) || Store.findAgentByIdentifier(badgeId);
+
+      if (!existingAgent) {
+        // Query server directly in case operative registered on their own device or backup roster
+        try {
+          const synced = await Store.syncAgentWithServer(badgeId);
+          if (synced?.agent) {
+            existingAgent = synced.agent;
+          }
+        } catch (_) {}
+      }
 
       if (existingAgent) {
         // Pause scanner and display the Check-In / Check-Out Confirmation Modal
@@ -156,6 +166,11 @@ export const KioskScanner: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
 
+    // Initial server sync to populate latest agents and status
+    Store.syncWithServer().then(() => {
+      if (isMounted) refreshLogs();
+    });
+
     const startKiosk = async () => {
       try {
         await new Promise((r) => setTimeout(r, 200));
@@ -200,18 +215,34 @@ export const KioskScanner: React.FC = () => {
           });
       }
     };
-  }, [processBadgeScan]);
+  }, [processBadgeScan, refreshLogs]);
 
-  const handleManualScanSubmit = (e: React.FormEvent) => {
+  // Synchronize kiosk state on global updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      refreshLogs();
+      if (lastScannedAgent) {
+        const up = Store.getAgentById(lastScannedAgent.agent_id);
+        if (up) setLastScannedAgent(up);
+      }
+    };
+    window.addEventListener('ieee_store_update', handleUpdate);
+    return () => {
+      window.removeEventListener('ieee_store_update', handleUpdate);
+    };
+  }, [lastScannedAgent, refreshLogs]);
+
+  const handleManualScanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
-    processBadgeScan(manualCode.trim());
+    const code = manualCode.trim();
     setManualCode('');
+    await processBadgeScan(code);
   };
 
-  const handleToggleCurrent = () => {
+  const handleToggleCurrent = async () => {
     if (!lastScannedAgent) return;
-    const res = Store.toggleCheckIn(lastScannedAgent.agent_id);
+    const res = await Store.toggleCheckInAsync(lastScannedAgent.agent_id);
     soundEffects.playSuccessChime();
     const updated = Store.getAgentById(lastScannedAgent.agent_id);
     setLastScannedAgent(updated);

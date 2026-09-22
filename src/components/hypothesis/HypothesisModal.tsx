@@ -90,7 +90,7 @@ export const HypothesisModal: React.FC<HypothesisModalProps> = ({
               [PARITY DIRECTIVE // +400 CLEARANCE POINTS]
             </div>
             <p className="font-display-grotesk text-[#949e93] leading-relaxed text-[11px]">
-              Operatives who correctly reconstruct the hidden architecture of The Protocol receive a flat +400 points toward the <strong>Claude Pro Subscription</strong>. Beware disinformation planted in telemetry channels.
+              Operatives who correctly reconstruct the hidden architecture of The Protocol receive a flat +400 points toward the <strong>Claude Pro Prize</strong>. Beware disinformation planted in telemetry channels.
             </p>
           </div>
 

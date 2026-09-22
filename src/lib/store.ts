@@ -7,7 +7,8 @@ import {
   IntelFragment, 
   NetworkConnection, 
   NodeItem,
-  PrimaryDomain 
+  PrimaryDomain,
+  RegistrationBackupRecord
 } from '@/types/database';
 import { WhatsAppDispatchRecord } from './whatsapp';
 
@@ -284,6 +285,7 @@ const KEY_ACCESS_LOGS = `${STORAGE_PREFIX}access_logs`;
 const KEY_CONNECTIONS = `${STORAGE_PREFIX}connections`;
 const KEY_WA_LOGS = `${STORAGE_PREFIX}wa_logs`;
 const KEY_WA_CONFIG = `${STORAGE_PREFIX}wa_config`;
+const KEY_REGISTRATION_BACKUP = `${STORAGE_PREFIX}registration_backup`;
 
 // Calculate Anti-Grind Dynamic Score
 export function calculateDynamicScore(
@@ -431,6 +433,10 @@ export function initStore(): void {
   if (!localStorage.getItem(KEY_CONNECTIONS)) {
     setStored(KEY_CONNECTIONS, [] as NetworkConnection[]);
   }
+
+  if (!localStorage.getItem(KEY_REGISTRATION_BACKUP)) {
+    setStored(KEY_REGISTRATION_BACKUP, []);
+  }
 }
 
 // Store API Functions
@@ -465,7 +471,7 @@ export const Store = {
       submission_cutoff_time: submission_cutoff_time !== undefined ? submission_cutoff_time : curr.submission_cutoff_time,
       updated_at: new Date().toISOString()
     };
-    setStored(KEY_GAME_STATE, updated);
+    setStored(KEY_GAME_STATE, updated, true);
     notifyServer({ action: 'update_game_state', ...updated });
     return updated;
   },
@@ -476,9 +482,51 @@ export const Store = {
     leaderboard_visible?: boolean,
     submission_cutoff_time?: string
   ): Promise<GameState> {
-    const updated = this.setGameState(status, global_broadcast, leaderboard_visible, submission_cutoff_time);
-    await notifyServerAsync({ action: 'update_game_state', ...updated });
-    return updated;
+    const curr = this.getGameState();
+    const targetState: GameState = {
+      ...curr,
+      status,
+      global_broadcast: global_broadcast !== undefined ? global_broadcast : curr.global_broadcast,
+      leaderboard_visible: leaderboard_visible !== undefined ? leaderboard_visible : (curr.leaderboard_visible ?? true),
+      submission_cutoff_time: submission_cutoff_time !== undefined ? submission_cutoff_time : curr.submission_cutoff_time,
+      updated_at: new Date().toISOString()
+    };
+
+    // Optimistically update local without triggering a racing background sync before POST commits
+    setStored(KEY_GAME_STATE, targetState, false);
+
+    if (typeof fetch !== 'undefined') {
+      try {
+        const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
+        const res = await fetch('/api/participants', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminToken ? { 'x-admin-token': adminToken } : {})
+          },
+          body: JSON.stringify({ action: 'update_game_state', ...targetState })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.gameState) {
+            setStored(KEY_GAME_STATE, data.gameState, false);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('ieee_game_state_change', { detail: data.gameState }));
+              window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: { key: KEY_GAME_STATE } }));
+            }
+            return data.gameState;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to update game state on server:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ieee_game_state_change', { detail: targetState }));
+      window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: { key: KEY_GAME_STATE } }));
+    }
+    return targetState;
   },
 
   toggleLeaderboard(visible: boolean): GameState {
@@ -634,23 +682,109 @@ export const Store = {
 
   // Async versions that wait for server roundtrip and file flush
   async checkInAgentAsync(agentId: string, notes?: string): Promise<{ success: boolean; agent?: Agent; message: string }> {
+    let localAgent = this.getAgentById(agentId);
+    if (!localAgent) {
+      await this.syncAgentWithServer(agentId).catch(() => {});
+      localAgent = this.getAgentById(agentId);
+    }
+
     const res = this.checkInAgent(agentId, notes);
-    if (res.agent) {
-      await notifyServerAsync({ action: 'update_status', agentId: res.agent.agent_id, status: 'ACTIVE', agentData: res.agent });
+    if (typeof fetch !== 'undefined') {
+      try {
+        const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
+        const apiRes = await fetch('/api/participants', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminToken ? { 'x-admin-token': adminToken } : {})
+          },
+          body: JSON.stringify({
+            action: 'update_status',
+            agentId,
+            status: 'ACTIVE',
+            agentData: res.agent || localAgent || { agent_id: agentId }
+          })
+        });
+        if (apiRes.ok) {
+          const data = await apiRes.json();
+          if (data.agent) {
+            const agents = this.getAgents();
+            const idx = agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+            if (idx >= 0) {
+              agents[idx] = { ...agents[idx], ...data.agent };
+            } else {
+              agents.unshift(data.agent);
+            }
+            setStored(KEY_AGENTS, agents, true);
+            return {
+              success: true,
+              agent: data.agent,
+              message: `CHECK-IN VERIFIED: ${data.agent.agent_number || data.agent.agent_id} (${data.agent.name}) is ACTIVE.`
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Server check-in update warning:', e);
+      }
     }
     return res;
   },
 
   async checkOutAgentAsync(agentId: string, notes?: string): Promise<{ success: boolean; agent?: Agent; message: string }> {
+    let localAgent = this.getAgentById(agentId);
+    if (!localAgent) {
+      await this.syncAgentWithServer(agentId).catch(() => {});
+      localAgent = this.getAgentById(agentId);
+    }
+
     const res = this.checkOutAgent(agentId, notes);
-    if (res.agent) {
-      await notifyServerAsync({ action: 'update_status', agentId: res.agent.agent_id, status: 'PAUSED', agentData: res.agent });
+    if (typeof fetch !== 'undefined') {
+      try {
+        const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
+        const apiRes = await fetch('/api/participants', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(adminToken ? { 'x-admin-token': adminToken } : {})
+          },
+          body: JSON.stringify({
+            action: 'update_status',
+            agentId,
+            status: 'PAUSED',
+            agentData: res.agent || localAgent || { agent_id: agentId }
+          })
+        });
+        if (apiRes.ok) {
+          const data = await apiRes.json();
+          if (data.agent) {
+            const agents = this.getAgents();
+            const idx = agents.findIndex(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+            if (idx >= 0) {
+              agents[idx] = { ...agents[idx], ...data.agent };
+            } else {
+              agents.unshift(data.agent);
+            }
+            setStored(KEY_AGENTS, agents, true);
+            return {
+              success: true,
+              agent: data.agent,
+              message: `CHECK-OUT RECORDED: ${data.agent.agent_number || data.agent.agent_id} PAUSED.`
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Server check-out update warning:', e);
+      }
     }
     return res;
   },
 
   async toggleCheckInAsync(agentId: string): Promise<{ success: boolean; agent?: Agent; status: 'ACTIVE' | 'PAUSED'; message: string }> {
-    const agent = this.getAgentById(agentId);
+    let agent = this.getAgentById(agentId);
+    if (!agent) {
+      await this.syncAgentWithServer(agentId).catch(() => {});
+      agent = this.getAgentById(agentId);
+    }
     if (!agent) return { success: false, status: 'PAUSED', message: 'Operative not found' };
 
     if (agent.check_in_status === 'ACTIVE') {
@@ -1329,6 +1463,200 @@ export const Store = {
     return [headers.join(','), ...rows].join('\n');
   },
 
+  getRegistrationBackup(): RegistrationBackupRecord[] {
+    return getStored<RegistrationBackupRecord[]>(KEY_REGISTRATION_BACKUP, []);
+  },
+
+  exportRegistrationBackupCSV(): string {
+    const backup = this.getRegistrationBackup();
+    const source = backup.length > 0 ? backup : this.getAgents().map(ag => ({
+      agent_id: ag.agent_id,
+      agent_number: ag.agent_number || ag.agent_id,
+      name: ag.name,
+      auth_identifier: ag.auth_identifier || '',
+      contact: ag.contact || '',
+      archetype: ag.archetype,
+      wristband_id: ag.wristband_id || ag.agent_id,
+      check_in_status: ag.check_in_status,
+      registered_at: ag.created_at || new Date().toISOString(),
+      token: ag.token
+    }));
+
+    const headers = [
+      'Agent ID',
+      'Agent Number',
+      'Operative Name',
+      'Roll Number',
+      'Phone / Contact',
+      'Tactical Domain',
+      'Wristband ID',
+      'Check-In Status',
+      'Registration Timestamp'
+    ];
+
+    const rows = source.map(r => [
+      `"${r.agent_id}"`,
+      `"${r.agent_number}"`,
+      `"${(r.name || '').replace(/"/g, '""')}"`,
+      `"${(r.auth_identifier || '').replace(/"/g, '""')}"`,
+      `"${(r.contact || '').replace(/"/g, '""')}"`,
+      `"${r.archetype}"`,
+      `"${r.wristband_id || r.agent_id}"`,
+      `"${r.check_in_status}"`,
+      `"${r.registered_at}"`
+    ].join(','));
+
+    return [headers.join(','), ...rows].join('\n');
+  },
+
+  parseCSVToOperatives(csvText: string): Array<Partial<Agent>> {
+    const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return [];
+
+    const parseRow = (line: string): string[] => {
+      const row: string[] = [];
+      let inQuotes = false;
+      let cur = '';
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === ',' && !inQuotes) {
+          row.push(cur.trim());
+          cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      row.push(cur.trim());
+      return row;
+    };
+
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const findIdx = (keywords: string[]) => {
+      return headers.findIndex(h => keywords.some(k => h.includes(k)));
+    };
+
+    const idIdx = findIdx(['agentid', 'callsign', 'agtid', 'badgeid', 'id']);
+    const nameIdx = findIdx(['operativename', 'fullname', 'name', 'studentname', 'participant']);
+    const rollIdx = findIdx(['rollnumber', 'rollno', 'roll', 'authidentifier', 'studentid', 'accountid']);
+    const phoneIdx = findIdx(['phone', 'contact', 'whatsapp', 'mobile', 'cell', 'number']);
+    const domainIdx = findIdx(['tacticaldomain', 'domain', 'role', 'archetype', 'cell']);
+    const bandIdx = findIdx(['wristbandid', 'wristband', 'bandid', 'band']);
+    const statusIdx = findIdx(['checkinstatus', 'status', 'checkin']);
+
+    const operatives: Array<Partial<Agent>> = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseRow(lines[i]);
+      if (cells.length === 0 || cells.every(c => !c)) continue;
+
+      const name = nameIdx >= 0 && cells[nameIdx] ? cells[nameIdx] : '';
+      const roll = rollIdx >= 0 && cells[rollIdx] ? cells[rollIdx] : '';
+      const phone = phoneIdx >= 0 && cells[phoneIdx] ? cells[phoneIdx] : '';
+      const customId = idIdx >= 0 && cells[idIdx] ? cells[idIdx].toUpperCase() : '';
+      const domainRaw = domainIdx >= 0 && cells[domainIdx] ? cells[domainIdx].toUpperCase() : '';
+      const wristband = bandIdx >= 0 && cells[bandIdx] ? cells[bandIdx] : '';
+      const statusRaw = statusIdx >= 0 && cells[statusIdx] ? cells[statusIdx].toUpperCase() : '';
+
+      const validDomains = ['LOGIC', 'SIGNAL', 'OBSERVATION', 'SYSTEM', 'SOCIAL'];
+      const archetype = validDomains.includes(domainRaw) ? (domainRaw as PrimaryDomain) : undefined;
+      const check_in_status = statusRaw.includes('ACTIVE') || statusRaw === 'IN'
+        ? 'ACTIVE'
+        : statusRaw.includes('PAUSE')
+        ? 'PAUSED'
+        : 'AWAITING_CHECKIN';
+
+      if (name || roll || phone || customId) {
+        operatives.push({
+          name: name || (customId ? `Operative ${customId}` : 'Operative'),
+          auth_identifier: roll || undefined,
+          contact: phone || undefined,
+          agent_id: customId || undefined,
+          wristband_id: wristband || undefined,
+          archetype,
+          check_in_status,
+          is_active: check_in_status === 'ACTIVE'
+        });
+      }
+    }
+
+    return operatives;
+  },
+
+  async bulkRegisterFromCSV(csvText: string): Promise<{
+    success: boolean;
+    registeredCount: number;
+    updatedCount: number;
+    totalCount: number;
+    message: string;
+  }> {
+    const operatives = this.parseCSVToOperatives(csvText);
+    if (operatives.length === 0) {
+      return {
+        success: false,
+        registeredCount: 0,
+        updatedCount: 0,
+        totalCount: 0,
+        message: 'No valid participant rows detected in CSV. Please verify file headers (Name, Roll Number, Phone).'
+      };
+    }
+
+    try {
+      const adminToken = typeof window !== 'undefined' ? sessionStorage.getItem('ieee_admin_token') || '' : '';
+      const res = await fetch('/api/participants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminToken ? { 'x-admin-token': adminToken } : {})
+        },
+        body: JSON.stringify({ action: 'bulk_register', operatives })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.agents) {
+          setStored(KEY_AGENTS, data.agents, true);
+        }
+        if (data.registrationBackup) {
+          setStored(KEY_REGISTRATION_BACKUP, data.registrationBackup, false);
+        }
+        if (data.gameState) {
+          setStored(KEY_GAME_STATE, data.gameState, false);
+        }
+        return {
+          success: true,
+          registeredCount: data.registeredCount || 0,
+          updatedCount: data.updatedCount || 0,
+          totalCount: operatives.length,
+          message: `Successfully processed ${operatives.length} operatives (${data.registeredCount} newly registered, ${data.updatedCount} updated).`
+        };
+      } else {
+        const err = await res.json().catch(() => ({}));
+        return {
+          success: false,
+          registeredCount: 0,
+          updatedCount: 0,
+          totalCount: operatives.length,
+          message: err.error || 'Server error processing bulk CSV registration.'
+        };
+      }
+    } catch (e) {
+      return {
+        success: false,
+        registeredCount: 0,
+        updatedCount: 0,
+        totalCount: operatives.length,
+        message: 'Network error communicating with registration server.'
+      };
+    }
+  },
+
   getTelemetry() {
     const agents = this.getAgents();
     const activeAgents = agents.filter(a => a.check_in_status === 'ACTIVE').length;
@@ -1450,13 +1778,17 @@ export const Store = {
       if (res.ok) {
         const data = await res.json();
         
-        // 1. Sync Game State
-        if (data.gameState) {
-          const prevStatus = currentGameState.status;
-          setStored(KEY_GAME_STATE, data.gameState, false);
-          if (prevStatus !== data.gameState.status) {
-            window.dispatchEvent(new CustomEvent('ieee_game_state_change', { detail: data.gameState }));
-            window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: data.gameState }));
+        // 1. Sync Game State with timestamp protection
+        if (data.gameState && data.gameState.updated_at) {
+          const localUpdated = currentGameState.updated_at ? new Date(currentGameState.updated_at).getTime() : 0;
+          const remoteUpdated = new Date(data.gameState.updated_at).getTime();
+          if (remoteUpdated >= localUpdated) {
+            const prevStatus = currentGameState.status;
+            setStored(KEY_GAME_STATE, data.gameState, false);
+            if (prevStatus !== data.gameState.status) {
+              window.dispatchEvent(new CustomEvent('ieee_game_state_change', { detail: data.gameState }));
+              window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: data.gameState }));
+            }
           }
         }
 
@@ -1496,9 +1828,19 @@ export const Store = {
       if (res.ok) {
         const data = await res.json();
         
-        // Sync Game State
-        if (data.gameState) {
-          setStored(KEY_GAME_STATE, data.gameState, false);
+        // Sync Game State with timestamp protection
+        if (data.gameState && data.gameState.updated_at) {
+          const currentGameState = this.getGameState();
+          const localUpdated = currentGameState.updated_at ? new Date(currentGameState.updated_at).getTime() : 0;
+          const remoteUpdated = new Date(data.gameState.updated_at).getTime();
+          if (remoteUpdated >= localUpdated) {
+            setStored(KEY_GAME_STATE, data.gameState, false);
+          }
+        }
+
+        // Sync Registration Backup
+        if (Array.isArray(data.registrationBackup)) {
+          setStored(KEY_REGISTRATION_BACKUP, data.registrationBackup, false);
         }
 
         if (Array.isArray(data.agents)) {
@@ -1523,6 +1865,7 @@ export const Store = {
     setStored(KEY_ACCESS_LOGS, [], true);
     setStored(KEY_CONNECTIONS, [], true);
     setStored(KEY_WA_LOGS, [], true);
+    setStored(KEY_REGISTRATION_BACKUP, [], true);
 
     if (typeof window !== 'undefined') {
       localStorage.removeItem('ieee_agent_id');
