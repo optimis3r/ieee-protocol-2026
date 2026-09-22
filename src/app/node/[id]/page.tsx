@@ -15,6 +15,13 @@ import {
   ArrowRight,
   Clock 
 } from 'lucide-react';
+import { BlackoutAudioStation } from '@/components/stations/BlackoutAudioStation';
+import { PushpinMapStation } from '@/components/stations/PushpinMapStation';
+import { UVMarkerStation } from '@/components/stations/UVMarkerStation';
+import { RedFilterStation } from '@/components/stations/RedFilterStation';
+import { RedactedArchiveStation } from '@/components/stations/RedactedArchiveStation';
+import { DeadDropStation } from '@/components/stations/DeadDropStation';
+import { RogueIntelStation } from '@/components/stations/RogueIntelStation';
 
 interface NodePageProps {
   params: Promise<{ id: string }>;
@@ -44,7 +51,7 @@ export default function NodeStationPage({ params }: NodePageProps) {
     if (!ag) return;
     setAgent(ag);
 
-    const targetNode = SEED_NODES.find(n => n.id.toUpperCase() === nodeId);
+    const targetNode = Store.getNodeById(nodeId) || SEED_NODES.find(n => n.id.toUpperCase() === nodeId);
     setNode(targetNode || null);
 
     if (targetNode) {
@@ -61,7 +68,7 @@ export default function NodeStationPage({ params }: NodePageProps) {
       if (storedId) {
         refreshState(storedId);
       } else {
-        const targetNode = SEED_NODES.find(n => n.id.toUpperCase() === nodeId);
+        const targetNode = Store.getNodeById(nodeId) || SEED_NODES.find(n => n.id.toUpperCase() === nodeId);
         setNode(targetNode || null);
       }
     }, 0);
@@ -340,30 +347,6 @@ export default function NodeStationPage({ params }: NodePageProps) {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Challenge Description / Cipher */}
-              {typeof node.payload.hint === 'string' && (
-                <div className="p-4 rounded-xl bg-[#141d17] border border-[#27392f] text-xs space-y-1.5">
-                  <div className="text-[10px] font-black text-proto-signal uppercase tracking-wider">
-                    STATION RECONNAISSANCE HINT:
-                  </div>
-                  <p className="text-[#cad3f5] leading-relaxed font-sans">
-                    {node.payload.hint}
-                  </p>
-                </div>
-              )}
-
-              {typeof node.payload.cipher === 'string' && (
-                <div className="p-4 rounded-xl bg-[#0a0f0d] border border-proto-logic/40 space-y-1 text-center">
-                  <div className="text-[10px] text-[#7d9787] uppercase">Intercepted Keystream:</div>
-                  <div className="text-sm sm:text-base font-black text-proto-logic tracking-widest break-all">
-                    {node.payload.cipher}
-                  </div>
-                  {typeof node.payload.algorithm === 'string' && (
-                    <div className="text-[10px] text-[#8ea897]">Algorithm: {node.payload.algorithm}</div>
-                  )}
-                </div>
-              )}
-
               {/* Feedback Alert */}
               {submissionFeedback && (
                 <div
@@ -382,35 +365,152 @@ export default function NodeStationPage({ params }: NodePageProps) {
                 </div>
               )}
 
-              {/* Submission Form */}
-              <form onSubmit={handleAnswerSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] text-[#8ea897] uppercase mb-1">
-                    {typeof node.payload.prompt === 'string' ? node.payload.prompt : 'Submit Station Bypass Passcode / Key:'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={answerInput}
-                    onChange={(e) => setAnswerInput(e.target.value)}
-                    placeholder="Enter decrypted bypass code..."
-                    className="w-full px-4 py-3 text-xs sm:text-sm bg-[#0a0f0d] border border-[#2b3e32] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-proto-signal uppercase tracking-wider"
-                  />
-                  <div className="flex items-center justify-between text-[10px] text-[#7d9787] mt-1">
-                    <span>Attempts: {agentNode?.attempts || 0}</span>
-                    <span>Penalty: -10 PTS per invalid keystream</span>
-                  </div>
-                </div>
+              {/* Dynamic Bespoke Station Challenge View */}
+              {(() => {
+                const sNum = (node.station_number || '').toUpperCase();
+                const nid = node.id.toUpperCase();
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow cursor-pointer"
-                >
-                  <KeyRound className="w-4 h-4" />
-                  <span>TRANSMIT DECRYPTED BYPASS</span>
-                </button>
-              </form>
+                if (nid.includes('AUDIO') || sNum === 'STATION 01') {
+                  return (
+                    <BlackoutAudioStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                if (nid.includes('MAP') || sNum === 'STATION 02') {
+                  return (
+                    <PushpinMapStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                if (nid.includes('UV') || sNum === 'STATION 03') {
+                  return (
+                    <UVMarkerStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                if (nid.includes('FILTER') || sNum === 'STATION 04') {
+                  return (
+                    <RedFilterStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                if (nid.includes('ARCHIVE') || sNum === 'STATION 05') {
+                  return (
+                    <RedactedArchiveStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                if (nid.includes('DEAD-DROP') || sNum === 'STATION 06') {
+                  return (
+                    <DeadDropStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                if (nid.includes('TWO-MAN') || sNum === 'STATION 07') {
+                  return (
+                    <RogueIntelStation
+                      node={node}
+                      answerInput={answerInput}
+                      setAnswerInput={setAnswerInput}
+                      onSubmit={handleAnswerSubmit}
+                      isSubmitting={isSubmitting}
+                    />
+                  );
+                }
+
+                // Default Challenge Form for custom or legacy circuits
+                return (
+                  <div className="space-y-5">
+                    {typeof node.payload.hint === 'string' && (
+                      <div className="p-4 rounded-xl bg-[#141d17] border border-[#27392f] text-xs space-y-1.5">
+                        <div className="text-[10px] font-black text-proto-signal uppercase tracking-wider">
+                          STATION RECONNAISSANCE HINT:
+                        </div>
+                        <p className="text-[#cad3f5] leading-relaxed font-sans">
+                          {node.payload.hint}
+                        </p>
+                      </div>
+                    )}
+
+                    {typeof node.payload.cipher === 'string' && (
+                      <div className="p-4 rounded-xl bg-[#0a0f0d] border border-proto-logic/40 space-y-1 text-center">
+                        <div className="text-[10px] text-[#7d9787] uppercase">Intercepted Keystream:</div>
+                        <div className="text-sm sm:text-base font-black text-proto-logic tracking-widest break-all">
+                          {node.payload.cipher}
+                        </div>
+                        {typeof node.payload.algorithm === 'string' && (
+                          <div className="text-[10px] text-[#8ea897]">Algorithm: {node.payload.algorithm}</div>
+                        )}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleAnswerSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] text-[#8ea897] uppercase mb-1 font-bold">
+                          {typeof node.payload.prompt === 'string' ? node.payload.prompt : 'Submit Station Bypass Passcode / Key:'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={answerInput}
+                          onChange={(e) => setAnswerInput(e.target.value)}
+                          placeholder="Enter decrypted bypass code..."
+                          className="w-full px-4 py-3 text-xs sm:text-sm bg-[#0a0f0d] border border-[#2b3e32] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-proto-signal uppercase tracking-wider font-mono"
+                        />
+                        <div className="flex items-center justify-between text-[10px] text-[#7d9787] mt-1">
+                          <span>Attempts: {agentNode?.attempts || 0}</span>
+                          <span>Penalty: -10 PTS per invalid keystream</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow cursor-pointer"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                        <span>TRANSMIT DECRYPTED BYPASS</span>
+                      </button>
+                    </form>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

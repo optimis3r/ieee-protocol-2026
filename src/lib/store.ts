@@ -14,10 +14,172 @@ import { WhatsAppDispatchRecord } from './whatsapp';
 
 // 1. Initial Seed Nodes with Workstations & Cross-Domain Connections
 export const SEED_NODES: NodeItem[] = [
-  // Observation Station 01
+  // -------------------------------------------------------------
+  // THE PROTOCOL 2026 OFFICIAL TOURNAMENT STATIONS (7 CIRCUITS)
+  // -------------------------------------------------------------
+  // Station 01: SIGNAL - Blackout Audio
+  {
+    id: 'NODE-01-AUDIO',
+    title: 'Station 01: Blackout Audio Intercept',
+    type: 'TERMINAL_DECRYPT',
+    domain: 'SIGNAL',
+    station_number: 'Station 01',
+    station_symbol: '⎔ AUDIO ALPHA',
+    laptop_label: 'Station 01 Terminal (ECE Acoustic Lab / Headphone Station)',
+    base_points: 150,
+    rarity_decay: 1.0,
+    secret_key: '17:45',
+    payload: {
+      hint: 'Listen closely underneath the high-frequency carrier static and Morse pulses. An operative timestamp was logged.',
+      prompt: 'Isolate and submit the intercepted incident timestamp [HH:MM]:',
+      audio_url: '',
+      timestamp_target: '17:45',
+      noise_level: 65,
+      frequency: '14.318 MHz',
+      badge_code: 'NODE-01-AUDIO'
+    }
+  },
+  // Station 02: OBSERVATION - Pushpin Map
+  {
+    id: 'NODE-02-MAP',
+    title: 'Station 02: Tactical Pushpin Triangulation',
+    type: 'TERMINAL_DECRYPT',
+    domain: 'OBSERVATION',
+    station_number: 'Station 02',
+    station_symbol: '⎔ MAP BETA',
+    laptop_label: 'Station 02 Terminal (Central Library Ground Floor Atrium)',
+    base_points: 140,
+    rarity_decay: 1.0,
+    secret_key: 'B-BLOCK TERRACE AIR VENT',
+    payload: {
+      hint: 'Stretch a taut string or ruler across the 3 colored pushpins on the physical corkboard to isolate the centroid geometric intersection.',
+      prompt: 'Submit the identified intersection site / landmark name:',
+      pin_1_name: 'Pin Alpha: Central Library Tower (Sector 4-A)',
+      pin_2_name: 'Pin Beta: ECE Waveguide Mast (Sector 2-C)',
+      pin_3_name: 'Pin Gamma: SAC Amphitheatre (Sector 7-F)',
+      target_intersection: 'B-BLOCK TERRACE AIR VENT',
+      badge_code: 'NODE-02-MAP'
+    }
+  },
+  // Station 03: OBSERVATION - UV Hidden Marker
+  {
+    id: 'NODE-03-UV',
+    title: 'Station 03: UV Fluorescent Room Marker',
+    type: 'TERMINAL_DECRYPT',
+    domain: 'OBSERVATION',
+    station_number: 'Station 03',
+    station_symbol: '⎔ UV SPECTRA GAMMA',
+    laptop_label: 'Station 03 Terminal (Seminar Hall 2 Room Perimeter)',
+    base_points: 150,
+    rarity_decay: 1.0,
+    secret_key: 'THE PROTOCOL IS ALIVE',
+    payload: {
+      hint: 'Direct the UV blacklight keychain torch against the room perimeter to uncover invisible luminescent cipher text.',
+      prompt: 'Submit decrypted plaintext bypass phrase:',
+      uv_room_location: 'Seminar Hall 2 - North Wall Poster',
+      uv_hidden_text: 'WKH SURWRFRO LV DOLYH',
+      cipher_algorithm: 'Caesar Shift (+3)',
+      cipher_shift: 3,
+      decrypted_answer: 'THE PROTOCOL IS ALIVE',
+      badge_code: 'NODE-03-UV'
+    }
+  },
+  // Station 04: LOGIC - Red Filter / Cardan Grille
+  {
+    id: 'NODE-04-FILTER',
+    title: 'Station 04: Optical Red-Filter & Cardan Grille',
+    type: 'TERMINAL_DECRYPT',
+    domain: 'LOGIC',
+    station_number: 'Station 04',
+    station_symbol: '⎔ APERTURE DELTA',
+    laptop_label: 'Station 04 Terminal (Digital Circuits Lab Bay)',
+    base_points: 160,
+    rarity_decay: 1.0,
+    secret_key: '8492',
+    payload: {
+      hint: 'Look through the physical red optical transparency sheet to cancel chromatic noise, or slide the slotted Cardan card over the dense text block.',
+      prompt: 'Submit the 4-digit optical PIN or decoded directive sentence:',
+      filter_submode: 'BOTH',
+      optical_pin: '8492',
+      cardan_directive: 'STRIKE AT DUSK',
+      grille_text: 'S 9 T 4 R I 2 K E 8 A T 0 D U S K 1 9 7 2',
+      badge_code: 'NODE-04-FILTER'
+    }
+  },
+  // Station 05: SYSTEM - Redacted Archive
+  {
+    id: 'NODE-05-ARCHIVE',
+    title: 'Station 05: The Redacted Personnel Archive',
+    type: 'TERMINAL_DECRYPT',
+    domain: 'SYSTEM',
+    station_number: 'Station 05',
+    station_symbol: '⎔ ARCHIVE EPSILON',
+    laptop_label: 'Station 05 Terminal (Computer Center Server Room)',
+    base_points: 170,
+    rarity_decay: 1.0,
+    secret_key: 'AGENT K',
+    payload: {
+      hint: 'Hold the physical memo sheets against backlight or execute terminal reconnaissance queries to unveil the redacted subject.',
+      prompt: 'Submit the redacted operative identifier or student roll number:',
+      memo_title: 'DEPT MEMORANDUM 1994 // DECLASSIFIED',
+      memo_body: 'INCIDENT 94-B: At approximately 03:00 hrs, unauthorized packets were relayed through Subsea Fiber 4. Eyewitness logs identify operative [REDACTED: AGENT K] (Roll #248721) manipulating the root memory segment. Exercise extreme discretion.',
+      redacted_subject: 'AGENT K',
+      redacted_roll: '248721',
+      badge_code: 'NODE-05-ARCHIVE'
+    }
+  },
+  // Station 06: SOCIAL - Dead Drop Handler
+  {
+    id: 'NODE-06-DEAD-DROP',
+    title: 'Station 06: Dead Drop Field Handler Encounter',
+    type: 'DUAL_HANDSHAKE',
+    domain: 'SOCIAL',
+    station_number: 'Station 06',
+    station_symbol: '⎔ CONTACT ZETA',
+    laptop_label: 'Station 06 Terminal (Student Activity Center Atrium)',
+    base_points: 180,
+    rarity_decay: 1.0,
+    secret_key: 'ENVELOPE-DROP-9081',
+    payload: {
+      hint: 'Locate the designated volunteer handler in the attendee crowd. Utter the secret verbal passphrase to receive the sealed physical envelope.',
+      prompt: 'Submit the clearance bypass code found inside the sealed envelope:',
+      handler_description: 'Volunteer operative wearing IEEE black lanyard with blue gel pen in chest pocket.',
+      verbal_passphrase: 'The packet dropped at midnight',
+      envelope_code: 'ENVELOPE-DROP-9081',
+      badge_code: 'NODE-06-DEAD-DROP'
+    }
+  },
+  // Station 07: SOCIAL - Rogue Intel / Two-Man Rule
+  {
+    id: 'NODE-07-TWO-MAN',
+    title: 'Station 07: Rogue Intel & The Two-Man Rule',
+    type: 'DUAL_HANDSHAKE',
+    domain: 'SOCIAL',
+    station_number: 'Station 07',
+    station_symbol: '⎔ PROTOCOL OMEGA',
+    laptop_label: 'Station 07 Terminal (Heritage Cell Core Chamber)',
+    base_points: 200,
+    rarity_decay: 1.0,
+    secret_key: 'FORGERY_DETECTED_1994',
+    payload: {
+      hint: 'Inspect the open confidential leak clipboard for forged timestamps, or synchronize with a peer in the Split-or-Steal chamber.',
+      prompt: 'Submit the forgery verification passcode or complete synchronization:',
+      coop_points: 40,
+      defect_points: 70,
+      rogue_leak_text: 'TOP SECRET IEEE WARANGAL DISPATCH: All operatives proceed to Room 404 immediately. Document Stamped: 1994-09-31. Signature: NITW-COUNCIL.',
+      forgery_hint: 'Inspect the stamped calendar date closely (September has only 30 days!).',
+      is_forged: true,
+      forgery_code: 'FORGERY_DETECTED_1994',
+      badge_code: 'NODE-07-TWO-MAN'
+    }
+  },
+
+  // -------------------------------------------------------------
+  // LEGACY ALIASES (Preserving QR codes & previously printed badges)
+  // -------------------------------------------------------------
   {
     id: 'NODE-ALPHA-QR',
-    title: 'Mainframe Sub-Level Monolith',
+    title: 'Mainframe Sub-Level Monolith (Legacy S1)',
     type: 'PHYSICAL_QR',
     domain: 'OBSERVATION',
     station_number: 'Station 01',
@@ -34,10 +196,9 @@ export const SEED_NODES: NodeItem[] = [
       linked_station: 'Station 03'
     }
   },
-  // Logic Station 02
   {
     id: 'NODE-BETA-CIPHER',
-    title: 'Subsea Fiber Cryptic Relay',
+    title: 'Subsea Fiber Cryptic Relay (Legacy S2)',
     type: 'TERMINAL_DECRYPT',
     domain: 'LOGIC',
     station_number: 'Station 02',
@@ -53,10 +214,9 @@ export const SEED_NODES: NodeItem[] = [
       prompt: 'Identify the transmission passphrase for fiber cluster 4.'
     }
   },
-  // Signal Station 03
   {
     id: 'NODE-THETA-AUDIO',
-    title: 'Rogue Carrier Waveform Spectrogram',
+    title: 'Rogue Carrier Waveform Spectrogram (Legacy S3)',
     type: 'TERMINAL_DECRYPT',
     domain: 'SIGNAL',
     station_number: 'Station 03',
@@ -72,10 +232,9 @@ export const SEED_NODES: NodeItem[] = [
       prompt: 'Submit the carrier frequency and target cluster code in format: [FREQ]_[TARGET]'
     }
   },
-  // Observation Station 04
   {
     id: 'NODE-DELTA-QR',
-    title: 'Antenna Mast Transceiver Tag',
+    title: 'Antenna Mast Transceiver Tag (Legacy S4)',
     type: 'PHYSICAL_QR',
     domain: 'OBSERVATION',
     station_number: 'Station 04',
@@ -91,10 +250,9 @@ export const SEED_NODES: NodeItem[] = [
       badge_code: 'NODE-DELTA-QR'
     }
   },
-  // System Station 05
   {
     id: 'NODE-EPSILON-CIPHER',
-    title: 'Kernel Memory Exploit Vector',
+    title: 'Kernel Memory Exploit Vector (Legacy S5)',
     type: 'TERMINAL_DECRYPT',
     domain: 'SYSTEM',
     station_number: 'Station 05',
@@ -110,10 +268,9 @@ export const SEED_NODES: NodeItem[] = [
       prompt: 'Submit the decoded ASCII mnemonic phrase (case-insensitive).'
     }
   },
-  // Social Station 06
   {
     id: 'NODE-GAMMA-HANDSHAKE',
-    title: 'Dual-Key Authentication Relay',
+    title: 'Dual-Key Authentication Relay (Legacy S6)',
     type: 'DUAL_HANDSHAKE',
     domain: 'SOCIAL',
     station_number: 'Station 06',
@@ -128,10 +285,9 @@ export const SEED_NODES: NodeItem[] = [
       description: 'Requires concurrent cryptographic verification between Logic/Observation and Signal Operatives.'
     }
   },
-  // Logic Station 07
   {
     id: 'NODE-KAPPA-LOGIC',
-    title: 'Boolean Matrix Logic Gate Relay',
+    title: 'Boolean Matrix Logic Gate Relay (Legacy S7)',
     type: 'TERMINAL_DECRYPT',
     domain: 'LOGIC',
     station_number: 'Station 07',
@@ -146,10 +302,9 @@ export const SEED_NODES: NodeItem[] = [
       prompt: 'Submit the resolved matrix passcode.'
     }
   },
-  // Signal Station 08
   {
     id: 'NODE-IOTA-MORSE',
-    title: 'Telegraphic Sub-Carrier Packet',
+    title: 'Telegraphic Sub-Carrier Packet (Legacy S8)',
     type: 'TERMINAL_DECRYPT',
     domain: 'SIGNAL',
     station_number: 'Station 08',
@@ -165,10 +320,9 @@ export const SEED_NODES: NodeItem[] = [
       prompt: 'Submit decoded plain text statement.'
     }
   },
-  // System Station 09
   {
     id: 'NODE-LAMBDA-TIMELINE',
-    title: 'Autonomic Chronos Archive',
+    title: 'Autonomic Chronos Archive (Legacy S9)',
     type: 'TERMINAL_DECRYPT',
     domain: 'SYSTEM',
     station_number: 'Station 09',
@@ -182,10 +336,9 @@ export const SEED_NODES: NodeItem[] = [
       prompt: 'Submit [YEAR]_[MONTH]_[DAEMON_TYPE] format deduced from logs.'
     }
   },
-  // Social Station 10
   {
     id: 'NODE-ZETA-HANDSHAKE',
-    title: 'Quantum Key Bridge',
+    title: 'Quantum Key Bridge (Legacy S10)',
     type: 'DUAL_HANDSHAKE',
     domain: 'SOCIAL',
     station_number: 'Station 10',
@@ -200,7 +353,6 @@ export const SEED_NODES: NodeItem[] = [
       description: 'System Archivists and Logic Operatives must establish direct peer handshake pairing.'
     }
   },
-  // Master Deduction Central Station 00
   {
     id: 'NODE-OMEGA-HYPOTHESIS',
     title: 'The Protocol Topology Deduction',
@@ -286,6 +438,7 @@ const KEY_CONNECTIONS = `${STORAGE_PREFIX}connections`;
 const KEY_WA_LOGS = `${STORAGE_PREFIX}wa_logs`;
 const KEY_WA_CONFIG = `${STORAGE_PREFIX}wa_config`;
 const KEY_REGISTRATION_BACKUP = `${STORAGE_PREFIX}registration_backup`;
+const KEY_STATION_NODES = `${STORAGE_PREFIX}station_nodes`;
 
 
 // Calculate Anti-Grind Dynamic Score
@@ -318,9 +471,12 @@ export function formatActiveTime(totalSeconds: number): string {
   const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
   if (hrs > 0) {
-    return `${hrs}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+    return `${hrs}h ${mins}m ${secs}s`;
   }
-  return `${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+  if (mins > 0) {
+    return `${mins}m ${secs}s`;
+  }
+  return `${secs}s`;
 }
 
 export function formatActiveTimeClock(totalSeconds: number): string {
@@ -330,24 +486,30 @@ export function formatActiveTimeClock(totalSeconds: number): string {
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Check if Submissions are Locked
+// Determine if submissions are currently locked
 export function isSubmissionLocked(gameState: GameState): { locked: boolean; reason?: string } {
   if (gameState.status === 'NETWORK_LOCKED') {
-    return { locked: true, reason: 'PROTOCOL LOCKED: Submissions frozen by Operations Desk.' };
+    return { locked: true, reason: 'PROTOCOL NETWORK LOCKED: All submissions are currently suspended by Command.' };
   }
-  
+
+  if (gameState.status === 'STANDBY') {
+    return { locked: true, reason: 'PROTOCOL IN STANDBY: Tournament challenge circuits offline until official activation.' };
+  }
+
+  // Check cutoff time
   if (gameState.submission_cutoff_time) {
     const now = new Date();
-    const parts = gameState.submission_cutoff_time.split(':').map(Number);
-    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      const cutoff = new Date();
-      cutoff.setHours(parts[0], parts[1], 0, 0);
-      if (now >= cutoff) {
-        return { locked: true, reason: 'SUBMISSIONS CLOSED: 8:00 PM cutoff deadline reached.' };
+    const cutoffStr = gameState.submission_cutoff_time;
+    if (cutoffStr.includes(':')) {
+      const [cutoffH, cutoffM] = cutoffStr.split(':').map(Number);
+      const currentH = now.getHours();
+      const currentM = now.getMinutes();
+      if (currentH > cutoffH || (currentH === cutoffH && currentM >= cutoffM)) {
+        return { locked: true, reason: `SUBMISSION WINDOW CLOSED: Cutoff time was ${cutoffStr}. Submissions locked.` };
       }
     }
   }
-  
+
   return { locked: false };
 }
 
@@ -439,6 +601,9 @@ export function initStore(): void {
     setStored(KEY_REGISTRATION_BACKUP, []);
   }
 
+  if (!localStorage.getItem(KEY_STATION_NODES)) {
+    setStored(KEY_STATION_NODES, SEED_NODES);
+  }
 }
 
 // Store API Functions
@@ -1075,12 +1240,58 @@ export const Store = {
     return getStored<AccessLog[]>(KEY_ACCESS_LOGS, []);
   },
 
+  getStationNodes(): NodeItem[] {
+    const stored = getStored<NodeItem[]>(KEY_STATION_NODES, []);
+    if (stored && stored.length > 0) {
+      return stored;
+    }
+    return SEED_NODES;
+  },
+
+  getNodeById(nodeId: string): NodeItem | null {
+    if (!nodeId) return null;
+    const cleanId = nodeId.trim().toUpperCase();
+    const nodes = this.getStationNodes();
+    return nodes.find(n => 
+      n.id.toUpperCase() === cleanId || 
+      (n.station_number && n.station_number.toUpperCase() === cleanId) ||
+      (typeof n.payload.badge_code === 'string' && n.payload.badge_code.toUpperCase() === cleanId)
+    ) || SEED_NODES.find(n => n.id.toUpperCase() === cleanId) || null;
+  },
+
+  updateStationNode(nodeId: string, updates: Partial<NodeItem>): NodeItem | null {
+    const nodes = [...this.getStationNodes()];
+    const index = nodes.findIndex(n => n.id.toUpperCase() === nodeId.toUpperCase());
+    if (index === -1) return null;
+
+    nodes[index] = {
+      ...nodes[index],
+      ...updates,
+      payload: {
+        ...nodes[index].payload,
+        ...(updates.payload || {})
+      }
+    };
+
+    setStored(KEY_STATION_NODES, nodes);
+    notifyServer({ action: 'update_node', nodeId, updates });
+    return nodes[index];
+  },
+
+  resetStationNodes(): NodeItem[] {
+    setStored(KEY_STATION_NODES, SEED_NODES);
+    notifyServer({ action: 'reset_nodes' });
+    return SEED_NODES;
+  },
+
   getAgentNodes(agentId: string): Array<AgentNode & { node: NodeItem }> {
     const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
     const agentRecords = allAgentNodes.filter(an => an.agent_id.toUpperCase() === agentId.toUpperCase());
+    const stationNodes = this.getStationNodes();
     
     return agentRecords.map(an => {
-      const node = SEED_NODES.find(n => n.id === an.node_id) || {
+      const node = stationNodes.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) ||
+        SEED_NODES.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) || {
         id: an.node_id,
         title: 'Unknown Circuit',
         type: 'PHYSICAL_QR' as const,
@@ -1130,7 +1341,7 @@ export const Store = {
       };
     }
 
-    const node = SEED_NODES.find(n => n.id === nodeId);
+    const node = this.getNodeById(nodeId) || SEED_NODES.find(n => n.id.toUpperCase() === nodeId.toUpperCase());
     if (!node) {
       return { success: false, attempts: 0, message: 'Circuit identifier not recognized.' };
     }
@@ -1163,9 +1374,29 @@ export const Store = {
     }
 
     const cleanInput = inputKey.trim().toUpperCase();
-    const cleanSecret = node.secret_key.trim().toUpperCase();
-    const badgeCode = typeof node.payload.badge_code === 'string' ? node.payload.badge_code.toUpperCase() : null;
-    const isMatch = cleanInput === cleanSecret || (badgeCode && cleanInput === badgeCode);
+    const cleanSecret = (node.secret_key || '').trim().toUpperCase();
+    const badgeCode = typeof node.payload.badge_code === 'string' ? node.payload.badge_code.trim().toUpperCase() : null;
+    const timestampTarget = typeof node.payload.timestamp_target === 'string' ? node.payload.timestamp_target.trim().toUpperCase() : null;
+    const targetIntersection = typeof node.payload.target_intersection === 'string' ? node.payload.target_intersection.trim().toUpperCase() : null;
+    const decryptedAnswer = typeof node.payload.decrypted_answer === 'string' ? node.payload.decrypted_answer.trim().toUpperCase() : null;
+    const opticalPin = typeof node.payload.optical_pin === 'string' ? node.payload.optical_pin.trim().toUpperCase() : null;
+    const cardanDirective = typeof node.payload.cardan_directive === 'string' ? node.payload.cardan_directive.trim().toUpperCase() : null;
+    const redactedSubject = typeof node.payload.redacted_subject === 'string' ? node.payload.redacted_subject.trim().toUpperCase() : null;
+    const redactedRoll = typeof node.payload.redacted_roll === 'string' ? node.payload.redacted_roll.trim().toUpperCase() : null;
+    const envelopeCode = typeof node.payload.envelope_code === 'string' ? node.payload.envelope_code.trim().toUpperCase() : null;
+    const forgeryCode = typeof node.payload.forgery_code === 'string' ? node.payload.forgery_code.trim().toUpperCase() : null;
+
+    const isMatch = cleanInput === cleanSecret ||
+      (badgeCode && cleanInput === badgeCode) ||
+      (timestampTarget && cleanInput === timestampTarget) ||
+      (targetIntersection && cleanInput === targetIntersection) ||
+      (decryptedAnswer && cleanInput === decryptedAnswer) ||
+      (opticalPin && cleanInput === opticalPin) ||
+      (cardanDirective && cleanInput === cardanDirective) ||
+      (redactedSubject && cleanInput === redactedSubject) ||
+      (redactedRoll && cleanInput === redactedRoll) ||
+      (envelopeCode && cleanInput === envelopeCode) ||
+      (forgeryCode && cleanInput === forgeryCode);
 
     if (isMatch) {
       const globalSolves = this.getNodeGlobalSolves(nodeId);
@@ -1722,6 +1953,7 @@ export const Store = {
     registeredCount: number;
     updatedCount: number;
     totalCount: number;
+    processedAgents?: Agent[];
     message: string;
   }> {
     const operatives = this.parseCSVToOperatives(csvText);
@@ -1762,6 +1994,7 @@ export const Store = {
           registeredCount: data.registeredCount || 0,
           updatedCount: data.updatedCount || 0,
           totalCount: operatives.length,
+          processedAgents: (data.processedAgents || []) as Agent[],
           message: `Successfully processed ${operatives.length} operatives (${data.registeredCount} newly registered, ${data.updatedCount} updated).`
         };
       } else {

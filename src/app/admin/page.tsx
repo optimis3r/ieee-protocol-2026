@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { KioskScanner } from '@/components/admin/KioskScanner';
 import { TelemetryDashboard } from '@/components/admin/TelemetryDashboard';
 import { PrintStation } from '@/components/admin/PrintStation';
+import { StationManager } from '@/components/admin/StationManager';
 import { initStore } from '@/lib/store';
 import { 
   Camera, 
@@ -14,7 +15,8 @@ import {
   MessageSquare, 
   ExternalLink,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Radio
 } from 'lucide-react';
 import { soundEffects } from '@/lib/audio';
 
@@ -22,7 +24,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [adminAgentName, setAdminAgentName] = useState<string>('ieee-protocol-admin');
-  const [activeTab, setActiveTab] = useState<'KIOSK' | 'TELEMETRY' | 'PRINT' | 'WHATSAPP'>('TELEMETRY');
+  const [activeTab, setActiveTab] = useState<'KIOSK' | 'TELEMETRY' | 'PRINT' | 'WHATSAPP' | 'STATIONS'>('TELEMETRY');
 
   useEffect(() => {
     initStore();
@@ -148,6 +150,18 @@ export default function AdminPage() {
                 <Printer className="w-4 h-4" />
                 <span>BADGE STATION</span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('STATIONS')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'STATIONS'
+                    ? 'bg-proto-surface2 text-proto-signal shadow-sm'
+                    : 'text-proto-subtext hover:text-proto-text'
+                }`}
+              >
+                <Radio className="w-4 h-4" />
+                <span>CHALLENGE STATIONS</span>
+              </button>
             </div>
 
             {/* Logout Admin Button */}
@@ -169,6 +183,7 @@ export default function AdminPage() {
         {activeTab === 'WHATSAPP' && <TelemetryDashboard defaultSection="WHATSAPP" />}
         {activeTab === 'KIOSK' && <KioskScanner />}
         {activeTab === 'PRINT' && <PrintStation />}
+        {activeTab === 'STATIONS' && <StationManager />}
       </main>
 
       {/* Footer */}

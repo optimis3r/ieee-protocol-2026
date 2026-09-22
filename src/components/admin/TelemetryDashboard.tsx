@@ -102,6 +102,8 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   const [csvFileName, setCsvFileName] = useState<string>('');
   const [csvPreviewOperatives, setCsvPreviewOperatives] = useState<Array<Partial<Agent>>>([]);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
+  const [sendWhatsAppOnBulk, setSendWhatsAppOnBulk] = useState(true);
+  const [bulkProgressStatus, setBulkProgressStatus] = useState<string>('');
 
   const refreshDashboard = useCallback(async () => {
     setGameState(Store.getGameState());
@@ -431,13 +433,49 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
   const handleExecuteBulkCsvRegister = async () => {
     if (!csvFileContent) return;
     setIsUploadingCsv(true);
+    setBulkProgressStatus('Allocating Call Signs & Tactical Cells in database...');
     soundEffects.playScanChirp();
 
     const res = await Store.bulkRegisterFromCSV(csvFileContent);
-    setIsUploadingCsv(false);
     if (res.success) {
+      if (sendWhatsAppOnBulk) {
+        const targets = (res.processedAgents && res.processedAgents.length > 0)
+          ? res.processedAgents
+          : Store.getAgents();
+        const withPhones = targets.filter(a => a.contact && a.contact.replace(/\D/g, '').length >= 8);
+
+        if (withPhones.length > 0) {
+          let dispatchedCount = 0;
+          for (let i = 0; i < withPhones.length; i++) {
+            const ag = withPhones[i];
+            setBulkProgressStatus(`Transmitting WhatsApp Group Link & QR Pass to ${ag.name} (${ag.agent_id}) [${i + 1}/${withPhones.length}]...`);
+            try {
+              await sendRegistrationWhatsAppMessages({
+                recipientPhone: ag.contact,
+                agentName: ag.name,
+                agentId: ag.agent_id,
+                agentNumber: ag.agent_number,
+                token: ag.token
+              });
+              dispatchedCount++;
+            } catch (waErr) {
+              console.warn(`[Bulk WhatsApp] Failed to transmit to ${ag.agent_id}:`, waErr);
+            }
+            if (i < withPhones.length - 1) {
+              await new Promise(r => setTimeout(r, 350));
+            }
+          }
+          setActionNotice(`BULK ALLOTMENT COMPLETE: ${res.registeredCount} ENROLLED • ${dispatchedCount} WHATSAPP LINK & QR PASSES TRANSMITTED`);
+        } else {
+          setActionNotice(res.message);
+        }
+      } else {
+        setActionNotice(res.message);
+      }
+
       soundEffects.playSuccessChime();
-      setActionNotice(res.message);
+      setIsUploadingCsv(false);
+      setBulkProgressStatus('');
       setIsCsvUploadOpen(false);
       setCsvFileContent(null);
       setCsvFileName('');
@@ -445,6 +483,8 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
       await refreshDashboard();
       setTimeout(() => setActionNotice(null), 5000);
     } else {
+      setIsUploadingCsv(false);
+      setBulkProgressStatus('');
       soundEffects.playErrorBuzz();
       alert(res.message);
     }
@@ -1584,6 +1624,29 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
                   )}
                 </div>
               )}
+              {/* WhatsApp Auto-Dispatch Option */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-proto-surface0 border border-proto-surface1">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-proto-text flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Send WhatsApp Group Link & QR Pass Automatically</span>
+                  </span>
+                  <span className="text-[11px] text-proto-subtext block font-sans">
+                    Transmits the WhatsApp group invite and personalized QR pass badge to each registered operative&apos;s phone number.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSendWhatsAppOnBulk(prev => !prev)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold uppercase transition-colors cursor-pointer border ${
+                    sendWhatsAppOnBulk
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-proto-surface1 text-proto-subtext border-proto-surface2'
+                  }`}
+                >
+                  {sendWhatsAppOnBulk ? 'ENABLED' : 'DISABLED'}
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-proto-surface1">
@@ -1594,6 +1657,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
                   setCsvFileContent(null);
                   setCsvFileName('');
                   setCsvPreviewOperatives([]);
+                  setBulkProgressStatus('');
                 }}
                 className="px-4 py-2 rounded-xl bg-proto-surface0 hover:bg-proto-surface1 text-proto-subtext font-bold text-xs uppercase cursor-pointer"
               >
@@ -1609,7 +1673,7 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = () => {
                 <Upload className="w-4 h-4" />
                 <span>
                   {isUploadingCsv 
-                    ? 'AUTO-REGISTERING OPERATIVES...' 
+                    ? (bulkProgressStatus || 'TRANSMITTING PASSES & QR CODES...') 
                     : `REGISTER & ALLOT ${csvPreviewOperatives.length} OPERATIVES`}
                 </span>
               </button>

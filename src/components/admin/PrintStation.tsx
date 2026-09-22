@@ -9,14 +9,17 @@ import { QrCode, Printer, ExternalLink, Ticket, Laptop } from 'lucide-react';
 export const PrintStation: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>(() => Store.getAgents());
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(() => Store.getAgents()[0] || null);
-  const [selectedNode, setSelectedNode] = useState<NodeItem>(() => SEED_NODES[0]);
+  const [stations, setStations] = useState<NodeItem[]>(() => Store.getStationNodes());
+  const [selectedNode, setSelectedNode] = useState<NodeItem>(() => Store.getStationNodes()[0] || SEED_NODES[0]);
   const [agentQrUrl, setAgentQrUrl] = useState<string>('');
   const [nodeQrUrl, setNodeQrUrl] = useState<string>('');
 
   useEffect(() => {
     const list = Store.getAgents();
+    const stList = Store.getStationNodes();
     setTimeout(() => {
       setAgents(list);
+      setStations(stList);
       if (list.length > 0 && !selectedAgent) {
         setSelectedAgent(list[0]);
       }
@@ -167,12 +170,12 @@ export const PrintStation: React.FC = () => {
             <select
               value={selectedNode?.id || ''}
               onChange={(e) => {
-                const found = SEED_NODES.find((n) => n.id === e.target.value);
+                const found = stations.find((n) => n.id === e.target.value) || SEED_NODES.find((n) => n.id === e.target.value);
                 if (found) setSelectedNode(found);
               }}
               className="px-2.5 py-1 text-xs bg-proto-surface0 border border-proto-surface1 rounded-lg text-proto-text focus:outline-none"
             >
-              {SEED_NODES.map((n) => (
+              {stations.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.station_number || 'STATION'}: {n.title}
                 </option>

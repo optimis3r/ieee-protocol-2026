@@ -17,6 +17,7 @@ interface ServerStoreData {
   wa_logs: WhatsAppDispatchRecord[];
   game_state: GameState;
   registration_backup: RegistrationBackupRecord[];
+  nodes?: NodeItem[];
   updated_at: string;
 }
 
@@ -39,6 +40,7 @@ function getInitialServerData(): ServerStoreData {
       updated_at: now
     },
     registration_backup: [],
+    nodes: SEED_NODES,
     updated_at: now
   };
 }
@@ -55,6 +57,9 @@ function loadServerData(): ServerStoreData {
       const raw = fs.readFileSync(STORE_FILE, 'utf-8');
       const parsed = JSON.parse(raw) as ServerStoreData;
       if (parsed && Array.isArray(parsed.agents)) {
+        if (!Array.isArray(parsed.nodes) || parsed.nodes.length === 0) {
+          parsed.nodes = SEED_NODES;
+        }
         if (!Array.isArray(parsed.registration_backup)) {
           // Check if standalone BACKUP_FILE exists
           if (fs.existsSync(BACKUP_FILE)) {
@@ -68,26 +73,26 @@ function loadServerData(): ServerStoreData {
           }
           // If still empty, seed from current agents
           if (!Array.isArray(parsed.registration_backup)) {
-            parsed.registration_backup = parsed.agents.map(a => ({
+            parsed.registration_backup = parsed.agents.map((a) => ({
               agent_id: a.agent_id,
-              agent_number: a.agent_number || a.agent_id,
+              agent_number: a.agent_number,
               name: a.name,
               auth_identifier: a.auth_identifier || '',
               contact: a.contact || '',
               archetype: a.archetype,
               wristband_id: a.wristband_id || a.agent_id,
-              check_in_status: a.check_in_status,
+              check_in_status: a.check_in_status || 'AWAITING_CHECKIN',
               registered_at: a.created_at || new Date().toISOString(),
               token: a.token
             }));
           }
         }
         memoryState = parsed;
-        return memoryState;
+        return parsed;
       }
     }
-  } catch (err) {
-    console.warn('[ServerStore] Failed to read disk cache, initializing fresh state:', err);
+  } catch (e) {
+    console.error('[ServerStore] Failed to load store file, initializing initial data:', e);
   }
 
   memoryState = getInitialServerData();
@@ -438,9 +443,10 @@ export const ServerStore = {
       };
       data.agents.unshift(agent);
 
-      // Seed initial nodes for new operative
-      const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
-      candidateNodes.slice(0, 3).forEach((n) => {
+      // Seed all 7 tournament stations for new operative
+      const primaryStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
+      const candidateNodes = primaryStations.length > 0 ? primaryStations : SEED_NODES.slice(0, 7);
+      candidateNodes.forEach((n) => {
         data.agent_nodes.push({
           id: `srv-an-${agent.agent_id}-${n.id}`,
           agent_id: agent.agent_id,
@@ -452,17 +458,6 @@ export const ServerStore = {
           points_earned: 0,
           first_accessed_at: null
         });
-      });
-      data.agent_nodes.push({
-        id: `srv-an-${agent.agent_id}-NODE-OMEGA-HYPOTHESIS`,
-        agent_id: agent.agent_id,
-        node_id: 'NODE-OMEGA-HYPOTHESIS',
-        is_unlocked: true,
-        is_completed: false,
-        completed_at: null,
-        attempts: 0,
-        points_earned: 0,
-        first_accessed_at: null
       });
     }
 
@@ -662,8 +657,9 @@ export const ServerStore = {
       an => an.agent_id.toUpperCase() !== agentId.toUpperCase()
     );
 
-    const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
-    candidateNodes.slice(0, 3).forEach((n) => {
+    const primaryStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
+    const candidateNodes = primaryStations.length > 0 ? primaryStations : SEED_NODES.slice(0, 7);
+    candidateNodes.forEach((n) => {
       data.agent_nodes.push({
         id: `srv-an-${agent.agent_id}-${n.id}`,
         agent_id: agent.agent_id,
@@ -693,14 +689,63 @@ export const ServerStore = {
     return false;
   },
 
+  getNodes(): NodeItem[] {
+    const data = loadServerData();
+    if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+      data.nodes = SEED_NODES;
+      saveServerData(data);
+    }
+    return data.nodes;
+  },
+
+  getNodeById(nodeId: string): NodeItem | null {
+    if (!nodeId) return null;
+    const cleanId = nodeId.trim().toUpperCase();
+    const nodes = this.getNodes();
+    return nodes.find(n => 
+      n.id.toUpperCase() === cleanId || 
+      (n.station_number && n.station_number.toUpperCase() === cleanId) ||
+      (typeof n.payload.badge_code === 'string' && n.payload.badge_code.toUpperCase() === cleanId)
+    ) || SEED_NODES.find(n => n.id.toUpperCase() === cleanId) || null;
+  },
+
+  updateNode(nodeId: string, updates: Partial<NodeItem>): NodeItem | null {
+    const data = loadServerData();
+    if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+      data.nodes = [...SEED_NODES];
+    }
+    const index = data.nodes.findIndex(n => n.id.toUpperCase() === nodeId.toUpperCase());
+    if (index === -1) return null;
+
+    data.nodes[index] = {
+      ...data.nodes[index],
+      ...updates,
+      payload: {
+        ...data.nodes[index].payload,
+        ...(updates.payload || {})
+      }
+    };
+    saveServerData(data);
+    return data.nodes[index];
+  },
+
+  resetNodesToDefault(): NodeItem[] {
+    const data = loadServerData();
+    data.nodes = [...SEED_NODES];
+    saveServerData(data);
+    return data.nodes;
+  },
+
   getAgentNodes(agentId: string): Array<AgentNode & { node: NodeItem }> {
     const data = loadServerData();
     const agentRecords = data.agent_nodes.filter(
       an => an.agent_id.toUpperCase() === agentId.toUpperCase()
     );
+    const nodes = this.getNodes();
 
     return agentRecords.map(an => {
-      const node = SEED_NODES.find(n => n.id === an.node_id) || {
+      const node = nodes.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) ||
+        SEED_NODES.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) || {
         id: an.node_id,
         title: 'Classified Node',
         type: 'PHYSICAL_QR' as const,
@@ -851,6 +896,7 @@ export const ServerStore = {
     registeredCount: number;
     updatedCount: number;
     agents: Agent[];
+    processedAgents: Agent[];
     registrationBackup: RegistrationBackupRecord[];
   } {
     const data = loadServerData();
@@ -952,8 +998,9 @@ export const ServerStore = {
         registeredCount++;
 
         // Initial nodes
-        const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
-        candidateNodes.slice(0, 3).forEach((n) => {
+        const primaryStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
+        const candidateNodes = primaryStations.length > 0 ? primaryStations : SEED_NODES.slice(0, 7);
+        candidateNodes.forEach((n) => {
           data.agent_nodes.push({
             id: `srv-an-${newAgent.agent_id}-${n.id}`,
             agent_id: newAgent.agent_id,
@@ -965,17 +1012,6 @@ export const ServerStore = {
             points_earned: 0,
             first_accessed_at: null
           });
-        });
-        data.agent_nodes.push({
-          id: `srv-an-${newAgent.agent_id}-NODE-OMEGA-HYPOTHESIS`,
-          agent_id: newAgent.agent_id,
-          node_id: 'NODE-OMEGA-HYPOTHESIS',
-          is_unlocked: true,
-          is_completed: false,
-          completed_at: null,
-          attempts: 0,
-          points_earned: 0,
-          first_accessed_at: null
         });
       }
     }
@@ -1009,6 +1045,7 @@ export const ServerStore = {
       registeredCount,
       updatedCount,
       agents: data.agents,
+      processedAgents,
       registrationBackup: data.registration_backup
     };
   },

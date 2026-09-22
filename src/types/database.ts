@@ -124,6 +124,42 @@ export interface NodePayload {
   expression?: string;
   audio_hint?: string;
   reward_flat?: number;
+  // Station 01: Blackout Audio
+  audio_url?: string;
+  timestamp_target?: string;
+  noise_level?: number;
+  // Station 02: Pushpin Map
+  pin_1_name?: string;
+  pin_2_name?: string;
+  pin_3_name?: string;
+  target_intersection?: string;
+  // Station 03: UV Hidden Marker
+  uv_room_location?: string;
+  uv_hidden_text?: string;
+  cipher_algorithm?: string;
+  cipher_shift?: number;
+  decrypted_answer?: string;
+  // Station 04: Red Filter / Cardan Grille
+  filter_submode?: 'RED_FILTER' | 'CARDAN_GRILLE' | 'BOTH';
+  grille_text?: string;
+  optical_pin?: string;
+  cardan_directive?: string;
+  // Station 05: Redacted Archive
+  memo_title?: string;
+  memo_body?: string;
+  redacted_subject?: string;
+  redacted_roll?: string;
+  // Station 06: Dead Drop Handler
+  handler_description?: string;
+  verbal_passphrase?: string;
+  envelope_code?: string;
+  // Station 07: Rogue Intel / Two-Man Rule
+  coop_points?: number;
+  defect_points?: number;
+  rogue_leak_text?: string;
+  is_forged?: boolean;
+  forgery_hint?: string;
+  forgery_code?: string;
   [key: string]: string | number | boolean | undefined;
 }
 

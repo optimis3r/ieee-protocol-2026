@@ -20,6 +20,12 @@ export async function GET(request: Request) {
       });
     }
 
+    const view = searchParams.get('view');
+    if (view === 'nodes') {
+      const nodes = ServerStore.getNodes();
+      return NextResponse.json({ success: true, nodes });
+    }
+
     const gameState = ServerStore.getGameState();
 
     if (agentId) {
@@ -203,6 +209,7 @@ export async function POST(request: Request) {
           registeredCount: result.registeredCount,
           updatedCount: result.updatedCount,
           agents: result.agents,
+          processedAgents: result.processedAgents,
           registrationBackup: result.registrationBackup,
           registrationBackupCount: result.registrationBackup.length,
           gameState
@@ -214,7 +221,24 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, csv });
       }
 
+      case 'get_nodes': {
+        const nodes = ServerStore.getNodes();
+        return NextResponse.json({ success: true, nodes });
+      }
 
+      case 'update_node': {
+        const { nodeId, updates } = body;
+        if (!nodeId || !updates) {
+          return NextResponse.json({ error: 'nodeId and updates required' }, { status: 400 });
+        }
+        const updated = ServerStore.updateNode(String(nodeId), updates);
+        return NextResponse.json({ success: Boolean(updated), node: updated });
+      }
+
+      case 'reset_nodes': {
+        const nodes = ServerStore.resetNodesToDefault();
+        return NextResponse.json({ success: true, nodes });
+      }
 
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
