@@ -35,6 +35,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Operative not found', gameState }, { status: 404 });
       }
       const nodes = ServerStore.getAgentNodes(sanitizedId);
+      const intel = ServerStore.getAgentIntel(sanitizedId);
       const questionData = ServerStore.getAgentCurrentQuestion(sanitizedId);
 
       return NextResponse.json({
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
         agent,
         gameState,
         nodes,
+        intel,
         currentQuestion: questionData.currentNode,
         questionStatus: questionData.status,
         solvedCount: questionData.totalSolved,
@@ -140,6 +142,52 @@ export async function POST(request: Request) {
         const safePoints = typeof pointsEarned === 'number' && pointsEarned > 0 ? Math.min(pointsEarned, 500) : 100;
         const result = ServerStore.completeNode(String(agentId).slice(0, 40), String(nodeId).slice(0, 50), safePoints);
         return NextResponse.json({ success: true, ...result });
+      }
+
+      case 'defer_node': {
+        const { agentId, deferredNodeId, nextNodeId } = body;
+        if (!agentId || !deferredNodeId) {
+          return NextResponse.json({ error: 'agentId and deferredNodeId are required' }, { status: 400 });
+        }
+        const result = ServerStore.deferCurrentNode(
+          String(agentId).slice(0, 40),
+          String(deferredNodeId).slice(0, 50),
+          nextNodeId ? String(nextNodeId).slice(0, 50) : undefined
+        );
+        return NextResponse.json(result);
+      }
+
+      case 'set_active_node': {
+        const { agentId, nodeId } = body;
+        if (!agentId || !nodeId) {
+          return NextResponse.json({ error: 'agentId and nodeId are required' }, { status: 400 });
+        }
+        const success = ServerStore.setActiveNode(
+          String(agentId).slice(0, 40),
+          String(nodeId).slice(0, 50)
+        );
+        return NextResponse.json({ success });
+      }
+
+      case 'assign_next_node': {
+        const { agentId } = body;
+        if (!agentId) {
+          return NextResponse.json({ error: 'agentId is required' }, { status: 400 });
+        }
+        const result = ServerStore.assignNextNode(String(agentId).slice(0, 40));
+        return NextResponse.json({ success: true, ...result });
+      }
+
+      case 'assign_initial_node': {
+        const { agentId, nodeId } = body;
+        if (!agentId) {
+          return NextResponse.json({ error: 'agentId is required' }, { status: 400 });
+        }
+        const result = ServerStore.assignInitialNode(
+          String(agentId).slice(0, 40),
+          nodeId ? String(nodeId).slice(0, 50) : undefined
+        );
+        return NextResponse.json({ success: true, node: result });
       }
 
       case 'adjust_score': {

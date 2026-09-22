@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { Agent, AgentNode, GameState, NodeItem, RegistrationBackupRecord, GoogleFormConfig } from '@/types/database';
-import { SEED_NODES, getAgentActiveSeconds } from './store';
+import { Agent, AgentNode, AgentIntel, IntelFragment, GameState, NodeItem, RegistrationBackupRecord, GoogleFormConfig } from '@/types/database';
+import { SEED_NODES, SEED_INTEL, getAgentActiveSeconds } from './store';
 import { WhatsAppDispatchRecord } from './whatsapp';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
@@ -14,6 +14,7 @@ export type { RegistrationBackupRecord, GoogleFormConfig };
 interface ServerStoreData {
   agents: Agent[];
   agent_nodes: AgentNode[];
+  agent_intel?: AgentIntel[];
   wa_logs: WhatsAppDispatchRecord[];
   game_state: GameState;
   registration_backup: RegistrationBackupRecord[];
@@ -30,6 +31,7 @@ function getInitialServerData(): ServerStoreData {
   return {
     agents: [],
     agent_nodes: [],
+    agent_intel: [],
     wa_logs: [],
     game_state: {
       id: 1,
@@ -86,6 +88,9 @@ function loadServerData(): ServerStoreData {
               token: a.token
             }));
           }
+        }
+        if (!Array.isArray(parsed.agent_intel)) {
+          parsed.agent_intel = [];
         }
         memoryState = parsed;
         return parsed;
@@ -443,22 +448,45 @@ export const ServerStore = {
       };
       data.agents.unshift(agent);
 
-      // Seed all 7 tournament stations for new operative
-      const primaryStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
-      const candidateNodes = primaryStations.length > 0 ? primaryStations : SEED_NODES.slice(0, 7);
-      candidateNodes.forEach((n) => {
-        data.agent_nodes.push({
-          id: `srv-an-${agent.agent_id}-${n.id}`,
+      // Assign exactly 1 initial tournament station at random
+      const tournamentStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
+      const candidateNodes = tournamentStations.length >= 7 ? tournamentStations : SEED_NODES.slice(0, 7);
+      const chosenStation = candidateNodes[Math.floor(Math.random() * candidateNodes.length)];
+      data.agent_nodes.push({
+        id: `srv-an-${agent.agent_id}-${chosenStation.id}`,
+        agent_id: agent.agent_id,
+        node_id: chosenStation.id,
+        is_unlocked: true,
+        is_completed: false,
+        completed_at: null,
+        attempts: 0,
+        points_earned: 0,
+        first_accessed_at: now
+      });
+
+      // Seed initial intel
+      if (!data.agent_intel) data.agent_intel = [];
+      const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
+      const archetypeAuth = authentic.filter(i => !i.required_archetype || i.required_archetype === archetype);
+      const selectedAuth = archetypeAuth.length >= 2 ? archetypeAuth.slice(0, 2) : authentic.slice(0, 2);
+      selectedAuth.forEach(i => {
+        data.agent_intel!.push({
+          id: `srv-ai-${agent.agent_id}-${i.id}`,
           agent_id: agent.agent_id,
-          node_id: n.id,
-          is_unlocked: true,
-          is_completed: false,
-          completed_at: null,
-          attempts: 0,
-          points_earned: 0,
-          first_accessed_at: null
+          intel_id: i.id,
+          revealed_at: now
         });
       });
+      const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
+      if (disinfo.length > 0) {
+        const chosenDis = disinfo[Math.floor(Math.random() * disinfo.length)];
+        data.agent_intel!.push({
+          id: `srv-ai-${agent.agent_id}-${chosenDis.id}`,
+          agent_id: agent.agent_id,
+          intel_id: chosenDis.id,
+          revealed_at: now
+        });
+      }
     }
 
     // Persist to registration_backup
@@ -607,7 +635,13 @@ export const ServerStore = {
     return record;
   },
 
-  completeNode(agentId: string, nodeId: string, pointsEarned: number): { agentNode: AgentNode | null; agent: Agent | null } {
+  completeNode(agentId: string, nodeId: string, pointsEarned: number): { 
+    agentNode: AgentNode | null; 
+    agent: Agent | null; 
+    nextNode?: (AgentNode & { node: NodeItem }) | null;
+    allCompleted?: boolean;
+    unlockedIntel?: IntelFragment | null;
+  } {
     const data = loadServerData();
     const now = new Date().toISOString();
     const record = data.agent_nodes.find(
@@ -626,8 +660,18 @@ export const ServerStore = {
       agent.last_active_at = now;
     }
 
-    saveServerData(data);
-    return { agentNode: record || null, agent };
+    saveServerData(data, true);
+
+    // Automatically assign next random unsolved station
+    const progression = this.assignNextNode(agentId);
+
+    return { 
+      agentNode: record || null, 
+      agent,
+      nextNode: progression.assignedNode,
+      allCompleted: progression.allCompleted,
+      unlockedIntel: progression.unlockedIntel
+    };
   },
 
   adjustScore(agentId: string, delta: number): Agent | null {
@@ -643,7 +687,8 @@ export const ServerStore = {
 
   resetAgent(agentId: string): Agent | null {
     const data = loadServerData();
-    const agent = data.agents.find(a => a.agent_id.toUpperCase() === agentId.toUpperCase());
+    const cleanId = agentId.trim().toUpperCase();
+    const agent = data.agents.find(a => a.agent_id.toUpperCase() === cleanId);
     if (!agent) return null;
 
     agent.score = 0;
@@ -652,28 +697,18 @@ export const ServerStore = {
     agent.check_in_status = 'AWAITING_CHECKIN';
     agent.last_active_at = new Date().toISOString();
 
-    // Reset nodes
+    // Reset nodes and assign 1 initial random station
     data.agent_nodes = data.agent_nodes.filter(
-      an => an.agent_id.toUpperCase() !== agentId.toUpperCase()
+      an => an.agent_id.toUpperCase() !== cleanId
     );
+    if (data.agent_intel) {
+      data.agent_intel = data.agent_intel.filter(
+        ai => ai.agent_id.toUpperCase() !== cleanId
+      );
+    }
+    saveServerData(data, true);
 
-    const primaryStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
-    const candidateNodes = primaryStations.length > 0 ? primaryStations : SEED_NODES.slice(0, 7);
-    candidateNodes.forEach((n) => {
-      data.agent_nodes.push({
-        id: `srv-an-${agent.agent_id}-${n.id}`,
-        agent_id: agent.agent_id,
-        node_id: n.id,
-        is_unlocked: true,
-        is_completed: false,
-        completed_at: null,
-        attempts: 0,
-        points_earned: 0,
-        first_accessed_at: null
-      });
-    });
-
-    saveServerData(data);
+    this.assignInitialNode(cleanId);
     return agent;
   },
 
@@ -736,14 +771,295 @@ export const ServerStore = {
     return data.nodes;
   },
 
-  getAgentNodes(agentId: string): Array<AgentNode & { node: NodeItem }> {
+  getTournamentStations(): NodeItem[] {
     const data = loadServerData();
-    const agentRecords = data.agent_nodes.filter(
-      an => an.agent_id.toUpperCase() === agentId.toUpperCase()
-    );
-    const nodes = this.getNodes();
+    const nodes = data.nodes || SEED_NODES;
+    const primary = nodes.filter(n => n.id.startsWith('NODE-0'));
+    return primary.length >= 7 ? primary : SEED_NODES.slice(0, 7);
+  },
 
-    return agentRecords.map(an => {
+  assignInitialNode(agentId: string, preferredNodeId?: string): AgentNode & { node: NodeItem } {
+    const data = loadServerData();
+    const cleanId = agentId.trim().toUpperCase();
+    const existing = data.agent_nodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+    if (existing.length > 0) {
+      const active = existing.find(n => n.is_unlocked && !n.is_completed) || existing[0];
+      const allNodes = this.getNodes();
+      const node = allNodes.find(n => n.id.toUpperCase() === active.node_id.toUpperCase()) || 
+        SEED_NODES.find(n => n.id.toUpperCase() === active.node_id.toUpperCase())!;
+      return { ...active, node };
+    }
+
+    const stations = this.getTournamentStations();
+    let chosen = stations[Math.floor(Math.random() * stations.length)];
+    if (preferredNodeId) {
+      const match = stations.find(s => s.id.toUpperCase() === preferredNodeId.trim().toUpperCase());
+      if (match) chosen = match;
+    }
+    const now = new Date().toISOString();
+    const record: AgentNode = {
+      id: `srv-an-${cleanId}-${chosen.id}`,
+      agent_id: cleanId,
+      node_id: chosen.id,
+      is_unlocked: true,
+      is_completed: false,
+      completed_at: null,
+      attempts: 0,
+      points_earned: 0,
+      first_accessed_at: now
+    };
+    data.agent_nodes.push(record);
+
+    // Seed intel on server if needed
+    if (!data.agent_intel) data.agent_intel = [];
+    const existingIntel = data.agent_intel.filter(ai => ai.agent_id.toUpperCase() === cleanId);
+    if (existingIntel.length === 0) {
+      const agent = data.agents.find(a => a.agent_id.toUpperCase() === cleanId);
+      const domain = agent?.archetype || 'LOGIC';
+      const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
+      const archetypeAuth = authentic.filter(i => !i.required_archetype || i.required_archetype === domain);
+      const selectedAuth = archetypeAuth.length >= 2 ? archetypeAuth.slice(0, 2) : authentic.slice(0, 2);
+
+      selectedAuth.forEach(i => {
+        data.agent_intel!.push({
+          id: `srv-ai-${cleanId}-${i.id}`,
+          agent_id: cleanId,
+          intel_id: i.id,
+          revealed_at: now
+        });
+      });
+
+      const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
+      if (disinfo.length > 0) {
+        const chosenDis = disinfo[Math.floor(Math.random() * disinfo.length)];
+        data.agent_intel!.push({
+          id: `srv-ai-${cleanId}-${chosenDis.id}`,
+          agent_id: cleanId,
+          intel_id: chosenDis.id,
+          revealed_at: now
+        });
+      }
+    }
+
+    saveServerData(data, true);
+    return { ...record, node: chosen };
+  },
+
+  assignNextNode(agentId: string): {
+    assignedNode: (AgentNode & { node: NodeItem }) | null;
+    allCompleted: boolean;
+    unlockedIntel?: IntelFragment | null;
+  } {
+    const data = loadServerData();
+    const cleanId = agentId.trim().toUpperCase();
+    const agentRecords = data.agent_nodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+    const tournamentStations = this.getTournamentStations();
+
+    const solvedIds = agentRecords.filter(an => an.is_completed).map(an => an.node_id.toUpperCase());
+    const unsolvedStations = tournamentStations.filter(s => !solvedIds.includes(s.id.toUpperCase()));
+
+    if (unsolvedStations.length === 0) {
+      return { assignedNode: null, allCompleted: true };
+    }
+
+    const alreadyUnlockedIds = agentRecords.map(an => an.node_id.toUpperCase());
+    const notYetUnlocked = unsolvedStations.filter(s => !alreadyUnlockedIds.includes(s.id.toUpperCase()));
+
+    let chosenStation: NodeItem;
+    if (notYetUnlocked.length > 0) {
+      chosenStation = notYetUnlocked[Math.floor(Math.random() * notYetUnlocked.length)];
+    } else {
+      chosenStation = unsolvedStations[0];
+    }
+
+    const now = new Date().toISOString();
+    let record = data.agent_nodes.find(an => an.agent_id.toUpperCase() === cleanId && an.node_id.toUpperCase() === chosenStation.id.toUpperCase());
+
+    if (!record) {
+      record = {
+        id: `srv-an-${cleanId}-${chosenStation.id}`,
+        agent_id: cleanId,
+        node_id: chosenStation.id,
+        is_unlocked: true,
+        is_completed: false,
+        completed_at: null,
+        attempts: 0,
+        points_earned: 0,
+        first_accessed_at: now
+      };
+      data.agent_nodes.push(record);
+    } else {
+      record.is_unlocked = true;
+      record.first_accessed_at = now;
+    }
+
+    // Unlock an intel fragment
+    if (!data.agent_intel) data.agent_intel = [];
+    const revealedIntelIds = data.agent_intel.filter(ai => ai.agent_id.toUpperCase() === cleanId).map(ai => ai.intel_id);
+    const unrevealedIntel = SEED_INTEL.filter(i => !revealedIntelIds.includes(i.id));
+    let unlockedIntel: IntelFragment | null = null;
+    if (unrevealedIntel.length > 0) {
+      unlockedIntel = unrevealedIntel[0];
+      data.agent_intel.push({
+        id: `srv-ai-${cleanId}-${unlockedIntel.id}`,
+        agent_id: cleanId,
+        intel_id: unlockedIntel.id,
+        revealed_at: now
+      });
+    }
+
+    saveServerData(data, true);
+    return {
+      assignedNode: { ...record, node: chosenStation },
+      allCompleted: false,
+      unlockedIntel
+    };
+  },
+
+  deferCurrentNode(agentId: string, currentNodeId: string, preferredNextId?: string): {
+    success: boolean;
+    assignedNode?: (AgentNode & { node: NodeItem }) | null;
+    message: string;
+  } {
+    const data = loadServerData();
+    const cleanId = agentId.trim().toUpperCase();
+    const cleanCurrent = currentNodeId.trim().toUpperCase();
+    const agentRecords = data.agent_nodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+    const tournamentStations = this.getTournamentStations();
+
+    const solvedIds = agentRecords.filter(an => an.is_completed).map(an => an.node_id.toUpperCase());
+    const candidateStations = tournamentStations.filter(s =>
+      !solvedIds.includes(s.id.toUpperCase()) &&
+      s.id.toUpperCase() !== cleanCurrent
+    );
+
+    if (candidateStations.length === 0) {
+      return {
+        success: false,
+        message: 'No alternate stations available. All other challenge stations are either solved or already active.'
+      };
+    }
+
+    const alreadyUnlockedIds = agentRecords.map(an => an.node_id.toUpperCase());
+    const notYetUnlocked = candidateStations.filter(s => !alreadyUnlockedIds.includes(s.id.toUpperCase()));
+
+    let nextStation: NodeItem;
+    if (preferredNextId) {
+      const match = candidateStations.find(s => s.id.toUpperCase() === preferredNextId.trim().toUpperCase());
+      if (match) nextStation = match;
+      else if (notYetUnlocked.length > 0) nextStation = notYetUnlocked[Math.floor(Math.random() * notYetUnlocked.length)];
+      else nextStation = candidateStations[0];
+    } else if (notYetUnlocked.length > 0) {
+      nextStation = notYetUnlocked[Math.floor(Math.random() * notYetUnlocked.length)];
+    } else {
+      nextStation = candidateStations[Math.floor(Math.random() * candidateStations.length)];
+    }
+
+    const now = new Date().toISOString();
+    let record = data.agent_nodes.find(an => an.agent_id.toUpperCase() === cleanId && an.node_id.toUpperCase() === nextStation.id.toUpperCase());
+
+    if (!record) {
+      record = {
+        id: `srv-an-${cleanId}-${nextStation.id}`,
+        agent_id: cleanId,
+        node_id: nextStation.id,
+        is_unlocked: true,
+        is_completed: false,
+        completed_at: null,
+        attempts: 0,
+        points_earned: 0,
+        first_accessed_at: now
+      };
+      data.agent_nodes.push(record);
+    } else {
+      record.first_accessed_at = now;
+    }
+
+    saveServerData(data, true);
+    return {
+      success: true,
+      assignedNode: { ...record, node: nextStation },
+      message: `Directive deferred. Switched to [${nextStation.station_number || nextStation.id}] ${nextStation.title}.`
+    };
+  },
+
+  setActiveNode(agentId: string, nodeId: string): boolean {
+    const data = loadServerData();
+    const cleanId = agentId.trim().toUpperCase();
+    const cleanNodeId = nodeId.trim().toUpperCase();
+    const record = data.agent_nodes.find(
+      an => an.agent_id.toUpperCase() === cleanId && an.node_id.toUpperCase() === cleanNodeId
+    );
+    if (!record) return false;
+    record.first_accessed_at = new Date().toISOString();
+    saveServerData(data, true);
+    return true;
+  },
+
+  getAgentIntel(agentId: string): Array<AgentIntel & { intel: IntelFragment }> {
+    const data = loadServerData();
+    const cleanId = agentId.trim().toUpperCase();
+    if (!data.agent_intel) data.agent_intel = [];
+    let agentRecords = data.agent_intel.filter(ai => ai.agent_id.toUpperCase() === cleanId);
+
+    if (agentRecords.length === 0) {
+      const agent = data.agents.find(a => a.agent_id.toUpperCase() === cleanId);
+      const domain = agent?.archetype || 'LOGIC';
+      const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
+      const archetypeAuth = authentic.filter(i => !i.required_archetype || i.required_archetype === domain);
+      const selectedAuth = archetypeAuth.length >= 2 ? archetypeAuth.slice(0, 2) : authentic.slice(0, 2);
+      const now = new Date().toISOString();
+
+      selectedAuth.forEach(i => {
+        data.agent_intel!.push({
+          id: `srv-ai-${cleanId}-${i.id}`,
+          agent_id: cleanId,
+          intel_id: i.id,
+          revealed_at: now
+        });
+      });
+
+      const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
+      if (disinfo.length > 0) {
+        const chosenDis = disinfo[Math.floor(Math.random() * disinfo.length)];
+        data.agent_intel!.push({
+          id: `srv-ai-${cleanId}-${chosenDis.id}`,
+          agent_id: cleanId,
+          intel_id: chosenDis.id,
+          revealed_at: now
+        });
+      }
+      saveServerData(data, true);
+      agentRecords = data.agent_intel.filter(ai => ai.agent_id.toUpperCase() === cleanId);
+    }
+
+    return agentRecords.map(ai => {
+      const intel = SEED_INTEL.find(i => i.id === ai.intel_id) || {
+        id: ai.intel_id,
+        title: 'Classified Fragment',
+        content: 'Data damaged or unavailable.',
+        is_disinformation: false,
+        required_archetype: null
+      };
+      return { ...ai, intel };
+    });
+  },
+
+  getAgentNodes(agentId: string): Array<AgentNode & { node: NodeItem }> {
+    const cleanId = agentId.trim().toUpperCase();
+    const data = loadServerData();
+    let agentRecords = data.agent_nodes.filter(
+      an => an.agent_id.toUpperCase() === cleanId
+    );
+
+    // Auto-heal: If agent has 0 nodes, assign 1 random tournament station immediately
+    if (agentRecords.length === 0) {
+      const initial = this.assignInitialNode(cleanId);
+      return [initial];
+    }
+
+    const nodes = this.getNodes();
+    const mapped = agentRecords.map(an => {
       const node = nodes.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) ||
         SEED_NODES.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) || {
         id: an.node_id,
@@ -756,6 +1072,15 @@ export const ServerStore = {
         payload: {}
       };
       return { ...an, node };
+    });
+
+    // Sort: In-progress nodes first (latest accessed first), followed by completed nodes
+    return mapped.sort((a, b) => {
+      if (!a.is_completed && b.is_completed) return -1;
+      if (a.is_completed && !b.is_completed) return 1;
+      const timeA = a.first_accessed_at ? new Date(a.first_accessed_at).getTime() : 0;
+      const timeB = b.first_accessed_at ? new Date(b.first_accessed_at).getTime() : 0;
+      return timeB - timeA;
     });
   },
 
@@ -997,22 +1322,45 @@ export const ServerStore = {
         processedAgents.push(newAgent);
         registeredCount++;
 
-        // Initial nodes
-        const primaryStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
-        const candidateNodes = primaryStations.length > 0 ? primaryStations : SEED_NODES.slice(0, 7);
-        candidateNodes.forEach((n) => {
-          data.agent_nodes.push({
-            id: `srv-an-${newAgent.agent_id}-${n.id}`,
+        // Assign 1 initial random tournament station
+        const tournamentStations = (data.nodes || SEED_NODES).filter(n => n.id.startsWith('NODE-0'));
+        const candidateNodes = tournamentStations.length >= 7 ? tournamentStations : SEED_NODES.slice(0, 7);
+        const chosenStation = candidateNodes[Math.floor(Math.random() * candidateNodes.length)];
+        data.agent_nodes.push({
+          id: `srv-an-${newAgent.agent_id}-${chosenStation.id}`,
+          agent_id: newAgent.agent_id,
+          node_id: chosenStation.id,
+          is_unlocked: true,
+          is_completed: false,
+          completed_at: null,
+          attempts: 0,
+          points_earned: 0,
+          first_accessed_at: now
+        });
+
+        // Seed initial intel
+        if (!data.agent_intel) data.agent_intel = [];
+        const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
+        const archetypeAuth = authentic.filter(i => !i.required_archetype || i.required_archetype === archetype);
+        const selectedAuth = archetypeAuth.length >= 2 ? archetypeAuth.slice(0, 2) : authentic.slice(0, 2);
+        selectedAuth.forEach(i => {
+          data.agent_intel!.push({
+            id: `srv-ai-${newAgent.agent_id}-${i.id}`,
             agent_id: newAgent.agent_id,
-            node_id: n.id,
-            is_unlocked: true,
-            is_completed: false,
-            completed_at: null,
-            attempts: 0,
-            points_earned: 0,
-            first_accessed_at: null
+            intel_id: i.id,
+            revealed_at: now
           });
         });
+        const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
+        if (disinfo.length > 0) {
+          const chosenDis = disinfo[Math.floor(Math.random() * disinfo.length)];
+          data.agent_intel!.push({
+            id: `srv-ai-${newAgent.agent_id}-${chosenDis.id}`,
+            agent_id: newAgent.agent_id,
+            intel_id: chosenDis.id,
+            revealed_at: now
+          });
+        }
       }
     }
 

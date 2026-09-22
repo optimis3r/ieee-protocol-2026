@@ -162,6 +162,8 @@ function AgentHUD() {
         if (freshAg) {
           setAgent({ ...freshAg });
           setActiveSeconds(getAgentActiveSeconds(freshAg));
+          setNodes(Store.getAgentNodes(freshAg.agent_id));
+          setIntel(Store.getAgentIntel(freshAg.agent_id));
           if (freshState) setGameState(freshState);
         }
       } catch (_) {}
@@ -360,11 +362,15 @@ function AgentHUD() {
           <NodeTerminal
             nodes={nodes}
             onSelectNode={(nodeItem) => setSelectedNode(nodeItem)}
+            agentId={agent?.agent_id}
+            onRefresh={() => agent && refreshAgentData(agent.agent_id)}
           />
         ) : (
           <IntelLocker 
             intelList={intel} 
             onOpenHypothesis={() => setIsHypothesisOpen(true)}
+            agentId={agent?.agent_id}
+            onRefresh={() => agent && refreshAgentData(agent.agent_id)}
           />
         )}
       </main>

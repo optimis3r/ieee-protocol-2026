@@ -1095,72 +1095,11 @@ export const Store = {
     setStored(KEY_AGENTS, agents);
     notifyServer({ action: 'register', agent: newAgent });
 
-    // Dynamic starting nodes allocation: 3 nodes matching/complementing role + 1 mystery + hypothesis
-    const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
-    const candidateNodes = SEED_NODES.filter(n => n.type !== 'DEDUCTION_HYPOTHESIS');
-    
-    // Sort so assigned domain comes first, followed by others
-    const prioritized = [...candidateNodes].sort((a, b) => {
-      if (a.domain === assignedDomain && b.domain !== assignedDomain) return -1;
-      if (b.domain === assignedDomain && a.domain !== assignedDomain) return 1;
-      return 0.5 - Math.random(); // shuffle rest
-    });
+    // Assign 1 initial random tournament station
+    this.assignInitialNode(newAgent.agent_id);
 
-    prioritized.slice(0, 3).forEach(n => {
-      allAgentNodes.push({
-        id: `an-${newAgent.agent_id}-${n.id}`,
-        agent_id: newAgent.agent_id,
-        node_id: n.id,
-        is_unlocked: true,
-        is_completed: false,
-        completed_at: null,
-        attempts: 0,
-        points_earned: 0,
-        first_accessed_at: null
-      });
-    });
-
-    // Also unlock deduction hypothesis node
-    allAgentNodes.push({
-      id: `an-${newAgent.agent_id}-NODE-OMEGA-HYPOTHESIS`,
-      agent_id: newAgent.agent_id,
-      node_id: 'NODE-OMEGA-HYPOTHESIS',
-      is_unlocked: true,
-      is_completed: false,
-      completed_at: null,
-      attempts: 0,
-      points_earned: 0,
-      first_accessed_at: null
-    });
-    setStored(KEY_AGENT_NODES, allAgentNodes);
-
-    // Allocate Intel Fragments
-    const allAgentIntel = getStored<AgentIntel[]>(KEY_AGENT_INTEL, []);
-    const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
-    const archetypeAuthentic = authentic.filter(i => !i.required_archetype || i.required_archetype === assignedDomain);
-    const selectedAuth = archetypeAuthentic.length >= 2 ? archetypeAuthentic.slice(0, 2) : authentic.slice(0, 2);
-
-    selectedAuth.forEach(i => {
-      allAgentIntel.push({
-        id: `ai-${newAgent.agent_id}-${i.id}`,
-        agent_id: newAgent.agent_id,
-        intel_id: i.id,
-        revealed_at: new Date().toISOString()
-      });
-    });
-
-    // 1 poisoned disinformation fragment (TRUST NO ONE mechanic)
-    const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
-    const chosenDisinfo = disinfo[Math.floor(Math.random() * disinfo.length)];
-    if (chosenDisinfo) {
-      allAgentIntel.push({
-        id: `ai-${newAgent.agent_id}-${chosenDisinfo.id}`,
-        agent_id: newAgent.agent_id,
-        intel_id: chosenDisinfo.id,
-        revealed_at: new Date().toISOString()
-      });
-    }
-    setStored(KEY_AGENT_INTEL, allAgentIntel);
+    // Seed initial intel
+    this.seedInitialIntel(newAgent.agent_id);
 
     if (payload.isPreVerified) {
       this.logAccess(newAgent.agent_id, 'IN', 'Pre-verified registration');
@@ -1208,6 +1147,11 @@ export const Store = {
             if (data.gameState) {
               setStored(KEY_GAME_STATE, data.gameState, false);
             }
+
+            // Sync or initialize assigned node and intel
+            this.assignInitialNode(canonicalAgent.agent_id);
+            this.seedInitialIntel(canonicalAgent.agent_id);
+
             return {
               agent: canonicalAgent,
               token: canonicalAgent.token,
@@ -1284,17 +1228,288 @@ export const Store = {
     return SEED_NODES;
   },
 
-  getAgentNodes(agentId: string): Array<AgentNode & { node: NodeItem }> {
+  getTournamentStations(): NodeItem[] {
+    const customNodes = this.getStationNodes();
+    const primary = customNodes.filter(n => n.id.startsWith('NODE-0'));
+    if (primary.length >= 7) return primary;
+    return SEED_NODES.filter(n => n.id.startsWith('NODE-0'));
+  },
+
+  assignInitialNode(agentId: string, preferredNodeId?: string): AgentNode & { node: NodeItem } {
+    const cleanId = agentId.trim().toUpperCase();
     const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
-    const agentRecords = allAgentNodes.filter(an => an.agent_id.toUpperCase() === agentId.toUpperCase());
+    const existing = allAgentNodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+
+    if (existing.length > 0) {
+      const active = existing.find(n => n.is_unlocked && !n.is_completed) || existing[0];
+      const stationNodes = this.getStationNodes();
+      const node = stationNodes.find(n => n.id.toUpperCase() === active.node_id.toUpperCase()) ||
+        SEED_NODES.find(n => n.id.toUpperCase() === active.node_id.toUpperCase())!;
+      return { ...active, node };
+    }
+
+    const stations = this.getTournamentStations();
+    let chosen = stations[Math.floor(Math.random() * stations.length)];
+    if (preferredNodeId) {
+      const match = stations.find(s => s.id.toUpperCase() === preferredNodeId.trim().toUpperCase());
+      if (match) chosen = match;
+    }
+    const now = new Date().toISOString();
+
+    const newRecord: AgentNode = {
+      id: `an-${cleanId}-${chosen.id}`,
+      agent_id: cleanId,
+      node_id: chosen.id,
+      is_unlocked: true,
+      is_completed: false,
+      completed_at: null,
+      attempts: 0,
+      points_earned: 0,
+      first_accessed_at: now
+    };
+
+    allAgentNodes.push(newRecord);
+    setStored(KEY_AGENT_NODES, allAgentNodes);
+
+    // Seed intel
+    this.seedInitialIntel(cleanId);
+
+    // Notify server
+    notifyServer({ action: 'assign_initial_node', agentId: cleanId, nodeId: chosen.id });
+
+    return { ...newRecord, node: chosen };
+  },
+
+  seedInitialIntel(agentId: string): Array<AgentIntel & { intel: IntelFragment }> {
+    const cleanId = agentId.trim().toUpperCase();
+    const allAgentIntel = getStored<AgentIntel[]>(KEY_AGENT_INTEL, []);
+    const existing = allAgentIntel.filter(ai => ai.agent_id.toUpperCase() === cleanId);
+    if (existing.length > 0) {
+      return this.getAgentIntel(cleanId);
+    }
+
+    const agent = this.getAgentById(cleanId);
+    const domain = agent?.archetype || 'LOGIC';
+    const authentic = SEED_INTEL.filter(i => !i.is_disinformation);
+    const archetypeAuth = authentic.filter(i => !i.required_archetype || i.required_archetype === domain);
+    const selectedAuth = archetypeAuth.length >= 2 ? archetypeAuth.slice(0, 2) : authentic.slice(0, 2);
+
+    const now = new Date().toISOString();
+    selectedAuth.forEach(i => {
+      allAgentIntel.push({
+        id: `ai-${cleanId}-${i.id}`,
+        agent_id: cleanId,
+        intel_id: i.id,
+        revealed_at: now
+      });
+    });
+
+    const disinfo = SEED_INTEL.filter(i => i.is_disinformation);
+    if (disinfo.length > 0) {
+      const chosenDis = disinfo[Math.floor(Math.random() * disinfo.length)];
+      allAgentIntel.push({
+        id: `ai-${cleanId}-${chosenDis.id}`,
+        agent_id: cleanId,
+        intel_id: chosenDis.id,
+        revealed_at: now
+      });
+    }
+
+    setStored(KEY_AGENT_INTEL, allAgentIntel);
+    return this.getAgentIntel(cleanId);
+  },
+
+  assignNextNode(agentId: string): {
+    assignedNode: (AgentNode & { node: NodeItem }) | null;
+    allCompleted: boolean;
+    unlockedIntel?: IntelFragment | null;
+  } {
+    const cleanId = agentId.trim().toUpperCase();
+    const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
+    const agentRecords = allAgentNodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+    const tournamentStations = this.getTournamentStations();
+
+    const solvedIds = agentRecords.filter(an => an.is_completed).map(an => an.node_id.toUpperCase());
+    const unsolvedStations = tournamentStations.filter(s => !solvedIds.includes(s.id.toUpperCase()));
+
+    if (unsolvedStations.length === 0) {
+      return { assignedNode: null, allCompleted: true };
+    }
+
+    const alreadyUnlockedIds = agentRecords.map(an => an.node_id.toUpperCase());
+    const notYetUnlocked = unsolvedStations.filter(s => !alreadyUnlockedIds.includes(s.id.toUpperCase()));
+
+    let chosenStation: NodeItem;
+    if (notYetUnlocked.length > 0) {
+      chosenStation = notYetUnlocked[Math.floor(Math.random() * notYetUnlocked.length)];
+    } else {
+      chosenStation = unsolvedStations[0];
+    }
+
+    const now = new Date().toISOString();
+    let record = allAgentNodes.find(an => an.agent_id.toUpperCase() === cleanId && an.node_id.toUpperCase() === chosenStation.id.toUpperCase());
+
+    if (!record) {
+      record = {
+        id: `an-${cleanId}-${chosenStation.id}`,
+        agent_id: cleanId,
+        node_id: chosenStation.id,
+        is_unlocked: true,
+        is_completed: false,
+        completed_at: null,
+        attempts: 0,
+        points_earned: 0,
+        first_accessed_at: now
+      };
+      allAgentNodes.push(record);
+    } else {
+      record.is_unlocked = true;
+      record.first_accessed_at = now;
+    }
+
+    setStored(KEY_AGENT_NODES, allAgentNodes);
+
+    // Unlock an intel fragment
+    const unlockedIntel = this.unlockNextIntelFragment(cleanId);
+
+    // Notify server
+    notifyServer({ action: 'assign_next_node', agentId: cleanId, nodeId: chosenStation.id });
+
+    return {
+      assignedNode: { ...record, node: chosenStation },
+      allCompleted: false,
+      unlockedIntel
+    };
+  },
+
+  deferCurrentNode(agentId: string, currentNodeId: string, preferredNextId?: string): {
+    success: boolean;
+    assignedNode?: (AgentNode & { node: NodeItem }) | null;
+    message: string;
+  } {
+    const cleanId = agentId.trim().toUpperCase();
+    const cleanCurrent = currentNodeId.trim().toUpperCase();
+    const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
+    const agentRecords = allAgentNodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+    const tournamentStations = this.getTournamentStations();
+
+    const solvedIds = agentRecords.filter(an => an.is_completed).map(an => an.node_id.toUpperCase());
+    const candidateStations = tournamentStations.filter(s =>
+      !solvedIds.includes(s.id.toUpperCase()) &&
+      s.id.toUpperCase() !== cleanCurrent
+    );
+
+    if (candidateStations.length === 0) {
+      return {
+        success: false,
+        message: 'No alternate circuits available. All other challenge stations are either solved or already active.'
+      };
+    }
+
+    const alreadyUnlockedIds = agentRecords.map(an => an.node_id.toUpperCase());
+    const notYetUnlocked = candidateStations.filter(s => !alreadyUnlockedIds.includes(s.id.toUpperCase()));
+
+    let nextStation: NodeItem;
+    if (preferredNextId) {
+      const match = candidateStations.find(s => s.id.toUpperCase() === preferredNextId.trim().toUpperCase());
+      if (match) nextStation = match;
+      else if (notYetUnlocked.length > 0) nextStation = notYetUnlocked[Math.floor(Math.random() * notYetUnlocked.length)];
+      else nextStation = candidateStations[0];
+    } else if (notYetUnlocked.length > 0) {
+      nextStation = notYetUnlocked[Math.floor(Math.random() * notYetUnlocked.length)];
+    } else {
+      nextStation = candidateStations[Math.floor(Math.random() * candidateStations.length)];
+    }
+
+    const now = new Date().toISOString();
+    let record = allAgentNodes.find(an => an.agent_id.toUpperCase() === cleanId && an.node_id.toUpperCase() === nextStation.id.toUpperCase());
+
+    if (!record) {
+      record = {
+        id: `an-${cleanId}-${nextStation.id}`,
+        agent_id: cleanId,
+        node_id: nextStation.id,
+        is_unlocked: true,
+        is_completed: false,
+        completed_at: null,
+        attempts: 0,
+        points_earned: 0,
+        first_accessed_at: now
+      };
+      allAgentNodes.push(record);
+    } else {
+      record.first_accessed_at = now;
+    }
+
+    setStored(KEY_AGENT_NODES, allAgentNodes);
+    notifyServer({
+      action: 'defer_node',
+      agentId: cleanId,
+      deferredNodeId: cleanCurrent,
+      nextNodeId: nextStation.id
+    });
+
+    return {
+      success: true,
+      assignedNode: { ...record, node: nextStation },
+      message: `DIRECTIVE DEFERRED: Circuit preserved in roster. Switched to [${nextStation.station_number || nextStation.id}] ${nextStation.title}.`
+    };
+  },
+
+  setActiveNode(agentId: string, nodeId: string): boolean {
+    const cleanId = agentId.trim().toUpperCase();
+    const cleanNodeId = nodeId.trim().toUpperCase();
+    const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
+    const record = allAgentNodes.find(an => an.agent_id.toUpperCase() === cleanId && an.node_id.toUpperCase() === cleanNodeId);
+    if (!record) return false;
+    record.first_accessed_at = new Date().toISOString();
+    setStored(KEY_AGENT_NODES, allAgentNodes);
+    notifyServer({
+      action: 'set_active_node',
+      agentId: cleanId,
+      nodeId: cleanNodeId
+    });
+    return true;
+  },
+
+  unlockNextIntelFragment(agentId: string): IntelFragment | null {
+    const cleanId = agentId.trim().toUpperCase();
+    const allAgentIntel = getStored<AgentIntel[]>(KEY_AGENT_INTEL, []);
+    const agentRecords = allAgentIntel.filter(ai => ai.agent_id.toUpperCase() === cleanId);
+    const revealedIds = agentRecords.map(ai => ai.intel_id);
+
+    const unrevealed = SEED_INTEL.filter(i => !revealedIds.includes(i.id));
+    if (unrevealed.length === 0) return null;
+
+    const chosen = unrevealed[0];
+    allAgentIntel.push({
+      id: `ai-${cleanId}-${chosen.id}`,
+      agent_id: cleanId,
+      intel_id: chosen.id,
+      revealed_at: new Date().toISOString()
+    });
+    setStored(KEY_AGENT_INTEL, allAgentIntel);
+    return chosen;
+  },
+
+  getAgentNodes(agentId: string): Array<AgentNode & { node: NodeItem }> {
+    const cleanId = agentId.trim().toUpperCase();
+    const allAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
+    let agentRecords = allAgentNodes.filter(an => an.agent_id.toUpperCase() === cleanId);
+
+    // Auto-heal: If agent has 0 nodes, assign 1 random tournament station immediately
+    if (agentRecords.length === 0) {
+      const initial = this.assignInitialNode(cleanId);
+      return [initial];
+    }
+
     const stationNodes = this.getStationNodes();
-    
-    return agentRecords.map(an => {
+    const mapped = agentRecords.map(an => {
       const node = stationNodes.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) ||
         SEED_NODES.find(n => n.id.toUpperCase() === an.node_id.toUpperCase()) || {
         id: an.node_id,
-        title: 'Unknown Circuit',
-        type: 'PHYSICAL_QR' as const,
+        title: 'Classified Circuit',
+        type: 'TERMINAL_DECRYPT' as const,
         domain: 'OBSERVATION' as const,
         base_points: 100,
         rarity_decay: 1.0,
@@ -1303,11 +1518,26 @@ export const Store = {
       };
       return { ...an, node };
     });
+
+    // Sort: In-progress nodes first (latest accessed first), followed by completed nodes
+    return mapped.sort((a, b) => {
+      if (!a.is_completed && b.is_completed) return -1;
+      if (a.is_completed && !b.is_completed) return 1;
+      const timeA = a.first_accessed_at ? new Date(a.first_accessed_at).getTime() : 0;
+      const timeB = b.first_accessed_at ? new Date(b.first_accessed_at).getTime() : 0;
+      return timeB - timeA;
+    });
   },
 
   getAgentIntel(agentId: string): Array<AgentIntel & { intel: IntelFragment }> {
+    const cleanId = agentId.trim().toUpperCase();
     const allAgentIntel = getStored<AgentIntel[]>(KEY_AGENT_INTEL, []);
-    const agentRecords = allAgentIntel.filter(ai => ai.agent_id.toUpperCase() === agentId.toUpperCase());
+    let agentRecords = allAgentIntel.filter(ai => ai.agent_id.toUpperCase() === cleanId);
+
+    // Auto-heal: If agent has 0 intel, seed initial intel immediately
+    if (agentRecords.length === 0) {
+      return this.seedInitialIntel(cleanId);
+    }
 
     return agentRecords.map(ai => {
       const intel = SEED_INTEL.find(i => i.id === ai.intel_id) || {
@@ -1330,7 +1560,16 @@ export const Store = {
     agentId: string, 
     nodeId: string, 
     inputKey: string
-  ): { success: boolean; pointsAwarded?: number; message: string; attempts: number } {
+  ): { 
+    success: boolean; 
+    pointsAwarded?: number; 
+    message: string; 
+    attempts: number;
+    nextNode?: NodeItem | null;
+    nextAgentNode?: (AgentNode & { node: NodeItem }) | null;
+    unlockedIntel?: IntelFragment | null;
+    allCompleted?: boolean;
+  } {
     const gameState = this.getGameState();
     const lockCheck = isSubmissionLocked(gameState);
     if (lockCheck.locked) {
@@ -1415,11 +1654,25 @@ export const Store = {
         setStored(KEY_AGENTS, agents);
       }
 
+      // Automatically assign the next random unsolved station & unlock new intel fragment!
+      const progression = this.assignNextNode(agentId);
+
+      let celebration = `AUTHORIZATION GRANTED: [${node.station_number || node.domain || 'SYSTEM'}] ${node.title} solved. +${points} PTS awarded.`;
+      if (progression.assignedNode) {
+        celebration += ` NEXT MISSION ASSIGNED: [${progression.assignedNode.node.station_number || progression.assignedNode.node.id}] ${progression.assignedNode.node.title} at ${progression.assignedNode.node.laptop_label || 'Station Terminal'}.`;
+      } else if (progression.allCompleted) {
+        celebration += ` ALL 7 TOURNAMENT CIRCUITS CONQUERED! Final master hypothesis deduction unlocked (+400 PTS)!`;
+      }
+
       return {
         success: true,
         pointsAwarded: points,
         attempts: record.attempts,
-        message: `AUTHORIZATION GRANTED: [${node.station_number || node.domain || 'SYSTEM'}] ${node.title} solved. +${points} PTS awarded.`
+        nextNode: progression.assignedNode?.node || null,
+        nextAgentNode: progression.assignedNode || null,
+        unlockedIntel: progression.unlockedIntel || null,
+        allCompleted: progression.allCompleted,
+        message: celebration
       };
     } else {
       record.attempts += 1;
@@ -2172,6 +2425,50 @@ export const Store = {
           if (statusChanged) {
             window.dispatchEvent(new CustomEvent('ieee_store_update', { detail: remoteAgent }));
           }
+
+          // 3. Sync nodes if returned
+          if (data.nodes && Array.isArray(data.nodes) && data.nodes.length > 0) {
+            const localAgentNodes = getStored<AgentNode[]>(KEY_AGENT_NODES, []);
+            const activeAgentId = remoteAgent.agent_id;
+            const otherNodes = localAgentNodes.filter(an => an.agent_id.toUpperCase() !== activeAgentId.toUpperCase());
+            
+            const remoteNodes: Array<AgentNode & { node?: any }> = data.nodes;
+            const mergedCurrent: AgentNode[] = remoteNodes.map(rn => {
+              const localMatch = localAgentNodes.find(lan => lan.agent_id.toUpperCase() === rn.agent_id.toUpperCase() && lan.node_id === rn.node_id);
+              const localTime = localMatch?.first_accessed_at ? new Date(localMatch.first_accessed_at).getTime() : 0;
+              const remoteTime = rn.first_accessed_at ? new Date(rn.first_accessed_at).getTime() : 0;
+              const latestTime = Math.max(localTime, remoteTime);
+              return {
+                id: rn.id || localMatch?.id || `an-${rn.agent_id}-${rn.node_id}`,
+                agent_id: rn.agent_id,
+                node_id: rn.node_id,
+                is_unlocked: rn.is_unlocked ?? localMatch?.is_unlocked ?? true,
+                is_completed: rn.is_completed || localMatch?.is_completed || false,
+                completed_at: rn.completed_at || localMatch?.completed_at || null,
+                attempts: Math.max(rn.attempts || 0, localMatch?.attempts || 0),
+                points_earned: Math.max(rn.points_earned || 0, localMatch?.points_earned || 0),
+                first_accessed_at: latestTime > 0 ? new Date(latestTime).toISOString() : null
+              };
+            });
+
+            setStored(KEY_AGENT_NODES, [...otherNodes, ...mergedCurrent], false);
+          }
+
+          // 4. Sync intel if returned
+          if (data.intel && Array.isArray(data.intel) && data.intel.length > 0) {
+            const localAgentIntel = getStored<AgentIntel[]>(KEY_AGENT_INTEL, []);
+            const activeAgentId = remoteAgent.agent_id;
+            const otherIntel = localAgentIntel.filter(ai => ai.agent_id.toUpperCase() !== activeAgentId.toUpperCase());
+            const remoteIntel: Array<AgentIntel & { intel?: any }> = data.intel;
+            const cleanedRemote = remoteIntel.map(ri => ({
+              id: ri.id,
+              agent_id: ri.agent_id,
+              intel_id: ri.intel_id,
+              revealed_at: ri.revealed_at
+            }));
+            setStored(KEY_AGENT_INTEL, [...otherIntel, ...cleanedRemote], false);
+          }
+
           return { agent: remoteAgent, gameState: data.gameState || currentGameState };
         }
       }

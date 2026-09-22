@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Store, initStore, SEED_NODES } from '@/lib/store';
 import { Agent, AgentNode, NodeItem } from '@/types/database';
 import { soundEffects } from '@/lib/audio';
@@ -12,8 +13,13 @@ import {
   ArrowLeft, 
   Laptop, 
   KeyRound, 
-  ArrowRight,
-  Clock 
+  ArrowRight, 
+  Clock,
+  RotateCw,
+  Sparkles,
+  Compass,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 import { BlackoutAudioStation } from '@/components/stations/BlackoutAudioStation';
 import { PushpinMapStation } from '@/components/stations/PushpinMapStation';
@@ -30,16 +36,22 @@ interface NodePageProps {
 export default function NodeStationPage({ params }: NodePageProps) {
   const resolvedParams = use(params);
   const nodeId = resolvedParams.id.toUpperCase();
+  const router = useRouter();
 
   const [agent, setAgent] = useState<Agent | null>(null);
   const [node, setNode] = useState<NodeItem | null>(null);
   const [agentNode, setAgentNode] = useState<AgentNode | null>(null);
+  const [allAgentNodes, setAllAgentNodes] = useState<Array<AgentNode & { node: NodeItem }>>([]);
   const [loginInput, setLoginInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Challenge Input
+  // Challenge Input & Progression States
   const [answerInput, setAnswerInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nextStation, setNextStation] = useState<NodeItem | null>(null);
+  const [allCompleted, setAllCompleted] = useState<boolean>(false);
+  const [isDeferring, setIsDeferring] = useState<boolean>(false);
+  const [deferNotice, setDeferNotice] = useState<string | null>(null);
   const [submissionFeedback, setSubmissionFeedback] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -55,10 +67,14 @@ export default function NodeStationPage({ params }: NodePageProps) {
     setNode(targetNode || null);
 
     if (targetNode) {
-      // Record physical station access
+      // Record physical station access & set active focus
       const record = Store.recordNodeAccess(ag.agent_id, targetNode.id);
+      Store.setActiveNode(ag.agent_id, targetNode.id);
       setAgentNode(record);
     }
+
+    const assignedNodes = Store.getAgentNodes(ag.agent_id);
+    setAllAgentNodes(assignedNodes);
   }, [nodeId]);
 
   useEffect(() => {
@@ -106,6 +122,12 @@ export default function NodeStationPage({ params }: NodePageProps) {
         spread: 90,
         origin: { y: 0.6 }
       });
+      if (res.nextNode) {
+        setNextStation(res.nextNode);
+      }
+      if (res.allCompleted) {
+        setAllCompleted(true);
+      }
       setSubmissionFeedback({
         type: 'success',
         text: res.message,
@@ -121,6 +143,33 @@ export default function NodeStationPage({ params }: NodePageProps) {
       refreshState(agent.agent_id);
     }
     setIsSubmitting(false);
+  };
+
+  const handleSwitchToStation = (targetStationId: string) => {
+    if (!agent) return;
+    Store.setActiveNode(agent.agent_id, targetStationId);
+    soundEffects.playScanChirp();
+    router.push(`/node/${targetStationId}`);
+  };
+
+  const handleDeferStation = () => {
+    if (!agent || !node || isDeferring) return;
+    setIsDeferring(true);
+    setDeferNotice(null);
+    try {
+      const res = Store.deferCurrentNode(agent.agent_id, node.id);
+      if (res.success && res.assignedNode) {
+        soundEffects.playScanChirp();
+        router.push(`/node/${res.assignedNode.node.id}`);
+      } else {
+        setDeferNotice(res.message);
+        setIsDeferring(false);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to switch station';
+      setDeferNotice(msg);
+      setIsDeferring(false);
+    }
   };
 
   if (!node) {
@@ -248,6 +297,18 @@ export default function NodeStationPage({ params }: NodePageProps) {
   }
 
   const isCompleted = Boolean(agentNode?.is_completed);
+  const deferredStations = allAgentNodes.filter(
+    an => !an.is_completed && an.node_id.toUpperCase() !== nodeId
+  );
+  const solvedStations = allAgentNodes.filter(
+    an => an.is_completed && an.node_id.toUpperCase() !== nodeId
+  );
+  const tournamentStations = Store.getTournamentStations();
+  const solvedIds = allAgentNodes.filter(an => an.is_completed).map(an => an.node_id.toUpperCase());
+  const unlockedIds = allAgentNodes.map(an => an.node_id.toUpperCase());
+  const canDrawMoreStations = tournamentStations.some(
+    ts => !solvedIds.includes(ts.id.toUpperCase()) && !unlockedIds.includes(ts.id.toUpperCase())
+  );
 
   return (
     <div className="min-h-screen bg-[#0a0f0d] text-[#eaf2ec] flex flex-col justify-between font-mono-cyber selection:bg-proto-signal selection:text-[#0a0f0d]">
@@ -277,14 +338,47 @@ export default function NodeStationPage({ params }: NodePageProps) {
             </div>
           </div>
 
-          <Link
-            href="/play"
-            className="px-3.5 py-1.5 rounded-lg bg-[#18261e] border border-proto-signal/40 text-proto-signal hover:bg-proto-signal hover:text-[#0a0f0d] text-xs font-bold transition-all"
-          >
-            Open HUD
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/play"
+              className="px-3.5 py-1.5 rounded-lg bg-[#18261e] border border-proto-signal/40 text-proto-signal hover:bg-proto-signal hover:text-[#0a0f0d] text-xs font-bold transition-all"
+            >
+              Open HUD
+            </Link>
+          </div>
         </div>
       </header>
+
+      {/* Standby Circuits Switcher Bar */}
+      {deferredStations.length > 0 && (
+        <div className="w-full bg-[#111915] border-b border-[#3a8ebd]/40 px-4 sm:px-6 py-2">
+          <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-bold text-[#3a8ebd] uppercase flex items-center gap-1.5">
+                <RotateCw className="w-3.5 h-3.5 text-[#3a8ebd]" />
+                STANDBY CIRCUITS ({deferredStations.length}):
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {deferredStations.map((ds) => (
+                  <button
+                    key={ds.node_id}
+                    onClick={() => handleSwitchToStation(ds.node_id)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#18261e] border border-[#3a8ebd]/60 hover:border-[#3a8ebd] text-[#3a8ebd] hover:text-[#f4f1ea] text-[11px] font-bold uppercase transition-colors cursor-pointer"
+                    title={`Click to switch back to ${ds.node.title}`}
+                  >
+                    <span>{ds.node.station_number ? ds.node.station_number.replace('Station ', 'ST-') : ds.node_id}: {ds.node.title}</span>
+                    <span className="text-[9px] text-[#8ea897]">({ds.attempts} att.)</span>
+                    <ArrowRight className="w-3 h-3 ml-0.5" />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <span className="text-[10px] text-[#8ea897] hidden md:inline">
+              Progress saved • Return anytime
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main Station Workstation View */}
       <main className="max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-6 flex-1 flex flex-col justify-center">
@@ -330,20 +424,111 @@ export default function NodeStationPage({ params }: NodePageProps) {
 
           {/* If already completed */}
           {isCompleted ? (
-            <div className="p-6 rounded-2xl bg-proto-signal/10 border-2 border-proto-signal text-center space-y-3">
+            <div className="p-6 rounded-2xl bg-proto-signal/10 border-2 border-proto-signal text-center space-y-4">
               <CheckCircle2 className="w-12 h-12 text-proto-signal mx-auto animate-bounce" />
               <h2 className="text-lg font-black text-proto-signal uppercase">
                 CIRCUIT VERIFIED & ENERGIZED
               </h2>
               <p className="text-xs text-[#8ea897]">
-                You have already solved this station challenge. +{agentNode?.points_earned || node.base_points} points accredited to your operative clearance score.
+                You have verified this station challenge. +{agentNode?.points_earned || node.base_points} points accredited to your operative clearance score.
               </p>
-              <Link
-                href="/play"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-proto-signal text-[#0a0f0d] font-bold text-xs uppercase"
-              >
-                Return to Operative HUD <ArrowRight className="w-4 h-4" />
-              </Link>
+
+              {/* Next Mission Directive Card */}
+              {nextStation ? (
+                <div className="p-4 rounded-xl bg-[#141d17] border border-proto-gold/60 text-left space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-proto-gold">
+                      ★ NEXT MISSION DIRECTIVE ASSIGNED
+                    </span>
+                    <span className="text-[10px] text-[#8ea897]">
+                      {nextStation.station_number || nextStation.id}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#f3f7f4]">
+                    {nextStation.title}
+                  </h3>
+                  {nextStation.laptop_label && (
+                    <p className="text-xs text-proto-gold flex items-center gap-1.5">
+                      <Laptop className="w-3.5 h-3.5 shrink-0" />
+                      <span>Location: {nextStation.laptop_label}</span>
+                    </p>
+                  )}
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    <Link
+                      href={`/node/${nextStation.id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-proto-signal text-[#0a0f0d] font-bold text-xs uppercase cursor-pointer"
+                    >
+                      Proceed to Station Terminal <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <Link
+                      href="/play"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#18261e] border border-[#2d4034] text-[#eaf2ec] font-bold text-xs uppercase"
+                    >
+                      Return to HUD
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Deferred Circuits Available to Resume */}
+              {deferredStations.length > 0 && (
+                <div className="p-4 rounded-xl bg-[#111915] border border-[#3a8ebd]/40 text-left space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-[#3a8ebd] flex items-center gap-1.5">
+                      <RotateCw className="w-3.5 h-3.5" />
+                      OR RESUME A PREVIOUSLY DEFERRED CIRCUIT ({deferredStations.length}):
+                    </span>
+                    <span className="text-[9px] text-[#8ea897]">
+                      Return anytime
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {deferredStations.map(ds => (
+                      <button
+                        key={ds.node_id}
+                        onClick={() => handleSwitchToStation(ds.node_id)}
+                        className="p-2.5 rounded-lg bg-[#141d17] border border-[#223027] hover:border-[#3a8ebd] flex items-center justify-between text-left transition-colors cursor-pointer"
+                      >
+                        <div>
+                          <div className="text-[11px] font-bold text-[#f3f7f4]">
+                            {ds.node.station_number || ds.node_id}: {ds.node.title}
+                          </div>
+                          <div className="text-[9px] text-[#8ea897]">
+                            {ds.node.laptop_label || 'Physical Station'} • {ds.attempts} attempts
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-[#3a8ebd] font-bold uppercase shrink-0 ml-2">
+                          RESUME →
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {allCompleted ? (
+                <div className="p-4 rounded-xl bg-[#141d17] border border-proto-gold/60 text-center space-y-2 mt-2">
+                  <span className="text-xs font-bold text-proto-gold uppercase block">
+                    ALL 7 TOURNAMENT CIRCUITS CONQUERED!
+                  </span>
+                  <p className="text-xs text-[#8ea897]">
+                    Final master topology deduction is now unlocked in your classified Intel Locker.
+                  </p>
+                  <Link
+                    href="/play?action=hypothesis"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-proto-gold text-[#0a0f0d] font-bold text-xs uppercase"
+                  >
+                    <Sparkles className="w-4 h-4" /> Final Topology Deduction (+400 PTS)
+                  </Link>
+                </div>
+              ) : !nextStation && deferredStations.length === 0 ? (
+                <Link
+                  href="/play"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-proto-signal text-[#0a0f0d] font-bold text-xs uppercase"
+                >
+                  Return to Operative HUD <ArrowRight className="w-4 h-4" />
+                </Link>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-5">
@@ -511,6 +696,76 @@ export default function NodeStationPage({ params }: NodePageProps) {
                   </div>
                 );
               })()}
+
+              {/* Deferral option for stuck operatives */}
+              <div className="p-4 rounded-xl bg-[#141d17] border border-[#223027] space-y-3 mt-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <RotateCw className="w-4 h-4 text-[#3a8ebd]" />
+                      <h4 className="text-xs font-bold text-[#f3f7f4] uppercase tracking-wider">
+                        Stuck on this station?
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-[#8ea897] mt-0.5">
+                      Move on to another challenge now. This station and your progress are saved — you can return back to it anytime.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDeferStation}
+                    disabled={isDeferring}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#18261e] border border-[#3a8ebd] text-[#3a8ebd] hover:bg-[#3a8ebd] hover:text-[#0a0f0d] text-xs font-bold uppercase transition-colors shrink-0 cursor-pointer shadow-sm"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 ${isDeferring ? 'animate-spin' : ''}`} />
+                    <span>{canDrawMoreStations ? 'DRAW NEXT STATION' : 'SWITCH TO ALTERNATE'}</span>
+                  </button>
+                </div>
+
+                {/* Direct switcher for deferred stations in standby */}
+                {deferredStations.length > 0 && (
+                  <div className="pt-2.5 border-t border-[#1c2921] space-y-1.5">
+                    <span className="text-[10px] text-[#8ea897] uppercase tracking-wider block font-bold">
+                      Or switch directly back to a station in standby:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {deferredStations.map(ds => (
+                        <button
+                          key={ds.node_id}
+                          type="button"
+                          onClick={() => handleSwitchToStation(ds.node_id)}
+                          className="p-2.5 rounded-lg bg-[#0e1611] border border-[#223027] hover:border-[#3a8ebd] flex items-center justify-between text-left transition-colors cursor-pointer group"
+                        >
+                          <div>
+                            <div className="text-[11px] font-bold text-[#f3f7f4] group-hover:text-[#3a8ebd]">
+                              {ds.node.station_number || ds.node_id}: {ds.node.title}
+                            </div>
+                            <div className="text-[9px] text-[#7d9787]">
+                              {ds.node.laptop_label || 'Physical Station'} • {ds.attempts} attempts
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-[#3a8ebd] font-bold uppercase shrink-0 ml-2">
+                            RESUME →
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {deferNotice && (
+                  <div className="p-2.5 bg-[#141d17] border border-[#c93b2b] text-[#c93b2b] text-xs font-mono-tabular flex items-center justify-between rounded-lg">
+                    <span>{deferNotice}</span>
+                    <button
+                      onClick={() => setDeferNotice(null)}
+                      className="text-[10px] text-[#8ea897] hover:text-[#f3f7f4] uppercase ml-2"
+                    >
+                      [Dismiss]
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

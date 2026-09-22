@@ -2,17 +2,28 @@
 
 import React from 'react';
 import { AgentIntel, IntelFragment } from '@/types/database';
-import { FileText, Lock, KeyRound, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Store } from '@/lib/store';
+import { FileText, Lock, KeyRound, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-react';
 
 interface IntelLockerProps {
   intelList: Array<AgentIntel & { intel: IntelFragment }>;
   onOpenHypothesis: () => void;
+  agentId?: string;
+  onRefresh?: () => void;
 }
 
 export const IntelLocker: React.FC<IntelLockerProps> = ({
   intelList,
   onOpenHypothesis,
+  agentId,
+  onRefresh,
 }) => {
+  const handleSyncIntel = () => {
+    if (!agentId) return;
+    Store.seedInitialIntel(agentId);
+    onRefresh?.();
+  };
+
   return (
     <div className="space-y-5">
       {/* Top Header */}
@@ -50,10 +61,19 @@ export const IntelLocker: React.FC<IntelLockerProps> = ({
       </div>
 
       {intelList.length === 0 ? (
-        <div className="p-8 text-center border border-[#2d312c] bg-[#1b1d1b] text-[#949e93]">
+        <div className="p-8 text-center border border-[#2d312c] bg-[#1b1d1b] text-[#949e93] space-y-3">
           <Lock className="w-6 h-6 mx-auto mb-2 text-[#949e93] opacity-60" />
           <p className="font-mono-tabular text-xs font-bold text-[#f4f1ea] uppercase">NO DECRYPTED INTEL IN ARCHIVE</p>
-          <p className="font-display-grotesk text-xs text-[#949e93] mt-1">Complete circuit stations to unlock classified data fragments.</p>
+          <p className="font-display-grotesk text-xs text-[#949e93]">Complete circuit stations to unlock classified data fragments.</p>
+          {agentId && (
+            <button
+              onClick={handleSyncIntel}
+              className="btn-editorial-primary inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase cursor-pointer"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>SYNCHRONIZE INTELLIGENCE ARCHIVE</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
