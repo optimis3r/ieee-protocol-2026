@@ -1,54 +1,74 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Store, initStore } from '@/lib/store';
-import { Agent, GameState } from '@/types/database';
-import { 
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+
+import type { Participant, Snapshot } from "@/lib/event/types";
+import {
   ArrowRight,
   QrCode,
   UserPlus,
   LogIn,
-  CheckCircle2,
   Clock,
   Trophy,
-  ShieldAlert
-} from 'lucide-react';
+  ShieldAlert,
+} from "lucide-react";
 
 export default function HomePage() {
-  const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
-  const [gameState, setGameState] = useState<GameState>(() => Store.getGameState());
-  const [sessionStatus, setSessionStatus] = useState<{ canPlay: boolean; status: string; activeSeconds: number }>({
-    canPlay: false,
-    status: 'AWAITING_CHECKIN',
-    activeSeconds: 0
+  const [currentAgent, setCurrentAgent] = useState<
+    | (Participant & {
+        agent_id: string;
+        agent_number: string;
+        auth_identifier: string;
+        wristband_id: string;
+      })
+    | null
+  >(null);
+  const [gameState, setGameState] = useState({
+    leaderboard_visible: false,
+    active: false,
   });
-
+  const [sessionStatus, setSessionStatus] = useState({ canPlay: false });
   useEffect(() => {
-    initStore();
-    const syncCurrent = () => {
-      setGameState(Store.getGameState());
-      const storedId = localStorage.getItem('ieee_agent_id');
-      if (storedId) {
-        const ag = Store.getAgentById(storedId);
-        if (ag) {
-          setCurrentAgent(ag);
-          setSessionStatus(Store.checkSessionStatus(ag.agent_id));
-        }
+    let live = true;
+    async function refresh() {
+      try {
+        const pub = await fetch("/api/event?view=public", {
+          cache: "no-store",
+        }).then((r) => r.json());
+        if (live)
+          setGameState({
+            leaderboard_visible: pub.leaderboard !== null,
+            active: [
+              "EVENT_ACTIVE",
+              "SUBMISSIONS_OPEN",
+              "EVENT_CLOSING",
+            ].includes(pub.phase),
+          });
+        const res = await fetch("/api/event", { cache: "no-store" });
+        if (res.ok) {
+          const d: Snapshot = await res.json();
+          const p = d.participant;
+          if (live && p) {
+            setCurrentAgent({
+              ...p,
+              agent_id: p.id,
+              agent_number: p.id,
+              auth_identifier: p.roll,
+              wristband_id: p.id,
+            });
+            setSessionStatus({ canPlay: d.canPlay });
+          }
+        } else if (live) setCurrentAgent(null);
+      } catch {
+        /* Keep the landing page usable during an outage. */
       }
-    };
-
-    syncCurrent();
-
-    const handleUpdate = () => {
-      syncCurrent();
-    };
-
-    window.addEventListener('ieee_store_update', handleUpdate);
-    Store.syncWithServer().then(() => syncCurrent());
-
+    }
+    void refresh();
+    const timer = setInterval(refresh, 5000);
     return () => {
-      window.removeEventListener('ieee_store_update', handleUpdate);
+      live = false;
+      clearInterval(timer);
     };
   }, []);
 
@@ -103,38 +123,47 @@ export default function HomePage() {
                     {currentAgent.name}
                   </span>
                   <div className="font-mono-tabular text-xs text-[#c28b28] mt-0.5">
-                    {currentAgent.agent_number || currentAgent.agent_id}{currentAgent.auth_identifier ? ` • ${currentAgent.auth_identifier}` : ''}
+                    {currentAgent.agent_number || currentAgent.agent_id}
+                    {currentAgent.auth_identifier
+                      ? ` • ${currentAgent.auth_identifier}`
+                      : ""}
                   </div>
                 </div>
 
-                <span className={`editorial-stamp ${
-                  sessionStatus.canPlay
-                    ? 'border-[#2d9f5d] text-[#2d9f5d]'
-                    : 'border-[#c28b28] text-[#c28b28]'
-                }`}>
-                  {sessionStatus.canPlay ? 'ACTIVE' : 'STANDBY'}
+                <span
+                  className={`editorial-stamp ${
+                    sessionStatus.canPlay
+                      ? "border-[#2d9f5d] text-[#2d9f5d]"
+                      : "border-[#c28b28] text-[#c28b28]"
+                  }`}
+                >
+                  {sessionStatus.canPlay ? "ACTIVE" : "STANDBY"}
                 </span>
               </div>
 
               <div className="space-y-2 text-xs font-display-grotesk text-[#949e93]">
                 <div className="flex justify-between py-1 border-b border-[#2d312c]">
                   <span>Clearance Score</span>
-                  <span className="font-mono-tabular text-[#f4f1ea] font-bold">{currentAgent.score || 0} PTS</span>
+                  <span className="font-mono-tabular text-[#f4f1ea] font-bold">
+                    {currentAgent.score || 0} PTS
+                  </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#2d312c]">
                   <span>Wristband / Band ID</span>
-                  <span className="font-mono-tabular text-[#f4f1ea]">{currentAgent.wristband_id || 'UNLINKED'}</span>
+                  <span className="font-mono-tabular text-[#f4f1ea]">
+                    {currentAgent.wristband_id || "UNLINKED"}
+                  </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#2d312c]">
                   <span>Desk Check-in</span>
                   <span className="font-mono-tabular text-[#f4f1ea]">
-                    {sessionStatus.canPlay ? 'VERIFIED' : 'PENDING GATE SCAN'}
+                    {sessionStatus.canPlay ? "VERIFIED" : "PENDING GATE SCAN"}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-2.5 pt-2">
-                {!Store.isEventActive() ? (
+                {!gameState.active ? (
                   <Link
                     href="/standby"
                     className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
@@ -190,10 +219,13 @@ export default function HomePage() {
                     Join the Investigation
                   </h2>
                   <p className="font-display-grotesk text-xs sm:text-sm text-[#949e93] leading-relaxed">
-                    Registration is open to all NITW students. Register below to receive your cryptographic agent pass, then bring your phone to the event desk to scan in and receive your physical wristband.
+                    Registration is open to all NITW students. Register below to
+                    receive your cryptographic agent pass, then bring your phone
+                    to the event desk to scan in and receive your physical
+                    wristband.
                   </p>
                   <div className="pt-1 text-[11px] text-[#949e93] font-mono-tabular">
-                    Linked directly to institute roll number • No passwords required.
+                    Private login QR • Separate interaction pass for networking.
                   </div>
                 </div>
 
@@ -211,7 +243,7 @@ export default function HomePage() {
                     className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular"
                   >
                     <LogIn className="w-4 h-4 text-[#c28b28]" />
-                    <span>Retrieve Pass (Roll Number)</span>
+                    <span>Sign in with private QR</span>
                   </Link>
                 </div>
               </div>
@@ -220,7 +252,10 @@ export default function HomePage() {
         </section>
 
         {/* Section: Overview & Disciplines alongside Dispatch Parameters */}
-        <section aria-label="Campus Overview and Disciplines" className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-14 items-start pt-2">
+        <section
+          aria-label="Campus Overview and Disciplines"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-10 sm:gap-14 items-start pt-2"
+        >
           {/* Left Column: Editorial Headline & Copy */}
           <div className="lg:col-span-7 space-y-6">
             <div className="space-y-3">
@@ -233,7 +268,10 @@ export default function HomePage() {
             </div>
 
             <p className="font-display-grotesk text-sm sm:text-base text-[#949e93] leading-relaxed max-w-xl">
-              Every operative is assigned an asymmetric role across campus monoliths. Register on your phone, present your QR pass at the operations desk for your wristband, and solve the network before the 8:00 PM cutoff.
+              Every operative is assigned an asymmetric role across campus
+              monoliths. Register on your phone, present your QR pass at the
+              operations desk for your wristband, and solve the network before
+              the 8:00 PM cutoff.
             </p>
 
             {/* Role Domains Ledger (Clean Editorial List) */}
@@ -241,27 +279,47 @@ export default function HomePage() {
               <span className="font-mono-tabular text-[10px] uppercase tracking-widest text-[#949e93] block">
                 OPERATIVE DOMAINS // 05 DISCIPLINES
               </span>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-display-grotesk">
                 <div className="p-2.5 border border-[#2d312c] bg-[#1b1d1b]">
-                  <span className="font-mono-tabular text-[10px] text-[#3a8ebd] font-bold block">01 / LOGIC</span>
-                  <span className="text-[#f4f1ea] font-medium text-[11px]">Cryptographic ciphers & stream tokens</span>
+                  <span className="font-mono-tabular text-[10px] text-[#3a8ebd] font-bold block">
+                    01 / LOGIC
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium text-[11px]">
+                    Cryptographic ciphers & stream tokens
+                  </span>
                 </div>
                 <div className="p-2.5 border border-[#2d312c] bg-[#1b1d1b]">
-                  <span className="font-mono-tabular text-[10px] text-[#2d9f5d] font-bold block">02 / SIGNAL</span>
-                  <span className="text-[#f4f1ea] font-medium text-[11px]">Physical station nodes & RF triangulation</span>
+                  <span className="font-mono-tabular text-[10px] text-[#2d9f5d] font-bold block">
+                    02 / SIGNAL
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium text-[11px]">
+                    Physical station nodes & RF triangulation
+                  </span>
                 </div>
                 <div className="p-2.5 border border-[#2d312c] bg-[#1b1d1b]">
-                  <span className="font-mono-tabular text-[10px] text-[#9368b7] font-bold block">03 / OBSERVATION</span>
-                  <span className="text-[#f4f1ea] font-medium text-[11px]">Reconnaissance & sector anomaly tracking</span>
+                  <span className="font-mono-tabular text-[10px] text-[#9368b7] font-bold block">
+                    03 / OBSERVATION
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium text-[11px]">
+                    Reconnaissance & sector anomaly tracking
+                  </span>
                 </div>
                 <div className="p-2.5 border border-[#2d312c] bg-[#1b1d1b]">
-                  <span className="font-mono-tabular text-[10px] text-[#d96b27] font-bold block">04 / SYSTEM</span>
-                  <span className="text-[#f4f1ea] font-medium text-[11px]">Campus host architecture & daemon logic</span>
+                  <span className="font-mono-tabular text-[10px] text-[#d96b27] font-bold block">
+                    04 / SYSTEM
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium text-[11px]">
+                    Campus host architecture & daemon logic
+                  </span>
                 </div>
                 <div className="p-2.5 border border-[#2d312c] bg-[#1b1d1b] sm:col-span-2">
-                  <span className="font-mono-tabular text-[10px] text-[#2fa596] font-bold block">05 / SOCIAL</span>
-                  <span className="text-[#f4f1ea] font-medium text-[11px]">Dual-agent handshakes & cross-domain synthesis</span>
+                  <span className="font-mono-tabular text-[10px] text-[#2fa596] font-bold block">
+                    05 / SOCIAL
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium text-[11px]">
+                    Dual-agent handshakes & cross-domain synthesis
+                  </span>
                 </div>
               </div>
             </div>
@@ -276,15 +334,23 @@ export default function HomePage() {
               <div className="grid grid-cols-2 gap-3 text-[11px]">
                 <div>
                   <span className="text-[#949e93] block">DATE</span>
-                  <span className="text-[#f4f1ea] font-bold">24 September 2026</span>
+                  <span className="text-[#f4f1ea] font-bold">
+                    26 September 2026
+                  </span>
                 </div>
                 <div>
                   <span className="text-[#949e93] block">LOCATION</span>
-                  <span className="text-[#f4f1ea] font-bold">Dept of ECE, NITW</span>
+                  <span className="text-[#f4f1ea] font-bold">
+                    Dept of ECE, NITW
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[#949e93] block">SUBMISSION CUTOFF</span>
-                  <span className="text-[#c93b2b] font-bold">20:00 HRS SHARP</span>
+                  <span className="text-[#949e93] block">
+                    SUBMISSION CUTOFF
+                  </span>
+                  <span className="text-[#c93b2b] font-bold">
+                    20:00 HRS SHARP
+                  </span>
                 </div>
                 <div>
                   <span className="text-[#949e93] block">CLEARANCE AWARD</span>
@@ -299,19 +365,26 @@ export default function HomePage() {
       {/* Understated Editorial Colophon */}
       <footer className="w-full border-t border-[#2d312c] px-4 sm:px-8 py-4 text-xs text-[#949e93] bg-[#141514]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-mono-tabular text-[11px]">
-          <div>
-            NIT WARANGAL • IEEE STUDENT BRANCH © 2026
-          </div>
+          <div>NIT WARANGAL • IEEE STUDENT BRANCH © 2026</div>
           <div className="flex items-center gap-4">
             {gameState?.leaderboard_visible && (
-              <Link href="/leaderboard" className="hover:text-[#f4f1ea] transition-colors">
+              <Link
+                href="/leaderboard"
+                className="hover:text-[#f4f1ea] transition-colors"
+              >
                 Standings
               </Link>
             )}
-            <Link href="/my-badge" className="hover:text-[#f4f1ea] transition-colors">
+            <Link
+              href="/my-badge"
+              className="hover:text-[#f4f1ea] transition-colors"
+            >
               Pass Retrieval
             </Link>
-            <Link href="/admin" className="hover:text-[#f4f1ea] transition-colors">
+            <Link
+              href="/admin"
+              className="hover:text-[#f4f1ea] transition-colors"
+            >
               Operations Desk
             </Link>
           </div>

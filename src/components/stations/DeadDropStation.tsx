@@ -1,118 +1,222 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { NodeItem } from '@/types/database';
-import { MessageSquare, Mail, ShieldAlert, Sparkles, User, CheckCircle } from 'lucide-react';
+import React, { useState } from "react";
+import type { PublicPuzzle, Progress } from "@/lib/event/types";
+import { soundEffects } from "@/lib/audio";
+import { Field } from "@/components/event/shared";
+import { Mail, Key, Sparkles, UserCheck, Delete } from "lucide-react";
 
-interface DeadDropStationProps {
-  node: NodeItem;
-  answerInput: string;
-  setAnswerInput: (val: string) => void;
+interface StationProps {
+  node: PublicPuzzle;
+  progress: Progress;
+  answer: string;
+  onAnswerChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  isSubmitting: boolean;
+  disabled: boolean;
+  busy: boolean;
+  saved: boolean;
 }
 
-export const DeadDropStation: React.FC<DeadDropStationProps> = ({
+export function DeadDropStation({
   node,
-  answerInput,
-  setAnswerInput,
+  progress,
+  answer,
+  onAnswerChange,
   onSubmit,
-  isSubmitting
-}) => {
-  const handlerDesc = (typeof node.payload.handler_description === 'string' && node.payload.handler_description) ||
-    'Volunteer operative wearing IEEE black lanyard with blue gel pen in chest pocket.';
-  const passphrase = (typeof node.payload.verbal_passphrase === 'string' && node.payload.verbal_passphrase) ||
-    'The packet dropped at midnight';
+  disabled,
+  busy,
+  saved,
+}: StationProps) {
+  const [envelopeOpen, setEnvelopeOpen] = useState(false);
+
+  const handleDigit = (digit: string) => {
+    if (disabled || answer.length >= 4) return;
+    soundEffects.playKeystrokeBeep();
+    onAnswerChange(answer + digit);
+  };
+
+  const handleBackspace = () => {
+    if (disabled || answer.length === 0) return;
+    soundEffects.playKeystrokeBeep();
+    onAnswerChange(answer.slice(0, -1));
+  };
 
   return (
     <div className="space-y-6">
-      {/* Field Handler Dossier & Reconnaissance Deck */}
-      <div className="bg-[#0b130e] border border-cyan-500/40 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-[#1b2a20] pb-3">
-          <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-wider">
-            <User className="w-4 h-4" />
-            <span>Field Handler Reconnaissance Profile</span>
+      {/* Operative Contact Dossier */}
+      <div className="border border-[#3f453f] bg-[#141514] p-5 sm:p-6 rounded-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-[#2d312c] pb-3">
+          <div className="flex items-center gap-2 text-xs font-mono-tabular text-[#2fa596]">
+            <UserCheck className="w-4 h-4 text-[#2fa596]" />
+            <span className="font-bold tracking-wider">
+              HUMINT CONTACT PROTOCOL // DEAD DROP HANDLER
+            </span>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold">
-            HUMINT PROTOCOL
+
+          <span className="editorial-stamp border-[#2fa596] text-[#2fa596]">
+            SOCIAL
           </span>
         </div>
 
-        {/* Visual Markings Checklist */}
-        <div className="p-4 rounded-xl bg-[#08120d] border border-cyan-500/20 space-y-2">
-          <div className="text-[10px] text-[#7d9787] uppercase font-mono font-bold">
-            Physical Visual Recognition Markers:
-          </div>
-          <p className="text-sm text-[#eaf2ec] font-bold">
-            {handlerDesc}
-          </p>
-          <div className="pt-2 flex flex-wrap gap-2 text-[10px] font-mono">
-            <span className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
-              ✓ Lanyard Identifier
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
-              ✓ Pocket Pen Marker
-            </span>
-            <span className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/30 text-cyan-300">
-              ✓ Mingling Among Attendees
-            </span>
-          </div>
-        </div>
+        {/* Tactical Contact Card */}
+        <div className="p-4 bg-[#181d1b] border border-[#2d312c] rounded-xs space-y-3 text-xs font-display-grotesk text-[#949e93] leading-relaxed">
+          <div className="flex items-start gap-3">
+            <div className="p-2 border border-[#2fa596]/40 bg-[#121c17] rounded-xs shrink-0 text-[#2fa596]">
+              <Mail className="w-5 h-5" />
+            </div>
 
-        {/* Verbal Passphrase Box */}
-        <div className="p-4 rounded-xl bg-[#06100a] border border-[#1b2a20] space-y-2">
-          <div className="text-[10px] text-cyan-400 font-mono font-bold uppercase flex items-center gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Verbal Authentication Passphrase:</span>
+            <div className="space-y-1">
+              <span className="font-mono-tabular text-[10px] text-[#949e93] uppercase block font-bold">
+                VOLUNTEER IDENTIFICATION PROFILE:
+              </span>
+              <p className="text-[#f4f1ea]">
+                Locate the handler operative wearing a{" "}
+                <strong className="text-[#eed49f]">YELLOW LANYARD</strong> and carrying a{" "}
+                <strong className="text-[#a6da95]">GREEN PEN</strong>.
+              </p>
+            </div>
           </div>
-          <div className="p-3 rounded-xl bg-[#040805] border border-cyan-500/40 text-center">
-            <span className="text-base sm:text-lg font-black text-cyan-200 font-mono tracking-wider italic">
-              &ldquo;{passphrase}&rdquo;
+
+          <div className="p-3 bg-[#111614] border border-[#202924] rounded-xs font-mono-tabular text-xs space-y-1">
+            <span className="text-[10px] text-[#949e93] uppercase block">
+              VERBAL RECOGNITION CHALLENGE:
             </span>
+            <div className="text-sm font-bold text-[#f4f1ea] italic">
+              “The packet dropped at midnight.”
+            </div>
           </div>
-          <p className="text-[11px] text-[#7d9787]">
-            Approach the handler discreetly. Utter this exact passphrase to receive the sealed envelope containing the clearance bypass token.
-          </p>
+
+          {/* Interactive Envelope Graphic */}
+          <div
+            onClick={() => {
+              setEnvelopeOpen(!envelopeOpen);
+              soundEffects.playKeystrokeBeep();
+            }}
+            className="p-4 border border-[#3f453f] bg-[#141514] rounded-xs cursor-pointer select-none text-center space-y-2 hover:border-[#2fa596] transition-colors"
+          >
+            <span className="text-[10px] font-mono-tabular text-[#2fa596] uppercase tracking-wider block font-bold">
+              {envelopeOpen
+                ? "[ENVELOPE UNSEALED // ENTER 4-DIGIT PIN]"
+                : "[CLICK TO INSPECT SEALED HANDLER ENVELOPE]"}
+            </span>
+
+            {envelopeOpen ? (
+              <div className="text-xs font-mono-tabular text-[#eed49f]">
+                Inside envelope: A card with four perforated digits. Enter the PIN below.
+              </div>
+            ) : (
+              <div className="text-xs font-mono-tabular text-[#949e93]">
+                Sealed wax document packet issued by the Dead Drop Handler.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Reconnaissance Clue Banner */}
-      <div className="p-4 rounded-xl bg-[#111a14] border border-[#233529] text-xs space-y-1.5">
-        <div className="text-[10px] font-black text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>HUMINT ENGAGEMENT RULES:</span>
-        </div>
-        <p className="text-[#cad3f5] font-sans leading-relaxed">
-          {node.payload.hint || 'Locate the designated volunteer handler in the attendee crowd. Utter the secret verbal passphrase to receive the sealed physical envelope.'}
-        </p>
-      </div>
-
-      {/* Sealed Envelope Code Submission Form */}
+      {/* Tactile 4-Digit PIN Tumbler Form */}
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label className="block text-[11px] text-[#8ea897] uppercase mb-1.5 font-bold flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{node.payload.prompt || 'Submit the clearance bypass code found inside the sealed envelope:'}</span>
-          </label>
-          <input
-            type="text"
-            required
-            value={answerInput}
-            onChange={(e) => setAnswerInput(e.target.value)}
-            placeholder="e.g. ENVELOPE-DROP-9081"
-            className="w-full px-4 py-3 text-sm bg-[#09110d] border border-[#273a2e] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-cyan-400 font-mono uppercase tracking-wider"
-          />
+          <span className="font-mono-tabular text-[11px] text-[#949e93] uppercase block mb-2 font-bold flex items-center gap-1.5">
+            <Key className="w-3.5 h-3.5 text-[#2fa596]" />
+            <span>FOUR-DIGIT ENVELOPE PIN</span>
+          </span>
+
+          {/* PIN Digit Boxes Display */}
+          <div className="flex items-center justify-center gap-3 py-2">
+            {[0, 1, 2, 3].map((index) => {
+              const digit = answer[index];
+              return (
+                <div
+                  key={index}
+                  className={`w-14 h-16 border-2 rounded-xs flex items-center justify-center text-2xl font-mono-tabular font-bold select-none ${
+                    digit
+                      ? "border-[#2fa596] bg-[#1a2520] text-[#a6da95]"
+                      : "border-[#3f453f] bg-[#141514] text-[#4e564e]"
+                  }`}
+                >
+                  {digit || "–"}
+                </div>
+              );
+            })}
+          </div>
+
+          <Field label="Your answer">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              value={answer}
+              onChange={(e) => onAnswerChange(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              disabled={disabled}
+              placeholder="Enter 4-digit PIN"
+              className="font-mono-tabular text-center tracking-widest text-lg"
+              autoComplete="off"
+            />
+          </Field>
+
+          {/* Tactile On-Screen Numeric Keypad */}
+          <div className="max-w-[280px] mx-auto pt-3">
+            <div className="grid grid-cols-3 gap-2">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  disabled={disabled || answer.length >= 4}
+                  onClick={() => handleDigit(num)}
+                  className="py-3 bg-[#1b1d1b] border border-[#3f453f] hover:border-[#2fa596] text-[#f4f1ea] font-mono-tabular text-base font-bold transition-all active:scale-95 disabled:opacity-40"
+                >
+                  {num}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                disabled={disabled || answer.length === 0}
+                onClick={() => onAnswerChange("")}
+                className="py-3 bg-[#141514] border border-[#3f453f] text-[#949e93] hover:text-[#f4f1ea] font-mono-tabular text-xs uppercase"
+              >
+                Clear
+              </button>
+
+              <button
+                type="button"
+                disabled={disabled || answer.length >= 4}
+                onClick={() => handleDigit("0")}
+                className="py-3 bg-[#1b1d1b] border border-[#3f453f] hover:border-[#2fa596] text-[#f4f1ea] font-mono-tabular text-base font-bold transition-all active:scale-95 disabled:opacity-40"
+              >
+                0
+              </button>
+
+              <button
+                type="button"
+                disabled={disabled || answer.length === 0}
+                onClick={handleBackspace}
+                className="py-3 bg-[#141514] border border-[#3f453f] text-[#949e93] hover:text-[#f4f1ea] font-mono-tabular flex items-center justify-center"
+              >
+                <Delete className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || !answerInput.trim()}
-          className="w-full py-3.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-[#0a0f0d] font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <CheckCircle className="w-4 h-4" />
-          <span>AUTHENTICATE DEAD DROP ENVELOPE CODE</span>
-        </button>
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <button
+            type="submit"
+            className="primary text-xs font-bold uppercase w-full sm:w-auto"
+            disabled={disabled || busy || answer.length !== 4}
+          >
+            <span>{busy ? "Validating…" : "Submit answer"}</span>
+          </button>
+
+          <small className="font-mono-tabular text-[11px] text-[#949e93]">
+            {saved ? "Draft saved" : "Syncing…"}
+            {node.attemptLimit
+              ? ` · ${progress.attempts.length}/${node.attemptLimit} attempts`
+              : " · Unlimited attempts"}
+          </small>
+        </div>
       </form>
     </div>
   );
-};
+}

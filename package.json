@@ -7,10 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "wa:gateway": "node scripts/whatsapp-gateway.mjs"
+    "wa:gateway": "node scripts/whatsapp-gateway.mjs",
+    "test": "node --import tsx --test src/lib/event/engine.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/newsreader": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "canvas-confetti": "^1.9.4",
     "html5-qrcode": "^2.3.8",
@@ -23,6 +27,8 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@esbuild/linux-x64": "^0.28.2",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
@@ -32,7 +38,9 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

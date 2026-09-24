@@ -9,18 +9,18 @@
   --color-proto-surface1: #313631;
   --color-proto-surface2: #3f453f;
   --color-proto-stone: #4e564e;
-  
+
   --color-proto-text: #f4f1ea;
   --color-proto-subtext: #949e93;
-  
+
   /* Purposeful Single-Source Accents */
-  --color-proto-crimson: #c93b2b;     /* Lacquer Red */
-  --color-proto-gold: #c28b28;        /* Archival Ochre / Amber */
-  --color-proto-signal: #2d9f5d;      /* Field Green Verification */
-  --color-proto-logic: #3a8ebd;       /* Archival Slate Blue */
-  --color-proto-obs: #9368b7;         /* Archival Violet */
-  --color-proto-system: #d96b27;      /* Terra Cotta */
-  --color-proto-social: #2fa596;      /* Deep Teal */
+  --color-proto-crimson: #c93b2b; /* Lacquer Red */
+  --color-proto-gold: #c28b28; /* Archival Ochre / Amber */
+  --color-proto-signal: #2d9f5d; /* Field Green Verification */
+  --color-proto-logic: #3a8ebd; /* Archival Slate Blue */
+  --color-proto-obs: #9368b7; /* Archival Violet */
+  --color-proto-system: #d96b27; /* Terra Cotta */
+  --color-proto-social: #2fa596; /* Deep Teal */
 
   --font-serif: var(--font-newsreader), Georgia, serif;
   --font-display: var(--font-space-grotesk), sans-serif;
@@ -36,7 +36,11 @@
 body {
   background-color: #141514;
   color: #f4f1ea;
-  font-family: var(--font-space-grotesk), -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    var(--font-space-grotesk),
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -135,3 +139,299 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #3f453f;
 }
+
+/* Shared participant and operations desk editorial system. Custom fonts remain global. */
+.event-shell {
+  max-width: 1240px;
+  width: 100%;
+  margin: auto;
+  padding: 24px;
+}
+.event-masthead {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 3px double #3f453f;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+.event-masthead span {
+  color: #949e93;
+}
+.event-masthead nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.event-heading {
+  margin: 36px 0 28px;
+}
+.event-heading h1 {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.1;
+  margin: 16px 0 8px;
+}
+.event-heading p,
+.event-shell small {
+  color: #949e93;
+}
+.event-panel {
+  padding: 22px;
+  background: #1b1d1b;
+  border: 1px solid #3f453f;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+.event-panel h2 {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 26px;
+  margin-bottom: 18px;
+}
+.event-panel h3 {
+  font-size: 18px;
+  margin: 12px 0;
+}
+.event-shell button,
+.event-button {
+  display: inline-block;
+  border: 1px solid #4e564e;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  margin: 4px 6px 4px 0;
+  background: #212421;
+  color: #f4f1ea;
+}
+.event-shell button:hover {
+  border-color: #f4f1ea;
+}
+.event-shell button.primary,
+.event-button.primary {
+  background: #c93b2b;
+  border-color: #c93b2b;
+  font-weight: 700;
+}
+.event-shell button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.event-shell input:not([type="checkbox"]),
+.event-shell textarea,
+.event-shell select {
+  width: 100%;
+  background: #141514;
+  border: 1px solid #4e564e;
+  padding: 10px;
+  color: #f4f1ea;
+  border-radius: 0;
+  font-size: 14px;
+}
+.event-shell textarea {
+  min-height: 90px;
+}
+.event-shell input:focus,
+.event-shell textarea:focus,
+.event-shell select:focus {
+  outline: 2px solid #c28b28;
+  outline-offset: 2px;
+}
+.event-field {
+  display: block;
+  margin-bottom: 14px;
+}
+.event-field > span {
+  display: block;
+  color: #949e93;
+  font-size: 11px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.event-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 18px 0;
+  border-top: 1px solid #3f453f;
+  border-bottom: 1px solid #3f453f;
+  margin-bottom: 20px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 12px;
+}
+.event-stats strong {
+  display: block;
+  font-size: 26px;
+  color: #c28b28;
+}
+.event-notice {
+  padding: 12px 16px;
+  border-left: 3px solid #c28b28;
+  background: #272b27;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.event-error {
+  border-color: #c93b2b;
+  color: #f5afa5;
+}
+.event-shell table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.event-shell th,
+.event-shell td {
+  border-bottom: 1px solid #3f453f;
+  padding: 12px 8px;
+  vertical-align: top;
+}
+.event-shell th {
+  color: #949e93;
+  font-weight: 400;
+}
+.event-scroll {
+  overflow-x: auto;
+}
+.event-row {
+  border-top: 1px solid #3f453f;
+  padding: 14px 0;
+}
+.event-row p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.event-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.event-tabs button[aria-pressed="true"] {
+  background: #c93b2b;
+}
+.event-qr {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 24px 12px 0;
+  font-size: 12px;
+}
+.event-qr a {
+  text-decoration: underline;
+}
+.event-shell footer {
+  margin-top: 40px;
+  border-top: 3px double #3f453f;
+  padding-top: 16px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  color: #949e93;
+}
+.event-shell audio,
+.event-shell video {
+  width: 100%;
+  margin: 12px 0;
+}
+.event-shell pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  max-height: 360px;
+  overflow: auto;
+}
+/* Tactile Micro-Animations and Cold War Terminal Effects */
+@keyframes stampIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.3) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes scanlineSweep {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(1000%);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+.animate-stamp {
+  animation: stampIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+/* Tactile button active states */
+.event-shell button:active,
+.event-button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 720px) {
+  .event-shell {
+    padding: 16px;
+  }
+  .event-grid {
+    grid-template-columns: 1fr;
+  }
+  .event-panel {
+    padding: 16px;
+  }
+  .event-masthead span {
+    display: block;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .event-masthead nav,
+  .event-tabs,
+  button,
+  .no-print {
+    display: none !important;
+  }
+  .event-shell {
+    color: black;
+    background: white;
+    max-width: 100%;
+    padding: 0;
+  }
+  .event-panel {
+    break-inside: avoid;
+    border: 1px solid #000000 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}
+

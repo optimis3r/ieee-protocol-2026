@@ -1,206 +1,191 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { NodeItem } from '@/types/database';
-import { Eye, Sun, Moon, Key, RotateCw, Sparkles, MapPin } from 'lucide-react';
+import React, { useState } from "react";
+import type { PublicPuzzle, Progress } from "@/lib/event/types";
+import { soundEffects } from "@/lib/audio";
+import { Field } from "@/components/event/shared";
+import {
+  Lightbulb,
+  Eye,
+  KeyRound,
+  RotateCw,
+  Sparkles,
+} from "lucide-react";
 
-interface UVMarkerStationProps {
-  node: NodeItem;
-  answerInput: string;
-  setAnswerInput: (val: string) => void;
+interface StationProps {
+  node: PublicPuzzle;
+  progress: Progress;
+  answer: string;
+  onAnswerChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  isSubmitting: boolean;
+  disabled: boolean;
+  busy: boolean;
+  saved: boolean;
 }
 
-export const UVMarkerStation: React.FC<UVMarkerStationProps> = ({
-  node,
-  answerInput,
-  setAnswerInput,
-  onSubmit,
-  isSubmitting
-}) => {
-  const [isUVActive, setIsUVActive] = useState(false);
-  const [caesarShift, setCaesarShift] = useState(3);
-  const [toolInput, setToolInput] = useState(typeof node.payload.uv_hidden_text === 'string' ? node.payload.uv_hidden_text : 'WKH SURWRFRO LV DOLYH');
-
-  const roomLocation = (typeof node.payload.uv_room_location === 'string' && node.payload.uv_room_location) || 'Seminar Hall 2 - North Wall Poster';
-  const hiddenText = (typeof node.payload.uv_hidden_text === 'string' && node.payload.uv_hidden_text) || 'WKH SURWRFRO LV DOLYH';
-  const cipherAlg = (typeof node.payload.cipher_algorithm === 'string' && node.payload.cipher_algorithm) || 'Caesar Shift (+3)';
-
-  // Helper Caesar shift function for testing
-  const applyCaesarShift = (text: string, shift: number) => {
-    return text.split('').map((char) => {
-      const code = char.charCodeAt(0);
-      if (code >= 65 && code <= 90) {
-        return String.fromCharCode(((code - 65 - shift + 26) % 26) + 65);
-      }
-      if (code >= 97 && code <= 122) {
-        return String.fromCharCode(((code - 97 - shift + 26) % 26) + 97);
+function caesarDecrypt(text: string, shift: number): string {
+  return text
+    .split("")
+    .map((char) => {
+      if (char >= "A" && char <= "Z") {
+        const code = char.charCodeAt(0) - 65;
+        const shifted = (code + shift + 26) % 26;
+        return String.fromCharCode(shifted + 65);
       }
       return char;
-    }).join('');
-  };
+    })
+    .join("");
+}
 
-  const decodedPreview = applyCaesarShift(toolInput, caesarShift);
+export function UVMarkerStation({
+  node,
+  progress,
+  answer,
+  onAnswerChange,
+  onSubmit,
+  disabled,
+  busy,
+  saved,
+}: StationProps) {
+  const [uvActive, setUvActive] = useState(false);
+  const [shiftTester, setShiftTester] = useState(-3);
+
+  const cipherText = "WKH SURWRFRO LV DOLYH";
+  const decryptedPreview = caesarDecrypt(cipherText, shiftTester);
 
   return (
     <div className="space-y-6">
-      {/* Physical Inspection Placard with UV Torch Simulation */}
-      <div className={`transition-all duration-500 rounded-2xl p-5 sm:p-6 shadow-2xl border ${
-        isUVActive
-          ? 'bg-[#150a24] border-purple-500/80 shadow-[0_0_35px_rgba(168,85,247,0.35)]'
-          : 'bg-[#0b130e] border-[#1f3025]'
-      }`}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-            {isUVActive ? (
-              <Moon className="w-4 h-4 text-purple-400 animate-pulse" />
-            ) : (
-              <Sun className="w-4 h-4 text-amber-400" />
-            )}
-            <span className={isUVActive ? 'text-purple-300' : 'text-[#8ea897]'}>
-              {isUVActive ? 'UV Blacklight Active (395nm Spectra)' : 'Ambient Optical Mode'}
+      {/* UV Blacklight Interactive Surface */}
+      <div className="border border-[#3f453f] bg-[#141514] p-5 sm:p-6 rounded-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-[#2d312c] pb-3">
+          <div className="flex items-center gap-2 text-xs font-mono-tabular text-[#c6a0f6]">
+            <Lightbulb className={`w-4 h-4 ${uvActive ? "text-[#c6a0f6]" : "text-[#949e93]"}`} />
+            <span className="font-bold tracking-wider">
+              UV FLUORESCENCE // 395nm SPECTRUM
             </span>
           </div>
 
           <button
             type="button"
-            onClick={() => setIsUVActive(!isUVActive)}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
-              isUVActive
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'bg-[#18261e] border border-[#2b3e32] text-proto-signal hover:bg-proto-signal hover:text-[#0a0f0d]'
+            onClick={() => {
+              setUvActive(!uvActive);
+              soundEffects.playKeystrokeBeep();
+            }}
+            className={`text-xs font-mono-tabular font-bold uppercase px-3 py-1.5 border transition-all ${
+              uvActive
+                ? "bg-[#351e44] border-[#c6a0f6] text-[#f4f1ea] shadow-lg shadow-purple-950/40"
+                : "bg-[#212421] border-[#3f453f] text-[#949e93] hover:text-[#f4f1ea]"
             }`}
           >
-            <Eye className="w-4 h-4" />
-            <span>{isUVActive ? 'DEACTIVATE UV TORCH' : 'ACTIVATE UV BLACKLIGHT'}</span>
+            {uvActive ? "UV TORCH: ENGAGED" : "ACTIVATE UV TORCH"}
           </button>
         </div>
 
-        {/* Inscription Wall Simulation */}
-        <div className="mt-4 p-6 rounded-xl border relative min-h-[130px] flex flex-col items-center justify-center text-center overflow-hidden transition-all duration-300"
-          style={{
-            backgroundColor: isUVActive ? '#1a0d2e' : '#080f0a',
-            borderColor: isUVActive ? '#9333ea' : '#1b2a20'
+        {/* Poster Surface Canvas */}
+        <div
+          onClick={() => {
+            setUvActive(!uvActive);
+            soundEffects.playKeystrokeBeep();
           }}
+          className={`relative p-8 rounded-xs border transition-all duration-500 cursor-pointer min-h-[140px] flex flex-col items-center justify-center text-center select-none ${
+            uvActive
+              ? "bg-[#110918] border-[#9368b7]/60 shadow-inner"
+              : "bg-[#161816] border-[#2d312c]"
+          }`}
         >
-          {isUVActive ? (
-            <div className="space-y-2 animate-in fade-in duration-500">
-              <span className="text-[10px] text-purple-400 uppercase tracking-widest font-mono font-bold block">
-                [FLUORESCENT INK DETECTED UNDER 395nm UV BEAM]
+          {uvActive ? (
+            <div className="space-y-2 animate-fade-in">
+              <span className="text-[10px] font-mono-tabular uppercase tracking-widest text-[#c6a0f6] block">
+                [LUMINESCENT INK FLUORESCING UNDER 395nm BEAM]
               </span>
-              <div className="text-xl sm:text-2xl font-black text-[#a855f7] tracking-widest font-mono drop-shadow-[0_0_12px_rgba(168,85,247,0.9)]">
-                {hiddenText}
+              <div
+                className="font-mono-tabular text-2xl sm:text-3xl font-bold tracking-widest text-[#f5c2e7] drop-shadow-[0_0_12px_rgba(198,160,246,0.8)]"
+              >
+                {cipherText}
               </div>
-              <div className="text-xs text-purple-300 font-mono font-bold">
-                CIPHER KEY INSCRIBED: <span className="underline">{cipherAlg}</span>
+              <div className="text-[11px] font-mono-tabular text-[#c6a0f6] mt-2">
+                CIPHER DIRECTIVE: Caesar Shift -3
               </div>
             </div>
           ) : (
-            <div className="space-y-1 text-center py-3">
-              <span className="text-xs text-[#526a5c] font-mono">
-                [Wall surface appears clean under normal ambient room light]
-              </span>
-              <p className="text-[11px] text-[#7d9787]">
-                Click <strong className="text-purple-400 font-bold">&quot;ACTIVATE UV BLACKLIGHT&quot;</strong> or use physical UV torch on-site to reveal invisible luminescent chalk ink.
-              </p>
+            <div className="text-xs font-mono-tabular text-[#949e93] space-y-1">
+              <Eye className="w-5 h-5 mx-auto text-[#4e564e]" />
+              <div>Poster appears blank under ambient room lighting.</div>
+              <div className="text-[10px] text-[#4e564e]">
+                Click to aim tethered UV flashlight.
+              </div>
             </div>
           )}
         </div>
 
-        <div className="mt-3 flex items-center gap-2 text-xs text-[#8ea897]">
-          <MapPin className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-          <span>Physical Location: <strong className="text-[#f3f7f4]">{roomLocation}</strong></span>
-        </div>
-      </div>
-
-      {/* Embedded In-Browser Cipher Decoder Wheel */}
-      <div className="p-5 rounded-2xl bg-[#0b130e] border border-purple-500/30 space-y-4">
-        <div className="flex items-center justify-between border-b border-[#1b2a20] pb-2 text-xs font-bold text-purple-400 uppercase">
-          <div className="flex items-center gap-1.5">
-            <Key className="w-4 h-4" />
-            <span>Tactical Decryption Wheel Tool</span>
-          </div>
-          <span className="text-[10px] font-mono text-[#8ea897]">CAESAR SHIFT TOOL</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div>
-            <label className="block text-[10px] text-[#8ea897] uppercase mb-1">Ciphertext to Decrypt:</label>
-            <input
-              type="text"
-              value={toolInput}
-              onChange={(e) => setToolInput(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-[#070e09] border border-[#233328] rounded-xl text-[#eaf2ec] font-mono uppercase"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between text-[10px] text-[#8ea897] uppercase mb-1">
-              <span>Shift Offset (N):</span>
-              <span className="text-purple-400 font-mono font-bold">+{caesarShift}</span>
+        {/* Interactive Caesar Cipher Test Tool */}
+        {uvActive && (
+          <div className="pt-3 border-t border-[#2d312c] space-y-2 text-xs font-mono-tabular">
+            <div className="flex items-center justify-between text-[11px] text-[#949e93]">
+              <span>CIPHER TEST BENCH:</span>
+              <span className="text-[#c28b28]">
+                Shift: {shiftTester > 0 ? `+${shiftTester}` : shiftTester}
+              </span>
             </div>
-            <input
-              type="range"
-              min={1}
-              max={25}
-              value={caesarShift}
-              onChange={(e) => setCaesarShift(Number(e.target.value))}
-              className="w-full h-1.5 bg-[#17251c] rounded-lg appearance-none cursor-pointer accent-purple-500"
-            />
+
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="-6"
+                max="6"
+                value={shiftTester}
+                onChange={(e) => setShiftTester(Number(e.target.value))}
+                className="w-full accent-[#c6a0f6]"
+              />
+            </div>
+
+            <div className="p-2.5 bg-[#141514] border border-[#2d312c] rounded-xs text-[11px] flex justify-between">
+              <span className="text-[#949e93]">Decoded Plaintext:</span>
+              <span
+                className={
+                  shiftTester === -3
+                    ? "text-[#2d9f5d] font-bold"
+                    : "text-[#f4f1ea]"
+                }
+              >
+                {decryptedPreview}
+              </span>
+            </div>
           </div>
-        </div>
-
-        <div className="p-3 rounded-xl bg-[#070e09] border border-purple-500/20 text-xs flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[10px] text-[#8ea897] uppercase">Decrypted Plaintext Output:</span>
-          <span className="font-mono font-black text-purple-300 text-sm tracking-wider">{decodedPreview}</span>
-          <button
-            type="button"
-            onClick={() => setAnswerInput(decodedPreview)}
-            className="text-[10px] px-2.5 py-1 rounded-lg bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition-colors"
-          >
-            Copy to Submit Box →
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Reconnaissance Clue Banner */}
-      <div className="p-4 rounded-xl bg-[#111a14] border border-[#233529] text-xs space-y-1.5">
-        <div className="text-[10px] font-black text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>UV RECONNAISSANCE DIRECTIVE:</span>
-        </div>
-        <p className="text-[#cad3f5] font-sans leading-relaxed">
-          {node.payload.hint || 'Direct the UV blacklight keychain torch against the room perimeter to uncover invisible luminescent cipher text.'}
-        </p>
-      </div>
-
-      {/* Plaintext Answer Submission Form */}
+      {/* Answer Submission Form */}
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-[11px] text-[#8ea897] uppercase mb-1.5 font-bold flex items-center gap-1.5">
-            <Key className="w-3.5 h-3.5 text-purple-400" />
-            <span>{node.payload.prompt || 'Submit Decrypted Plaintext Bypass Phrase:'}</span>
-          </label>
+        <Field label="Your answer">
           <input
-            type="text"
+            value={answer}
+            onChange={(e) => onAnswerChange(e.target.value)}
+            disabled={disabled}
+            placeholder="e.g. Caesar -3"
             required
-            value={answerInput}
-            onChange={(e) => setAnswerInput(e.target.value)}
-            placeholder="e.g. THE PROTOCOL IS ALIVE"
-            className="w-full px-4 py-3 text-sm bg-[#09110d] border border-[#273a2e] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-purple-500 font-mono uppercase tracking-wider"
+            maxLength={60}
+            className="font-mono-tabular text-sm"
           />
-        </div>
+        </Field>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || !answerInput.trim()}
-          className="w-full py-3.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <RotateCw className="w-4 h-4" />
-          <span>TRANSMIT DECRYPTED CIPHER PASSCODE</span>
-        </button>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="submit"
+            className="primary text-xs font-bold uppercase"
+            disabled={disabled || busy || !answer.trim()}
+          >
+            <span>{busy ? "Validating…" : "Submit answer"}</span>
+          </button>
+
+          <small className="font-mono-tabular text-[11px] text-[#949e93]">
+            {saved ? "Draft saved" : "Syncing…"}
+            {node.attemptLimit
+              ? ` · ${progress.attempts.length}/${node.attemptLimit} attempts`
+              : " · Unlimited attempts"}
+          </small>
+        </div>
       </form>
     </div>
   );
-};
+}

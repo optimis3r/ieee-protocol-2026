@@ -1,299 +1,314 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import QRCode from 'qrcode';
-import { Store, initStore, getAgentActiveSeconds, formatActiveTime } from '@/lib/store';
-import { Agent, GameState, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
-import { soundEffects } from '@/lib/audio';
+import React, { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Frame, Panel, QR, useEvent, api } from "@/components/event/shared";
+import confetti from "canvas-confetti";
+import { soundEffects } from "@/lib/audio";
+import {
+  Shield,
+  CheckCircle2,
+  Clock,
+  QrCode,
+  ArrowRight,
+  Printer,
+  LogOut,
+  UserCheck,
+  AlertTriangle,
+  Radio,
+} from "lucide-react";
 
 export default function MyBadgePage() {
   const router = useRouter();
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [gameState, setGameState] = useState<GameState>(() => Store.getGameState());
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [activeSeconds, setActiveSeconds] = useState<number>(0);
-
-  const refreshState = useCallback((agentId: string) => {
-    const current = Store.getAgentById(agentId);
-    if (!current) return;
-    setAgent(current);
-    setActiveSeconds(getAgentActiveSeconds(current));
-    setGameState(Store.getGameState());
-  }, []);
+  const { data, error, offline, refresh } = useEvent();
+  const [origin, setOrigin] = useState("");
+  const prevCheckedIn = useRef<boolean | null>(null);
+  const [justCheckedIn, setJustCheckedIn] = useState(false);
 
   useEffect(() => {
-    initStore();
-    const storedAgentId = localStorage.getItem('ieee_agent_id');
-    if (!storedAgentId) {
-      router.push('/login');
-      return;
-    }
+    queueMicrotask(() => setOrigin(window.location.origin));
+  }, []);
 
-    const current = Store.getAgentById(storedAgentId);
-    if (!current) {
-      router.push('/login');
-      return;
-    }
+  const p = data?.participant;
 
-    setTimeout(() => {
-      setAgent(current);
-      refreshState(current.agent_id);
-    }, 0);
-
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://network.ieee';
-    const qrPayload = `${origin}/play?agent_id=${current.agent_id}&token=${current.token}`;
-
-    QRCode.toDataURL(qrPayload, {
-      width: 260,
-      margin: 1,
-      color: {
-        dark: '#141514',
-        light: '#f4f1ea',
-      },
-    }).then(setQrDataUrl).catch(console.error);
-
-    let isCancelled = false;
-    let prevCheckInStatus = current.check_in_status;
-
-    const pollLiveStatus = async () => {
-      try {
-        const { agent: serverAg, gameState: serverState } = await Store.syncAgentWithServer(current.agent_id);
-        if (isCancelled || !serverAg) return;
-
-        setAgent({ ...serverAg });
-        if (serverState) {
-          setGameState(serverState);
-        }
-        setActiveSeconds(getAgentActiveSeconds(serverAg));
-
-        const isLiveActive = (serverState?.status || Store.getGameState().status) === 'NETWORK_ACTIVE';
-
-        if (serverAg.check_in_status === 'ACTIVE' && prevCheckInStatus !== 'ACTIVE') {
-          prevCheckInStatus = 'ACTIVE';
-          soundEffects.playSuccessChime();
-          if (isLiveActive) {
-            setTimeout(() => {
-              if (!isCancelled) {
-                router.push('/play');
-              }
-            }, 600);
-          }
-        } else {
-          prevCheckInStatus = serverAg.check_in_status;
-        }
-      } catch {
-        refreshState(current.agent_id);
+  // Sound and transition notification when desk checks in the player
+  useEffect(() => {
+    if (p) {
+      if (prevCheckedIn.current === false && p.checkedIn === true) {
+        soundEffects.playSuccessChime();
+        setJustCheckedIn(true);
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ["#2d9f5d", "#c28b28", "#f4f1ea"],
+          });
+        } catch {}
       }
-    };
+      prevCheckedIn.current = p.checkedIn;
+    }
+  }, [p]);
 
-    pollLiveStatus();
-    const interval = setInterval(pollLiveStatus, 2000);
-
-    const handleStoreUpdate = () => {
-      setGameState(Store.getGameState());
-      pollLiveStatus();
-    };
-    window.addEventListener('ieee_store_update', handleStoreUpdate);
-    window.addEventListener('storage', handleStoreUpdate);
-
-    return () => {
-      isCancelled = true;
-      window.removeEventListener('ieee_store_update', handleStoreUpdate);
-      window.removeEventListener('storage', handleStoreUpdate);
-      clearInterval(interval);
-    };
-  }, [router, refreshState]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('ieee_agent_id');
-    localStorage.removeItem('ieee_agent_token');
-    router.push('/login');
-  };
-
-  if (!agent) {
+  if (!data && !offline) {
     return (
-      <div className="min-h-screen bg-[#141514] flex items-center justify-center p-4">
-        <div className="w-5 h-5 border border-[#f4f1ea] border-t-transparent animate-spin" />
-      </div>
+      <Frame title="Retrieving operative credential…">
+        <div className="event-notice">Accessing secure identity records…</div>
+      </Frame>
     );
   }
 
-  const roleMeta = ROLE_DETAILS[(agent.archetype as PrimaryDomain) || 'LOGIC'];
-  const isActive = agent.check_in_status === 'ACTIVE';
-  const isPaused = agent.check_in_status === 'PAUSED';
+  if (!p) {
+    return (
+      <Frame
+        title="Operative Pass Retrieval"
+        subtitle="No active operative session detected on this device."
+      >
+        <div style={{ maxWidth: 580 }}>
+          <Panel title="Identity Required">
+            <p className="text-sm text-[#949e93] leading-relaxed mb-6">
+              To present your badge or check in at the desk, authenticate using
+              your private login pass or register as a new operative.
+            </p>
+            <div className="space-y-3">
+              <Link
+                href="/login"
+                className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Scan Private Login Pass</span>
+              </Link>
+              <Link
+                href="/register"
+                className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular"
+              >
+                <span>Register New Operative</span>
+              </Link>
+            </div>
+          </Panel>
+        </div>
+      </Frame>
+    );
+  }
+
+  const solvedCount = Object.values(p.progress).filter(
+    (pr) => pr.completedAt,
+  ).length;
 
   return (
-    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between p-4 sm:p-8 font-sans">
-      {/* Top Editorial Masthead */}
-      <header className="max-w-xl w-full mx-auto rule-double pb-2.5 flex items-baseline justify-between text-xs text-[#949e93] font-mono-tabular">
-        <div>
-          <strong className="text-[#f4f1ea] font-display-grotesk tracking-tight">NIT WARANGAL IEEE</strong>
-          <span className="mx-2">•</span>
-          <span>THE PROTOCOL 2026</span>
+    <Frame
+      title={`Pass Docket // Agent ${p.id.replace("AGT-", "")}`}
+      subtitle="Official Field Credential · Present at operations desk for verification and physical wristband."
+    >
+      {justCheckedIn && (
+        <div className="event-notice border-[#2d9f5d] bg-[#16271c] text-[#a6da95] flex items-center justify-between gap-4 py-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-[#2d9f5d] shrink-0" />
+            <span>
+              <strong>CHECK-IN CONFIRMED:</strong> You are now authorized for
+              field operations!
+            </span>
+          </div>
+          <Link
+            href="/play"
+            className="btn-editorial-primary py-1.5 px-3 text-xs font-bold uppercase shrink-0"
+          >
+            Launch Terminal
+          </Link>
         </div>
-        <div className="text-[11px] uppercase tracking-wider text-[#c28b28] font-bold">
-          PASS ID: {agent.agent_id}
-        </div>
-      </header>
+      )}
 
-      {/* Asymmetric Document Body */}
-      <main className="max-w-xl w-full mx-auto my-auto py-4 space-y-5">
-        
-        {/* Editorial Heading Section */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-serif-editorial tracking-tight text-[#f4f1ea]">
-            Operative Credential Pass
-          </h1>
-          <p className="text-xs text-[#949e93] font-display-grotesk leading-relaxed">
-            Present this QR pass at the desk to complete verification or scan into workstations.
-          </p>
-        </div>
+      {error && <div className="event-notice event-error">{error}</div>}
 
-        {/* Asymmetric Pass Layout (Two Columns on Desktop, Stacked on Mobile) */}
-        <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 items-center">
-          
-          {/* Column A: Tabular Identity Ledger */}
-          <div className="space-y-3 font-display-grotesk text-xs order-2 sm:order-1">
-            <div className="rule-hairline pb-2">
-              <span className="text-[10px] uppercase text-[#949e93] block font-mono-tabular">CALL SIGN</span>
-              <span className="text-xl font-bold font-mono-tabular text-[#f4f1ea] tracking-tight">{agent.agent_id}</span>
-            </div>
-
-            <div className="rule-hairline pb-2">
-              <span className="text-[10px] uppercase text-[#949e93] block font-mono-tabular">NAME & ROLL NO</span>
-              <span className="font-semibold text-[#f4f1ea] block truncate">{agent.name}</span>
-              <span className="text-[11px] text-[#949e93] font-mono-tabular block">{agent.auth_identifier || 'Unspecified'}</span>
-            </div>
-
-            <div className="rule-hairline pb-2">
-              <span className="text-[10px] uppercase text-[#949e93] block font-mono-tabular">TACTICAL CELL</span>
-              <span className="font-semibold text-[#f4f1ea]">{roleMeta.title}</span>
-              <span className="text-[11px] text-[#949e93] block font-serif-editorial italic">{roleMeta.subtitle}</span>
-            </div>
-
-            <div className="rule-hairline pb-2 flex items-center justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Physical Pass Mockup (Printable Card) */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="border-2 border-[#3f453f] bg-[#1b1d1b] p-6 sm:p-8 rounded-sm shadow-2xl relative overflow-hidden print:border-black print:text-black print:bg-white">
+            {/* Top Badge Ribbon */}
+            <div className="flex items-start justify-between gap-4 border-b-2 border-[#2d312c] pb-4 mb-6">
               <div>
-                <span className="text-[10px] uppercase text-[#949e93] block font-mono-tabular">WRISTBAND</span>
-                <span className="font-mono-tabular font-bold text-[#c28b28]">{agent.wristband_id || agent.agent_id}</span>
+                <span className="font-mono-tabular text-[10px] text-[#949e93] uppercase tracking-widest block">
+                  NIT WARANGAL • IEEE STUDENT BRANCH
+                </span>
+                <span className="font-serif-editorial text-2xl sm:text-3xl font-bold text-[#f4f1ea] block">
+                  {p.name}
+                </span>
+                <div className="font-mono-tabular text-xs text-[#c28b28] mt-1 font-bold">
+                  {p.id} • ROLL: {p.roll}
+                </div>
               </div>
-              
-              {/* Authentic Status Stamp */}
-              <div>
-                {isActive ? (
-                  <span className="editorial-stamp text-[#2d9f5d] border-[#2d9f5d]">
-                    ACTIVE // {formatActiveTime(activeSeconds)}
-                  </span>
-                ) : isPaused ? (
-                  <span className="editorial-stamp text-[#c28b28] border-[#c28b28]">
-                    CHECKED OUT (PAUSED)
-                  </span>
-                ) : (
-                  <span className="editorial-stamp text-[#c93b2b] border-[#c93b2b]">
-                    AWAITING CHECK-IN
-                  </span>
+
+              <div className="text-right">
+                <span
+                  className={`editorial-stamp font-mono-tabular ${
+                    p.checkedIn
+                      ? "border-[#2d9f5d] text-[#2d9f5d]"
+                      : "border-[#c28b28] text-[#c28b28]"
+                  }`}
+                >
+                  {p.checkedIn ? "DESK: ACTIVE" : "DESK: PENDING"}
+                </span>
+                <span className="text-[10px] font-mono-tabular text-[#949e93] block mt-1">
+                  26 SEPT 2026
+                </span>
+              </div>
+            </div>
+
+            {/* Central Pass Graphic: Scannable Interaction QR */}
+            <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
+              <div className="shrink-0 bg-white p-3 rounded-xs border-2 border-[#3f453f] shadow-inner">
+                {origin && (
+                  <QR
+                    value={`${origin}/play#peer=${p.socialToken}`}
+                    label={`${p.id} interaction pass`}
+                  />
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* Column B: High-Contrast QR Code */}
-          <div className="flex flex-col items-center justify-center order-1 sm:order-2">
-            <div className="p-2.5 bg-[#f4f1ea] border border-[#2d312c]">
-              {qrDataUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={qrDataUrl}
-                  alt="Operative Authentication Pass"
-                  className="w-44 h-44 sm:w-48 sm:h-48 object-contain"
-                />
-              ) : (
-                <div className="w-44 h-44 flex items-center justify-center bg-[#f4f1ea]">
-                  <div className="w-5 h-5 border border-[#141514] border-t-transparent animate-spin" />
+              <div className="space-y-3 text-xs font-mono-tabular flex-1 w-full">
+                <div className="p-3 bg-[#141514] border border-[#2d312c] rounded-xs space-y-1">
+                  <div className="text-[10px] text-[#949e93] uppercase">
+                    PASS USAGE
+                  </div>
+                  <div className="text-[#f4f1ea]">
+                    Present this public QR code to the operations desk for gate
+                    entry and to other operatives for data handshakes.
+                  </div>
                 </div>
-              )}
+
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="p-2 border border-[#2d312c] bg-[#141514]">
+                    <span className="text-[#949e93] block text-[9px]">
+                      CLEARANCE
+                    </span>
+                    <span className="text-[#c28b28] font-bold text-sm">
+                      {p.score} PTS
+                    </span>
+                  </div>
+                  <div className="p-2 border border-[#2d312c] bg-[#141514]">
+                    <span className="text-[#949e93] block text-[9px]">
+                      NODES SOLVED
+                    </span>
+                    <span className="text-[#2d9f5d] font-bold text-sm">
+                      {solvedCount} / 7
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-[9px] uppercase tracking-wider text-[#949e93] font-mono-tabular mt-2 text-center">
-              SCAN IDENTIFIER // LIVE TOKEN
+
+            {/* Live Check-in Status Notice */}
+            <div className="mt-6 pt-4 border-t border-[#2d312c] flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2 text-xs">
+                {p.checkedIn ? (
+                  <>
+                    <UserCheck className="w-4 h-4 text-[#2d9f5d]" />
+                    <span className="text-[#2d9f5d] font-semibold">
+                      Officially checked in at operations desk.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Radio className="w-4 h-4 text-[#c28b28] animate-pulse" />
+                    <span className="text-[#c28b28]">
+                      Awaiting QR scan at E&ICT C301 desk…
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn-editorial-outline py-1.5 px-3 text-[11px] font-mono-tabular flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Pass</span>
+              </button>
             </div>
           </div>
-
         </div>
 
-        {/* Primary Action Button */}
-        <div>
-          {gameState.status !== 'NETWORK_ACTIVE' ? (
-            isActive ? (
+        {/* Right Column: Actions & Private Credentials */}
+        <div className="lg:col-span-5 space-y-6">
+          <Panel title="Operations Directive">
+            <div className="space-y-4 text-xs font-display-grotesk text-[#949e93] leading-relaxed">
+              <p>
+                Keep this screen open when approaching the event desk. Once the
+                operator scans your badge, your clearance activates
+                automatically.
+              </p>
+
               <div className="space-y-2">
-                <div className="p-3 border border-[#2d9f5d]/40 bg-[#15241b] text-center rounded-sm">
-                  <span className="text-xs font-bold text-[#2d9f5d] font-mono-tabular block">
-                    ✓ DESK VERIFICATION COMPLETE • PASS ACTIVE
-                  </span>
-                  <span className="text-[11px] text-[#949e93] font-display-grotesk block mt-0.5">
-                    Terminal access unlocks as soon as operations desk activates the network.
-                  </span>
-                </div>
+                {p.checkedIn ? (
+                  <Link
+                    href="/play"
+                    className="btn-editorial-primary w-full py-3 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+                  >
+                    <span>Enter Mission Terminal</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                ) : (
+                  <div className="p-3 border border-[#c28b28]/40 bg-[#1e1c14] text-[#eed49f] rounded-xs text-[11px]">
+                    <div className="font-bold flex items-center gap-1.5 mb-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>GATE CHECK REQUIRED</span>
+                    </div>
+                    You cannot solve Nodes or submit deduction hypotheses until
+                    your wristband is issued at E&ICT C301.
+                  </div>
+                )}
+
                 <Link
-                  href="/standby"
-                  className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
+                  href="/play"
+                  className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-1.5 text-center font-mono-tabular"
                 >
-                  Event in Standby • View Launch Countdown →
+                  <span>Open Full HUD</span>
                 </Link>
               </div>
-            ) : (
-              <Link
-                href="/standby"
-                className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
-              >
-                Event in Standby • View Launch Countdown →
-              </Link>
-            )
-          ) : isActive ? (
-            <Link
-              href="/play"
-              className="w-full py-3 px-4 btn-editorial-primary text-xs block text-center tracking-wider font-bold"
-            >
-              Enter Mission Terminal →
-            </Link>
-          ) : isPaused ? (
-            <Link
-              href="/play"
-              className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
-            >
-              View Terminal Progress (Timer Paused) →
-            </Link>
-          ) : (
-            <div className="text-xs text-[#949e93] text-center font-display-grotesk rule-hairline pb-2">
-              Present this pass to operations staff at the venue desk to receive clearance.
             </div>
-          )}
+          </Panel>
+
+          <Panel title="Private Login Key">
+            <p className="text-xs text-[#949e93] mb-3 leading-relaxed">
+              This private link grants instant login access to your account from
+              any other device. Do not display this to other participants.
+            </p>
+
+            <details className="text-xs font-mono-tabular space-y-3">
+              <summary className="cursor-pointer text-[#c28b28] hover:underline font-bold py-1">
+                Reveal Private QR Code
+              </summary>
+              <div className="p-4 bg-[#141514] border border-[#2d312c] rounded-xs mt-2">
+                {origin && (
+                  <QR
+                    value={`${origin}/login#login=${p.token}`}
+                    label={`${p.id} Private Login Key`}
+                  />
+                )}
+                <div className="text-[10px] text-[#949e93] mt-2 break-all select-all">
+                  {origin}/login#login={p.token}
+                </div>
+              </div>
+            </details>
+
+            <div className="pt-4 mt-4 border-t border-[#2d312c]">
+              <button
+                type="button"
+                onClick={async () => {
+                  await api("logout");
+                  router.push("/login");
+                }}
+                className="text-xs text-[#c93b2b] hover:text-[#f4f1ea] flex items-center gap-1.5 transition-colors font-mono-tabular"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Disconnect session from this browser</span>
+              </button>
+            </div>
+          </Panel>
         </div>
-
-        {/* Subordinate Links */}
-        <div className="flex items-center justify-between text-xs text-[#949e93] font-display-grotesk pt-1">
-          {gameState.leaderboard_visible ? (
-            <Link href="/leaderboard" className="hover:text-[#f4f1ea] underline underline-offset-4 flex items-center gap-1 text-[#c28b28]">
-              Public Standings →
-            </Link>
-          ) : (
-            <span className="text-[#949e93]/50">Standings Concealed</span>
-          )}
-          <button
-            onClick={handleLogout}
-            className="text-[#c93b2b] hover:underline underline-offset-4 cursor-pointer"
-          >
-            Sign Out
-          </button>
-        </div>
-
-      </main>
-
-      {/* Editorial Footer */}
-      <footer className="max-w-xl w-full mx-auto rule-hairline pt-2 flex items-center justify-between text-[10px] text-[#949e93] font-mono-tabular">
-        <span>NIT WARANGAL • DEPT OF ECE</span>
-        <span>AUTONOMOUS TELEMETRY ACTIVE</span>
-      </footer>
-    </div>
+      </div>
+    </Frame>
   );
 }

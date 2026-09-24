@@ -1,165 +1,172 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { NodeItem } from '@/types/database';
-import { Eye, Grid, Sparkles, KeyRound } from 'lucide-react';
+import React, { useState } from "react";
+import type { PublicPuzzle, Progress } from "@/lib/event/types";
+import { soundEffects } from "@/lib/audio";
+import { Field } from "@/components/event/shared";
+import { Eye, Grid, Sparkles, KeyRound } from "lucide-react";
 
-interface RedFilterStationProps {
-  node: NodeItem;
-  answerInput: string;
-  setAnswerInput: (val: string) => void;
+interface StationProps {
+  node: PublicPuzzle;
+  progress: Progress;
+  answer: string;
+  onAnswerChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  isSubmitting: boolean;
+  disabled: boolean;
+  busy: boolean;
+  saved: boolean;
 }
 
-export const RedFilterStation: React.FC<RedFilterStationProps> = ({
+export function RedFilterStation({
   node,
-  answerInput,
-  setAnswerInput,
+  progress,
+  answer,
+  onAnswerChange,
   onSubmit,
-  isSubmitting
-}) => {
-  const [activeTab, setActiveTab] = useState<'RED_FILTER' | 'CARDAN_GRILLE'>('RED_FILTER');
-  const [isFilterEngaged, setIsFilterEngaged] = useState(false);
-  const [grilleOffset, setGrilleOffset] = useState(0);
+  disabled,
+  busy,
+  saved,
+}: StationProps) {
+  const [activeTab, setActiveTab] = useState<"RED_FILTER" | "CARDAN_GRILLE">(
+    "RED_FILTER",
+  );
+  const [filterEngaged, setFilterEngaged] = useState(false);
 
-  const opticalPin = (typeof node.payload.optical_pin === 'string' && node.payload.optical_pin) || '8492';
-  const cardanDirective = (typeof node.payload.cardan_directive === 'string' && node.payload.cardan_directive) || 'STRIKE AT DUSK';
-  const denseBlock = (typeof node.payload.grille_text === 'string' && node.payload.grille_text) || 'S 9 T 4 R I 2 K E 8 A T 0 D U S K 1 9 7 2';
-
-  // Cardan tokens split into grid
-  const letters = denseBlock.split(' ').filter(Boolean);
+  const cipherText = "EBVSDVV SURWRFRO DOSKD";
+  const denseBlock = "B Y P A S S P R O T O C O L A L P H A 2 0 2 6";
+  const letters = denseBlock.split(" ").filter(Boolean);
 
   return (
     <div className="space-y-6">
-      {/* Mode Navigation Tabs */}
-      <div className="flex items-center gap-2 bg-[#0b130e] p-1 rounded-xl border border-[#1b2b20]">
+      {/* Submode Switcher Tabs */}
+      <div className="flex items-center gap-2 border border-[#2d312c] bg-[#141514] p-1 rounded-xs">
         <button
           type="button"
-          onClick={() => setActiveTab('RED_FILTER')}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === 'RED_FILTER'
-              ? 'bg-red-950/70 border border-red-500/50 text-red-400 shadow-md'
-              : 'text-[#8ea897] hover:text-[#eaf2ec]'
+          onClick={() => {
+            setActiveTab("RED_FILTER");
+            soundEffects.playKeystrokeBeep();
+          }}
+          className={`flex-1 py-1.5 px-3 text-xs font-mono-tabular font-bold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === "RED_FILTER"
+              ? "bg-[#2d1b1b] border border-[#c93b2b] text-[#f4f1ea]"
+              : "text-[#949e93] hover:text-[#f4f1ea]"
           }`}
         >
-          <Eye className="w-3.5 h-3.5" />
+          <Eye className="w-3.5 h-3.5 text-[#c93b2b]" />
           <span>OPTICAL RED FILTER (650nm)</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab('CARDAN_GRILLE')}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === 'CARDAN_GRILLE'
-              ? 'bg-amber-950/70 border border-amber-500/50 text-amber-400 shadow-md'
-              : 'text-[#8ea897] hover:text-[#eaf2ec]'
+          onClick={() => {
+            setActiveTab("CARDAN_GRILLE");
+            soundEffects.playKeystrokeBeep();
+          }}
+          className={`flex-1 py-1.5 px-3 text-xs font-mono-tabular font-bold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === "CARDAN_GRILLE"
+              ? "bg-[#2d251b] border border-[#c28b28] text-[#f4f1ea]"
+              : "text-[#949e93] hover:text-[#f4f1ea]"
           }`}
         >
-          <Grid className="w-3.5 h-3.5" />
+          <Grid className="w-3.5 h-3.5 text-[#c28b28]" />
           <span>SLOTTED CARDAN GRILLE</span>
         </button>
       </div>
 
-      {/* Mode 1: Optical Red Filter Simulation */}
-      {activeTab === 'RED_FILTER' && (
-        <div className="bg-[#0b130e] border border-red-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between border-b border-[#1b2a20] pb-3">
-            <span className="text-xs font-bold text-red-400 uppercase tracking-wider">
-              Chromatic Camouflage Placard
+      {/* Tab 1: Optical Red Filter Simulation */}
+      {activeTab === "RED_FILTER" ? (
+        <div className="border border-[#3f453f] bg-[#141514] p-5 sm:p-6 rounded-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#2d312c] pb-3">
+            <span className="text-xs font-mono-tabular font-bold text-[#c93b2b] uppercase tracking-wider">
+              CHROMATIC CAMOUFLAGE PLACARD
             </span>
+
             <button
               type="button"
-              onClick={() => setIsFilterEngaged(!isFilterEngaged)}
-              className={`text-xs px-3.5 py-1.5 rounded-xl border font-bold uppercase transition-all cursor-pointer ${
-                isFilterEngaged
-                  ? 'bg-red-600 text-white shadow-lg border-red-400'
-                  : 'bg-[#152219] border-[#293d30] text-[#8ea897] hover:text-[#eaf2ec]'
+              onClick={() => {
+                setFilterEngaged(!filterEngaged);
+                soundEffects.playKeystrokeBeep();
+              }}
+              className={`text-xs font-mono-tabular font-bold uppercase px-3 py-1.5 border transition-all ${
+                filterEngaged
+                  ? "bg-[#c93b2b] border-[#c93b2b] text-[#f4f1ea]"
+                  : "bg-[#212421] border-[#3f453f] text-[#949e93] hover:text-[#f4f1ea]"
               }`}
             >
-              {isFilterEngaged ? 'RED FILTER: ENGAGED' : 'ENGAGE RED FILTER SHEET'}
+              {filterEngaged
+                ? "RED SHEET: ENGAGED"
+                : "ENGAGE RED ACRYLIC SHEET"}
             </button>
           </div>
 
-          {/* Poster Surface */}
-          <div className="relative p-8 rounded-xl border border-[#233529] overflow-hidden min-h-[160px] flex items-center justify-center select-none bg-[#050906]">
-            {/* Background noise lines */}
-            <div className="absolute inset-0 flex flex-wrap opacity-40">
-              {Array.from({ length: 18 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1/3 h-10 border-t border-r rotate-6"
-                  style={{
-                    borderColor: i % 2 === 0 ? '#38bdf8' : '#22c55e'
-                  }}
-                />
-              ))}
-            </div>
-
-            {/* Hidden PIN text with chromatic noise */}
-            <div className="relative text-3xl sm:text-5xl font-black tracking-[0.3em] font-mono z-10">
-              {isFilterEngaged ? (
-                <span className="text-white drop-shadow-[0_0_15px_rgba(239,68,68,0.9)] animate-in fade-in duration-300">
-                  {opticalPin}
-                </span>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span className="text-[#0284c7] line-through blur-[1px]">8</span>
-                  <span className="text-[#10b981] blur-[1px]">4</span>
-                  <span className="text-[#06b6d4] line-through blur-[1px]">9</span>
-                  <span className="text-[#14b8a6] blur-[1px]">2</span>
-                </div>
-              )}
-            </div>
-
-            {/* Red transparency overlay */}
-            {isFilterEngaged && (
-              <div className="absolute inset-0 bg-red-600/75 mix-blend-multiply backdrop-blur-[0.5px] pointer-events-none transition-all duration-300" />
+          {/* Optical Poster Surface */}
+          <div
+            onClick={() => {
+              setFilterEngaged(!filterEngaged);
+              soundEffects.playKeystrokeBeep();
+            }}
+            className={`relative p-8 rounded-xs border overflow-hidden min-h-[160px] flex items-center justify-center select-none cursor-pointer transition-all duration-300 ${
+              filterEngaged
+                ? "bg-[#330c0c] border-[#c93b2b]/60"
+                : "bg-[#181111] border-[#2d312c]"
+            }`}
+          >
+            {/* Visual Noise Pattern */}
+            {!filterEngaged && (
+              <div className="absolute inset-0 flex flex-wrap opacity-60 pointer-events-none">
+                {Array.from({ length: 24 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1/4 h-8 border-t border-r rotate-6"
+                    style={{
+                      borderColor: i % 2 === 0 ? "#ef4444" : "#22c55e",
+                    }}
+                  />
+                ))}
+              </div>
             )}
-          </div>
 
-          <p className="text-[11px] text-[#7d9787] text-center">
-            {isFilterEngaged
-              ? 'Cyan & green chromatic noise cancelled by the red spectrum pass. Hidden 4-digit PIN is revealed!'
-              : 'Looking through a physical red transparency cancels cyan noise to expose the underlying 4-digit PIN.'}
-          </p>
-        </div>
-      )}
-
-      {/* Mode 2: Cardan Grille Aperture Alignment */}
-      {activeTab === 'CARDAN_GRILLE' && (
-        <div className="bg-[#0b130e] border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1b2a20] pb-3">
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-              Aperture Card Alignment Grid
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-[#8ea897] uppercase">Slide Aperture Card:</span>
-              <button
-                type="button"
-                onClick={() => setGrilleOffset(grilleOffset === 0 ? 1 : 0)}
-                className="px-3 py-1 text-xs rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold hover:bg-amber-500/30 transition-colors"
-              >
-                {grilleOffset === 0 ? 'ALIGN TO SECRET APERTURE' : 'RESET POSITION'}
-              </button>
+            {/* Hidden Blue Text revealed under red optical filter */}
+            <div
+              className={`font-mono-tabular text-xl sm:text-2xl font-bold tracking-widest transition-all duration-300 z-10 text-center ${
+                filterEngaged
+                  ? "text-[#8aadf4] drop-shadow-[0_0_10px_rgba(138,173,244,0.9)] opacity-100"
+                  : "text-[#d24c3a] blur-[2px] opacity-40 select-none"
+              }`}
+            >
+              {cipherText}
             </div>
           </div>
 
-          {/* Letter Matrix with Cardan Overlay */}
-          <div className="p-4 rounded-xl bg-[#070d09] border border-[#1b2a20] space-y-3">
-            <div className="text-[10px] text-[#7d9787] uppercase">Dense Text Block:</div>
-            <div className="grid grid-cols-6 sm:grid-cols-10 gap-2 font-mono text-center">
+          <div className="text-[11px] font-mono-tabular text-[#949e93] leading-relaxed">
+            Hint: Place the physical red acrylic sheet over the poster to cancel
+            red noise and reveal blue ciphertext. Decode it with your Caesar -3
+            key from Node 03.
+          </div>
+        </div>
+      ) : (
+        /* Tab 2: Slotted Cardan Grille Simulation */
+        <div className="border border-[#3f453f] bg-[#141514] p-5 sm:p-6 rounded-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[#2d312c] pb-3">
+            <span className="text-xs font-mono-tabular font-bold text-[#c28b28] uppercase tracking-wider">
+              APERTURE CARD OVERLAY
+            </span>
+            <span className="text-[10px] font-mono-tabular text-[#949e93]">
+              MATRIX 4x6
+            </span>
+          </div>
+
+          <div className="p-6 bg-[#161716] border border-[#2d312c] rounded-xs select-none">
+            <div className="grid grid-cols-6 gap-2 text-center font-mono-tabular text-base">
               {letters.map((char, idx) => {
-                const isRevealed = grilleOffset === 1 && idx % 2 === 0;
+                const isCardanSlot = idx < 20;
                 return (
                   <div
                     key={idx}
-                    className={`h-9 flex items-center justify-center rounded-lg font-black text-sm transition-all duration-300 border ${
-                      isRevealed
-                        ? 'bg-amber-500/30 border-amber-400 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.5)] scale-105'
-                        : grilleOffset === 1
-                        ? 'opacity-20 bg-transparent border-transparent text-[#55695c]'
-                        : 'bg-[#101913] border-[#223327] text-[#cad3f5]'
+                    className={`py-2 px-1 border rounded-xs ${
+                      isCardanSlot
+                        ? "bg-[#252016] border-[#c28b28] text-[#c28b28] font-bold"
+                        : "bg-[#111211] border-[#202420] text-[#4e564e]"
                     }`}
                   >
                     {char}
@@ -167,53 +174,46 @@ export const RedFilterStation: React.FC<RedFilterStationProps> = ({
                 );
               })}
             </div>
+          </div>
 
-            {grilleOffset === 1 && (
-              <div className="mt-3 p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs flex items-center justify-between">
-                <span className="text-amber-400 font-bold uppercase">Decoded Directive:</span>
-                <span className="font-mono font-black text-amber-200 text-sm tracking-widest">{cardanDirective}</span>
-              </div>
-            )}
+          <div className="text-[11px] font-mono-tabular text-[#949e93]">
+            Slotted aperture cards isolate the directive payload across the
+            character matrix.
           </div>
         </div>
       )}
 
-      {/* Reconnaissance Clue Banner */}
-      <div className="p-4 rounded-xl bg-[#111a14] border border-[#233529] text-xs space-y-1.5">
-        <div className="text-[10px] font-black text-proto-logic uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>OPTICS / TACTILE DIRECTIVE:</span>
-        </div>
-        <p className="text-[#cad3f5] font-sans leading-relaxed">
-          {node.payload.hint || 'Look through the physical red optical transparency sheet to cancel chromatic noise, or slide the slotted Cardan card over the dense text block.'}
-        </p>
-      </div>
-
       {/* Answer Submission Form */}
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-[11px] text-[#8ea897] uppercase mb-1.5 font-bold flex items-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5 text-proto-logic" />
-            <span>{node.payload.prompt || 'Submit the 4-digit optical PIN or decoded directive sentence:'}</span>
-          </label>
+        <Field label="Your answer">
           <input
-            type="text"
+            value={answer}
+            onChange={(e) => onAnswerChange(e.target.value)}
+            disabled={disabled}
+            placeholder="e.g. Bypass Protocol Alpha"
             required
-            value={answerInput}
-            onChange={(e) => setAnswerInput(e.target.value)}
-            placeholder="e.g. 8492 or STRIKE AT DUSK"
-            className="w-full px-4 py-3 text-sm bg-[#09110d] border border-[#273a2e] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-proto-logic font-mono uppercase tracking-wider"
+            maxLength={100}
+            className="font-mono-tabular text-sm"
           />
-        </div>
+        </Field>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || !answerInput.trim()}
-          className="w-full py-3.5 px-4 rounded-xl bg-proto-logic hover:bg-[#2fd9ff] disabled:opacity-50 text-[#0a0f0d] font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <span>TRANSMIT DECODED BYPASS CODE</span>
-        </button>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="submit"
+            className="primary text-xs font-bold uppercase"
+            disabled={disabled || busy || !answer.trim()}
+          >
+            <span>{busy ? "Validating…" : "Submit answer"}</span>
+          </button>
+
+          <small className="font-mono-tabular text-[11px] text-[#949e93]">
+            {saved ? "Draft saved" : "Syncing…"}
+            {node.attemptLimit
+              ? ` · ${progress.attempts.length}/${node.attemptLimit} attempts`
+              : " · Unlimited attempts"}
+          </small>
+        </div>
       </form>
     </div>
   );
-};
+}

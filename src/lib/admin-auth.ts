@@ -1,22 +1,24 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
 // Secret key for HMAC signing of admin session tokens
-const ADMIN_SECRET = process.env.ADMIN_SECRET || (() => {
-  // Generate stable process-lifetime random secret if not provided in env
-  const secret = crypto.randomBytes(32).toString('hex');
-  return secret;
-})();
+const ADMIN_SECRET =
+  process.env.ADMIN_SECRET ||
+  (() => {
+    // Generate stable process-lifetime random secret if not provided in env
+    const secret = crypto.randomBytes(32).toString("hex");
+    return secret;
+  })();
 
-const DEFAULT_ADMIN_AGENT = 'ieee-protocol-admin';
-const DEFAULT_ADMIN_PASSWORD = 'protocol2026';
+const DEFAULT_ADMIN_AGENT = "ieee-protocol-admin";
+const DEFAULT_ADMIN_PASSWORD = "";
 
 /**
  * Timing-safe string comparison to prevent side-channel timing attacks
  */
 function timingSafeEqual(a: string, b: string): boolean {
   try {
-    const bufA = Buffer.from(a, 'utf-8');
-    const bufB = Buffer.from(b, 'utf-8');
+    const bufA = Buffer.from(a, "utf-8");
+    const bufB = Buffer.from(b, "utf-8");
     if (bufA.length !== bufB.length) return false;
     return crypto.timingSafeEqual(bufA, bufB);
   } catch {
@@ -27,13 +29,24 @@ function timingSafeEqual(a: string, b: string): boolean {
 /**
  * Validate admin login credentials against server environment variables
  */
-export function verifyAdminCredentials(agentName?: string, password?: string): boolean {
-  if (!agentName || !password) return false;
+export function verifyAdminCredentials(
+  agentName?: string,
+  password?: string,
+): boolean {
+  if (typeof agentName !== "string" || typeof password !== "string")
+    return false;
+
+  const adminPass = process.env.ADMIN_PASSWORD || process.env.ADMIN_SECRET_TOKEN;
+  if (!adminPass || adminPass === "FILLER")
+    return false;
 
   const expectedAgent = process.env.ADMIN_AGENT_NAME || DEFAULT_ADMIN_AGENT;
-  const expectedPassword = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+  const expectedPassword = adminPass;
 
-  const agentMatches = timingSafeEqual(agentName.trim().toLowerCase(), expectedAgent.toLowerCase());
+  const agentMatches = timingSafeEqual(
+    agentName.trim().toLowerCase(),
+    expectedAgent.toLowerCase(),
+  );
   const passMatches = timingSafeEqual(password.trim(), expectedPassword);
 
   return agentMatches && passMatches;
@@ -42,15 +55,17 @@ export function verifyAdminCredentials(agentName?: string, password?: string): b
 /**
  * Create a cryptographically signed admin session token valid for 12 hours
  */
-export function createAdminToken(agentName: string = DEFAULT_ADMIN_AGENT): string {
+export function createAdminToken(
+  agentName: string = DEFAULT_ADMIN_AGENT,
+): string {
   const expiresAt = Date.now() + 12 * 60 * 60 * 1000; // 12 hours
   const payload = `${agentName}:${expiresAt}`;
   const signature = crypto
-    .createHmac('sha256', ADMIN_SECRET)
+    .createHmac("sha256", ADMIN_SECRET)
     .update(payload)
-    .digest('hex');
-  
-  return Buffer.from(`${payload}:${signature}`).toString('base64url');
+    .digest("hex");
+
+  return Buffer.from(`${payload}:${signature}`).toString("base64url");
 }
 
 /**
@@ -58,13 +73,17 @@ export function createAdminToken(agentName: string = DEFAULT_ADMIN_AGENT): strin
  */
 export function verifyAdminToken(token: string | null | undefined): boolean {
   if (!token) return false;
-  if (process.env.ADMIN_SECRET_TOKEN && token === process.env.ADMIN_SECRET_TOKEN) {
+  if (
+    process.env.ADMIN_SECRET_TOKEN &&
+    process.env.ADMIN_SECRET_TOKEN !== "FILLER" &&
+    token === process.env.ADMIN_SECRET_TOKEN
+  ) {
     return true;
   }
 
   try {
-    const raw = Buffer.from(token, 'base64url').toString('utf-8');
-    const parts = raw.split(':');
+    const raw = Buffer.from(token, "base64url").toString("utf-8");
+    const parts = raw.split(":");
     if (parts.length !== 3) return false;
 
     const [agentName, expiresAtStr, signature] = parts;
@@ -76,9 +95,9 @@ export function verifyAdminToken(token: string | null | undefined): boolean {
 
     const payload = `${agentName}:${expiresAtStr}`;
     const expectedSig = crypto
-      .createHmac('sha256', ADMIN_SECRET)
+      .createHmac("sha256", ADMIN_SECRET)
       .update(payload)
-      .digest('hex');
+      .digest("hex");
 
     return timingSafeEqual(signature, expectedSig);
   } catch {
@@ -90,9 +109,9 @@ export function verifyAdminToken(token: string | null | undefined): boolean {
  * Check if incoming Request is authenticated as admin
  */
 export function verifyAdminRequest(request: Request): boolean {
-  const token = 
-    request.headers.get('x-admin-token') ||
-    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+  const token =
+    request.headers.get("x-admin-token") ||
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
     null;
 
   return verifyAdminToken(token);
@@ -107,15 +126,18 @@ interface RateLimitRecord {
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
 // Clean up stale rate-limit keys every 5 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of rateLimitStore.entries()) {
-      if (now > record.resetAt) {
-        rateLimitStore.delete(key);
+if (typeof setInterval !== "undefined") {
+  setInterval(
+    () => {
+      const now = Date.now();
+      for (const [key, record] of rateLimitStore.entries()) {
+        if (now > record.resetAt) {
+          rateLimitStore.delete(key);
+        }
       }
-    }
-  }, 5 * 60 * 1000).unref();
+    },
+    5 * 60 * 1000,
+  ).unref();
 }
 
 /**
@@ -127,7 +149,7 @@ if (typeof setInterval !== 'undefined') {
 export function checkRateLimit(
   key: string,
   maxRequests: number = 20,
-  windowMs: number = 60 * 1000
+  windowMs: number = 60 * 1000,
 ): { allowed: boolean; remaining: number; resetMs: number } {
   const now = Date.now();
   const record = rateLimitStore.get(key);
@@ -138,24 +160,32 @@ export function checkRateLimit(
   }
 
   if (record.count >= maxRequests) {
-    return { allowed: false, remaining: 0, resetMs: Math.max(0, record.resetAt - now) };
+    return {
+      allowed: false,
+      remaining: 0,
+      resetMs: Math.max(0, record.resetAt - now),
+    };
   }
 
   record.count += 1;
-  return { allowed: true, remaining: maxRequests - record.count, resetMs: Math.max(0, record.resetAt - now) };
+  return {
+    allowed: true,
+    remaining: maxRequests - record.count,
+    resetMs: Math.max(0, record.resetAt - now),
+  };
 }
 
 /**
  * Extract client IP from headers (supports reverse proxies like Render/Vercel/Cloudflare)
  */
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
+  const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    return forwarded.split(",")[0].trim();
   }
-  const realIp = request.headers.get('x-real-ip');
+  const realIp = request.headers.get("x-real-ip");
   if (realIp) {
     return realIp.trim();
   }
-  return '127.0.0.1';
+  return "127.0.0.1";
 }

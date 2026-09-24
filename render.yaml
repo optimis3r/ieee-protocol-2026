@@ -1,13 +1,23 @@
 services:
   - type: web
-    name: ieee-protocol-wa-gateway
-    env: docker
-    dockerfilePath: Dockerfile.gateway
-    plan: free
-    healthCheckPath: /health
-    autoDeploy: true
+    name: ieee-protocol-event
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start -- --port $PORT
+    healthCheckPath: /api/event?view=public
+    disk:
+      name: protocol-data
+      mountPath: /var/data/protocol
+      sizeGB: 1
     envVars:
-      - key: PORT
-        value: 5005
-      - key: NODE_ENV
-        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: PROTOCOL_DATA_DIR
+        value: /var/data/protocol
+      - key: ADMIN_AGENT_NAME
+        value: ieee-protocol-admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_SECRET
+        generateValue: true

@@ -1,206 +1,141 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { QRScannerModal, ScanResult } from '@/components/scanner/QRScannerModal';
-import { Store, initStore } from '@/lib/store';
-import { 
-  ScanLine, 
-  ArrowLeft,
-  Lock
-} from 'lucide-react';
+import React, { useState, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Frame, Panel, Field, api, credential } from "@/components/event/shared";
+import { QRScannerModal } from "@/components/scanner/QRScannerModal";
+import { soundEffects } from "@/lib/audio";
+import { Camera, QrCode, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
 
 export default function ScanToEnterPage() {
   const router = useRouter();
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [manualId, setManualId] = useState('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(true);
+  const [manualCode, setManualCode] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    initStore();
-    Store.syncWithServer();
-  }, []);
-
-  const handleScanSuccess = async (result: ScanResult) => {
-    if (result.type === 'BADGE' || result.id.startsWith('AGT-')) {
-      let agent = Store.getAgentById(result.id) || Store.findAgentByIdentifier(result.id);
-      if (!agent) {
-        try {
-          const synced = await Store.syncAgentWithServer(result.id);
-          if (synced?.agent) agent = synced.agent;
-        } catch (_) {}
-      }
-
-      if (agent) {
-        localStorage.setItem('ieee_agent_id', agent.agent_id);
-        localStorage.setItem('ieee_agent_token', agent.token);
-        const destination = Store.isEventActive()
-          ? `/play?agent_id=${agent.agent_id}&token=${agent.token}`
-          : '/standby';
-        router.push(destination);
-      } else {
-        setErrorMsg(`Badge identifier ${result.id} not registered yet. Please check in at the Operations desk.`);
-      }
-    } else {
-      setErrorMsg(`Unrecognized badge format: ${result.raw}`);
-    }
-  };
-
-  const handleManualLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualId.trim()) return;
-
-    const id = manualId.trim();
-    let agent = Store.getAgentById(id) || Store.findAgentByIdentifier(id);
-    if (!agent) {
+  const handleLogin = useCallback(
+    async (raw: string) => {
+      setBusy(true);
+      setError("");
+      soundEffects.playScanChirp();
       try {
-        const synced = await Store.syncAgentWithServer(id);
-        if (synced?.agent) agent = synced.agent;
-      } catch (_) {}
-    }
+        // If it's a direct station node URL, route there directly
+        const nodeMatch = raw.match(/\/node\/([a-zA-Z0-9_-]+)/i);
+        if (nodeMatch) {
+          router.push(`/node/${nodeMatch[1]}`);
+          return;
+        }
 
-    if (agent) {
-      localStorage.setItem('ieee_agent_id', agent.agent_id);
-      localStorage.setItem('ieee_agent_token', agent.token);
-      const destination = Store.isEventActive()
-        ? `/play?agent_id=${agent.agent_id}&token=${agent.token}`
-        : '/standby';
-      router.push(destination);
-    } else {
-      setErrorMsg(`Operative ${id.toUpperCase()} not found in Protocol directory.`);
-    }
-  };
+        // Check if user accidentally scanned a peer interaction pass
+        if (raw.includes("peer=")) {
+          setError(
+            "Scanned code is an operative interaction pass for handshakes. Scan your private login pass to authenticate.",
+          );
+          soundEffects.playErrorBuzz();
+          setBusy(false);
+          return;
+        }
+
+        const token = credential(raw, "login");
+        if (!token) {
+          throw new Error("Invalid pass format. Please scan a valid private login QR.");
+        }
+
+        await api("login", { token });
+        soundEffects.playSuccessChime();
+        router.push("/play");
+      } catch (err) {
+        soundEffects.playErrorBuzz();
+        setError((err as Error).message || "Authentication failed. Pass may be rotated or invalid.");
+        setBusy(false);
+      }
+    },
+    [router],
+  );
 
   return (
-    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between selection:bg-[#c93b2b] selection:text-[#f4f1ea]">
-      {/* Top Masthead */}
-      <header className="w-full border-b border-[#2d312c] px-4 sm:px-8 py-3.5 bg-[#141514]">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="p-1.5 border border-[#3f453f] hover:border-[#949e93] text-[#949e93] hover:text-[#f4f1ea] transition-colors rounded-sm"
-              aria-label="Back to home"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="font-mono-tabular text-[10px] text-[#949e93] tracking-widest uppercase">
-                NIT WARANGAL • DEPT OF ECE
-              </div>
-              <div className="text-xs font-bold tracking-wider text-[#f4f1ea] uppercase">
-                OPTICAL SENSOR GATEWAY
-              </div>
-            </div>
-          </div>
-
-          <Link
-            href="/my-badge"
-            className="btn-editorial-outline px-3 py-1.5 text-xs uppercase font-mono-tabular"
-          >
-            My Pass
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Authentication Section */}
-      <main className="max-w-md w-full mx-auto px-4 py-10 flex-1 flex flex-col justify-center">
-        <div className="border border-[#3f453f] bg-[#1b1d1b] p-6 sm:p-7 space-y-6">
-          <div className="space-y-1 border-b border-[#2d312c] pb-4">
-            <span className="font-mono-tabular text-[10px] text-[#c93b2b] uppercase tracking-wider block">
-              [GATEWAY AUTHENTICATION]
-            </span>
-            <h1 className="font-serif-editorial text-3xl font-normal text-[#f4f1ea]">
-              Scan to Enter
-            </h1>
-            <p className="font-display-grotesk text-xs text-[#949e93]">
-              Scan an operative physical badge or enter your assigned Agent ID.
-            </p>
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 border border-[#c93b2b] bg-[#251515] text-[#c93b2b] text-xs flex items-start gap-2 font-mono-tabular">
-              <Lock className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
+    <Frame
+      title="Rapid Optical Access // Scan to Enter"
+      subtitle="Present your physical badge or private QR to this terminal’s optical sensor."
+    >
+      <div style={{ maxWidth: 600 }}>
+        <Panel title="Optical Viewfinder">
+          {error && (
+            <div className="event-notice event-error flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Primary Action: Camera Scan */}
-          <button
-            onClick={() => setIsScannerOpen(true)}
-            className="btn-editorial-primary w-full py-3.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2.5 cursor-pointer"
-          >
-            <ScanLine className="w-4 h-4" />
-            <span>OPEN CAMERA SCANNER</span>
-          </button>
+          <p className="text-xs text-[#949e93] leading-relaxed mb-6 font-display-grotesk">
+            Align your private login QR code within the camera frame. The
+            cybernetic reticle will automatically lock on and initialize your
+            session.
+          </p>
 
-          {/* Divider */}
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-[#2d312c] w-full" />
-            <span className="bg-[#1b1d1b] px-3 font-mono-tabular text-[10px] uppercase text-[#949e93] absolute">
-              OR MANUAL AGENT ID
-            </span>
-          </div>
+          <div className="space-y-4">
+            <button
+              type="button"
+              className="btn-editorial-primary w-full py-3.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+              onClick={() => setScanOpen(true)}
+              disabled={busy}
+            >
+              <Camera className="w-4 h-4" />
+              <span>Open Scanner Viewfinder</span>
+            </button>
 
-          {/* Secondary: Manual ID Entry */}
-          <form onSubmit={handleManualLogin} className="space-y-2 font-mono-tabular">
-            <label className="block text-[10px] text-[#949e93] uppercase">
-              Agent ID (e.g. AGT-001):
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualId}
-                onChange={(e) => setManualId(e.target.value)}
-                placeholder="AGT-XXXX"
-                className="flex-1 px-3 py-2 text-xs bg-[#141514] border border-[#2d312c] text-[#f4f1ea] focus:outline-none focus:border-[#949e93] uppercase placeholder:text-[#949e93]/50"
-              />
+            {/* Fallback Manual Input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleLogin(manualCode);
+              }}
+              className="pt-4 border-t border-[#2d312c] space-y-3"
+            >
+              <Field label="Or paste private token / link manually">
+                <input
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  placeholder="Paste login link or token..."
+                  disabled={busy}
+                  autoComplete="off"
+                />
+              </Field>
+
               <button
                 type="submit"
-                className="btn-editorial-outline px-4 py-2 text-xs font-bold uppercase"
+                className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular"
+                disabled={busy || !manualCode.trim()}
               >
-                Access
+                <span>Authorize Credentials</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            </div>
-          </form>
+            </form>
+          </div>
 
-          {/* Operative Registration Link */}
-          <div className="pt-3 border-t border-[#2d312c] flex items-center justify-between text-xs font-display-grotesk text-[#949e93]">
-            <span>Need an assignment?</span>
-            <Link href="/register" className="text-[#f4f1ea] hover:underline font-bold">
-              Register here →
+          <div className="mt-6 pt-4 border-t border-[#2d312c] flex justify-between text-[11px] font-mono-tabular text-[#949e93]">
+            <Link href="/register" className="hover:text-[#f4f1ea] transition-colors">
+              New operative? Register
+            </Link>
+            <Link href="/" className="hover:text-[#f4f1ea] transition-colors">
+              Return home
             </Link>
           </div>
-        </div>
-      </main>
+        </Panel>
+      </div>
 
-      {/* Footer Navigation */}
-      <footer className="w-full border-t border-[#2d312c] px-4 sm:px-8 py-3.5 text-xs text-[#949e93] bg-[#141514]">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-mono-tabular text-[11px]">
-          <span>NIT WARANGAL IEEE STUDENT BRANCH</span>
-          <div className="flex items-center gap-4">
-            <Link href="/my-badge" className="hover:text-[#f4f1ea]">
-              My Pass
-            </Link>
-            <Link href="/login" className="hover:text-[#f4f1ea]">
-              Pass Recovery
-            </Link>
-            <Link href="/admin" className="hover:text-[#f4f1ea]">
-              Operations
-            </Link>
-          </div>
-        </div>
-      </footer>
-
-      {/* Scanner Modal */}
       <QRScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScanSuccess={handleScanSuccess}
-        title="BADGE OPTICAL SENSOR"
-        subtitle="Align physical badge QR within reticle"
+        isOpen={scanOpen}
+        onClose={() => setScanOpen(false)}
+        onScanSuccess={(result) => {
+          setScanOpen(false);
+          void handleLogin(result.raw);
+        }}
+        title="OPTICAL SENSOR SCANNER"
+        subtitle="Align your private pass QR within frame"
       />
-    </div>
+    </Frame>
   );
 }

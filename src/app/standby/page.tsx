@@ -1,251 +1,337 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Store, initStore } from '@/lib/store';
-import { Agent, ROLE_DETAILS, PrimaryDomain } from '@/types/database';
-import { soundEffects } from '@/lib/audio';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Frame, Panel } from "@/components/event/shared";
+import confetti from "canvas-confetti";
+import { soundEffects } from "@/lib/audio";
+import {
+  Clock,
+  Radio,
+  ArrowRight,
+  ShieldAlert,
+  MessageCircle,
+  QrCode,
+  Sparkles,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 
-const TARGET_LAUNCH_DATE = new Date('2026-09-24T09:00:00+05:30').getTime();
+const TARGET_LAUNCH_DATE = new Date("2026-09-26T17:00:00+05:30").getTime();
+
+function calculateTimeLeft() {
+  const now = Date.now();
+  const diff = Math.max(0, TARGET_LAUNCH_DATE - now);
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  return { days, hours, minutes, seconds, isPast: diff === 0 };
+}
 
 export default function StandbyWaitingPage() {
   const router = useRouter();
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number }>({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0
-  });
-  const [isLiveLaunching, setIsLiveLaunching] = useState(false);
-  const [waGroupLink, setWaGroupLink] = useState<string>('');
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+  const [publicState, setPublicState] = useState<{
+    phase: string;
+    deadline: string;
+    whatsappUrl?: string;
+  } | null>(null);
+  const [currentAgent, setCurrentAgent] = useState<{
+    id: string;
+    name: string;
+    checkedIn: boolean;
+  } | null>(null);
+  const [isLaunching, setIsLaunching] = useState(false);
+  const hasTransitioned = useRef(false);
 
-  const updateCountdown = useCallback(() => {
-    const now = Date.now();
-    const diff = Math.max(0, TARGET_LAUNCH_DATE - now);
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-    setTimeLeft({ days, hours, minutes, seconds });
+  // Countdown timer tick
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+    return () => clearInterval(id);
   }, []);
 
+  // Poll event phase and auto-transition when game starts
   useEffect(() => {
-    initStore();
-    updateCountdown();
+    let live = true;
 
-    const storedId = localStorage.getItem('ieee_agent_id');
-    if (storedId) {
-      const localAg = Store.getAgentById(storedId);
-      if (localAg) setAgent(localAg);
-    }
-    setWaGroupLink(Store.getWhatsAppConfig().groupLink || '');
-
-    const timer = setInterval(updateCountdown, 1000);
-
-    let isCancelled = false;
-    const pollServerStatus = async () => {
-      const activeId = localStorage.getItem('ieee_agent_id');
+    async function checkPhase() {
       try {
-        const result = await Store.syncAgentWithServer(activeId || undefined);
-        if (isCancelled) return;
+        const pubRes = await fetch("/api/event?view=public", {
+          cache: "no-store",
+        });
+        if (pubRes.ok) {
+          const pub = await pubRes.json();
+          if (!live) return;
+          setPublicState(pub);
 
-        if (result.agent) {
-          setAgent(result.agent);
+          const isActive = [
+            "EVENT_ACTIVE",
+            "SUBMISSIONS_OPEN",
+            "EVENT_CLOSING",
+          ].includes(pub.phase);
+
+          if (isActive && !hasTransitioned.current) {
+            hasTransitioned.current = true;
+            setIsLaunching(true);
+            soundEffects.playMasterDeductionFanfare();
+            try {
+              confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.5 },
+                colors: ["#2d9f5d", "#c28b28", "#f4f1ea", "#c93b2b"],
+              });
+            } catch {}
+            setTimeout(() => {
+              if (live) {
+                router.push("/play");
+              }
+            }, 1800);
+          }
         }
 
-        if (result.gameState?.status === 'NETWORK_ACTIVE') {
-          setIsLiveLaunching(true);
-          soundEffects.playSuccessChime();
-          setTimeout(() => {
-            if (!isCancelled) {
-              router.push('/play');
-            }
-          }, 1000);
+        const agentRes = await fetch("/api/event", { cache: "no-store" });
+        if (agentRes.ok) {
+          const snap = await agentRes.json();
+          if (live && snap.participant) {
+            setCurrentAgent({
+              id: snap.participant.id,
+              name: snap.participant.name,
+              checkedIn: snap.participant.checkedIn,
+            });
+          }
         }
       } catch {
-        const localState = Store.getGameState();
-        if (localState.status === 'NETWORK_ACTIVE' && !isCancelled) {
-          setIsLiveLaunching(true);
-          router.push('/play');
-        }
+        /* Reconnecting */
       }
-    };
+    }
 
-    pollServerStatus();
-    const pollInterval = setInterval(pollServerStatus, 2000);
-
-    const handleUpdate = () => pollServerStatus();
-    window.addEventListener('ieee_store_update', handleUpdate);
-    window.addEventListener('storage', handleUpdate);
+    void checkPhase();
+    const pollId = setInterval(checkPhase, 3000);
 
     return () => {
-      isCancelled = true;
-      clearInterval(timer);
-      clearInterval(pollInterval);
-      window.removeEventListener('ieee_store_update', handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
+      live = false;
+      clearInterval(pollId);
     };
-  }, [router, updateCountdown]);
-
-  const handleLogout = () => {
-    soundEffects.playScanChirp();
-    localStorage.removeItem('ieee_agent_id');
-    localStorage.removeItem('ieee_agent_token');
-    router.push('/login');
-  };
-
-  const domain = (agent?.archetype || 'LOGIC') as PrimaryDomain;
-  const roleMeta = ROLE_DETAILS[domain] || ROLE_DETAILS.LOGIC;
+  }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#141514] text-[#f4f1ea] flex flex-col justify-between p-4 sm:p-8 font-sans">
-      {/* Top Editorial Masthead */}
-      <header className="max-w-2xl w-full mx-auto rule-double pb-2.5 flex items-baseline justify-between text-xs text-[#949e93] font-mono-tabular">
-        <div>
-          <strong className="text-[#f4f1ea] font-display-grotesk tracking-tight">NIT WARANGAL IEEE</strong>
-          <span className="mx-2">•</span>
-          <span>COMMENCEMENT BULLETIN</span>
-        </div>
-        <div className="editorial-stamp text-[#c28b28] border-[#c28b28]">
-          HOLDING STATE
-        </div>
-      </header>
-
-      {/* Main Asymmetric Editorial Body */}
-      <main className="max-w-2xl w-full mx-auto my-auto py-6 space-y-6">
-        
-        {/* Live Launch Banner */}
-        {isLiveLaunching && (
-          <div className="p-4 bg-[#c93b2b] text-[#f4f1ea] font-bold text-center border border-[#a82e20]">
-            <div className="text-sm uppercase tracking-widest font-display-grotesk">
-              NETWORK ACTIVATED // OPENING HUD TERMINAL
-            </div>
-          </div>
-        )}
-
-        {/* Editorial Headline & Statement */}
-        <div className="space-y-2">
-          <div className="text-[11px] text-[#c28b28] uppercase tracking-widest font-mono-tabular font-bold">
-            SCHEDULED EVENT START: SEPT 24, 2026 // 09:00 IST
-          </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif-editorial tracking-tight text-[#f4f1ea] leading-tight">
-            Please standby for the game to begin.
-          </h1>
-          <p className="text-sm text-[#949e93] font-display-grotesk max-w-lg leading-relaxed pt-1">
-            Station circuits and challenge coordinates are locked until the Operations Desk initializes the network. This terminal will automatically transition to your active HUD upon launch.
-          </p>
-        </div>
-
-        {/* Mechanical Countdown Display */}
-        <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 sm:p-5">
-          <div className="text-[10px] uppercase text-[#949e93] font-mono-tabular tracking-wider rule-hairline pb-2 mb-3">
-            OFFICIAL COMMENCEMENT COUNTDOWN
-          </div>
-          <div className="grid grid-cols-4 gap-2 text-center font-mono-tabular">
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-[#f4f1ea] tracking-tight">
-                {String(timeLeft.days).padStart(2, '0')}
-              </div>
-              <div className="text-[10px] uppercase text-[#949e93] mt-1">Days</div>
-            </div>
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-[#f4f1ea] tracking-tight">
-                {String(timeLeft.hours).padStart(2, '0')}
-              </div>
-              <div className="text-[10px] uppercase text-[#949e93] mt-1">Hours</div>
-            </div>
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-[#f4f1ea] tracking-tight">
-                {String(timeLeft.minutes).padStart(2, '0')}
-              </div>
-              <div className="text-[10px] uppercase text-[#949e93] mt-1">Minutes</div>
-            </div>
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-[#c28b28] tracking-tight">
-                {String(timeLeft.seconds).padStart(2, '0')}
-              </div>
-              <div className="text-[10px] uppercase text-[#949e93] mt-1">Seconds</div>
-            </div>
+    <Frame
+      title="Network Standby // Staging Docket"
+      subtitle="The campus network is currently dormant. Operations initiate at 17:00 HRS IST."
+    >
+      {isLaunching && (
+        <div className="event-notice border-[#2d9f5d] bg-[#16271c] text-[#a6da95] flex items-center justify-between gap-4 py-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-[#2d9f5d] animate-spin" />
+            <span>
+              <strong>NETWORK ACTIVATED:</strong> Initializing operative
+              terminal…
+            </span>
           </div>
         </div>
+      )}
 
-        {/* Two-Column Detail & Action Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start font-display-grotesk text-xs">
-          
-          {/* Left: Operative Enrollment Ledger */}
-          <div className="border border-[#2d312c] bg-[#1b1d1b] p-4 space-y-2.5">
-            <div className="rule-hairline pb-1.5 flex items-center justify-between">
-              <span className="text-[10px] uppercase text-[#949e93] font-mono-tabular">ENROLLED OPERATIVE</span>
-              {agent && (
-                <span className="font-mono-tabular font-bold text-[#c28b28]">{agent.agent_id}</span>
-              )}
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Big Countdown Clock & Status */}
+        <div className="lg:col-span-7 space-y-6">
+          <Panel title="Mission Initiation Countdown">
+            <div className="py-4">
+              <div className="grid grid-cols-4 gap-2 sm:gap-4 text-center font-mono-tabular">
+                <div className="p-3 sm:p-5 bg-[#141514] border border-[#2d312c] rounded-xs">
+                  <span className="text-3xl sm:text-5xl font-bold text-[#c28b28] block">
+                    {String(timeLeft.days).padStart(2, "0")}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-[#949e93] uppercase tracking-wider block mt-1">
+                    DAYS
+                  </span>
+                </div>
 
-            {agent ? (
-              <div className="space-y-1">
-                <div className="font-bold text-[#f4f1ea] text-sm truncate">{agent.name}</div>
-                <div className="text-[#949e93] font-serif-editorial italic">Cell: {roleMeta.title} ({roleMeta.subtitle})</div>
-                <div className="text-[11px] text-[#949e93] font-mono-tabular pt-1">
-                  Wristband ID: <strong className="text-[#f4f1ea]">{agent.wristband_id || agent.agent_id}</strong>
+                <div className="p-3 sm:p-5 bg-[#141514] border border-[#2d312c] rounded-xs">
+                  <span className="text-3xl sm:text-5xl font-bold text-[#c28b28] block">
+                    {String(timeLeft.hours).padStart(2, "0")}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-[#949e93] uppercase tracking-wider block mt-1">
+                    HOURS
+                  </span>
+                </div>
+
+                <div className="p-3 sm:p-5 bg-[#141514] border border-[#2d312c] rounded-xs">
+                  <span className="text-3xl sm:text-5xl font-bold text-[#c28b28] block">
+                    {String(timeLeft.minutes).padStart(2, "0")}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-[#949e93] uppercase tracking-wider block mt-1">
+                    MINS
+                  </span>
+                </div>
+
+                <div className="p-3 sm:p-5 bg-[#141514] border border-[#2d312c] rounded-xs">
+                  <span className="text-3xl sm:text-5xl font-bold text-[#c28b28] block">
+                    {String(timeLeft.seconds).padStart(2, "0")}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-[#949e93] uppercase tracking-wider block mt-1">
+                    SECS
+                  </span>
                 </div>
               </div>
-            ) : (
-              <div className="text-[#949e93]">
-                <span>No active enrollment on this device. </span>
-                <Link href="/register" className="text-[#f4f1ea] underline underline-offset-4 font-bold">
-                  Enlist here →
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-[#2d312c] flex items-center justify-between text-xs font-mono-tabular text-[#949e93]">
+              <div className="flex items-center gap-2">
+                <Radio className="w-3.5 h-3.5 text-[#c28b28] animate-pulse" />
+                <span>
+                  PHASE:{" "}
+                  <strong className="text-[#f4f1ea]">
+                    {publicState?.phase?.replaceAll("_", " ") || "STANDBY"}
+                  </strong>
+                </span>
+              </div>
+              <span>AUTO-REFRESH ACTIVE</span>
+            </div>
+          </Panel>
+
+          {/* Staging Instructions */}
+          <Panel title="Operative Briefing">
+            <div className="space-y-3 text-xs font-display-grotesk text-[#949e93] leading-relaxed">
+              <p>
+                Welcome, operative. When the countdown reaches zero and the
+                operations desk signals <strong className="text-[#f4f1ea]">EVENT ACTIVE</strong>, this page will automatically unlock your mission HUD.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 font-mono-tabular text-[11px]">
+                <div className="p-3 border border-[#2d312c] bg-[#141514]">
+                  <span className="text-[#949e93] block text-[9px] uppercase">
+                    STEP 01
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium">
+                    Register or sign in on this device.
+                  </span>
+                </div>
+                <div className="p-3 border border-[#2d312c] bg-[#141514]">
+                  <span className="text-[#949e93] block text-[9px] uppercase">
+                    STEP 02
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium">
+                    Present QR pass at E&ICT C301 for your wristband.
+                  </span>
+                </div>
+                <div className="p-3 border border-[#2d312c] bg-[#141514]">
+                  <span className="text-[#949e93] block text-[9px] uppercase">
+                    STEP 03
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium">
+                    Investigate campus nodes & exchange intel.
+                  </span>
+                </div>
+                <div className="p-3 border border-[#2d312c] bg-[#141514]">
+                  <span className="text-[#949e93] block text-[9px] uppercase">
+                    STEP 04
+                  </span>
+                  <span className="text-[#f4f1ea] font-medium">
+                    Submit Master Deduction before 20:00 HRS sharp.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Panel>
+        </div>
+
+        {/* Right Column: Operative Status & Channels */}
+        <div className="lg:col-span-5 space-y-6">
+          {currentAgent ? (
+            <Panel title="Identified Operative">
+              <div className="space-y-3 text-xs font-mono-tabular">
+                <div className="flex justify-between items-center border-b border-[#2d312c] pb-2">
+                  <span className="text-[#949e93]">OPERATIVE</span>
+                  <span className="text-[#f4f1ea] font-bold">
+                    {currentAgent.name}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#2d312c] pb-2">
+                  <span className="text-[#949e93]">AGENT ID</span>
+                  <span className="text-[#c28b28] font-bold">
+                    {currentAgent.id}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-[#2d312c] pb-2">
+                  <span className="text-[#949e93]">DESK STATUS</span>
+                  <span
+                    className={
+                      currentAgent.checkedIn
+                        ? "text-[#2d9f5d] font-bold"
+                        : "text-[#c28b28] font-bold"
+                    }
+                  >
+                    {currentAgent.checkedIn ? "CHECKED IN" : "PENDING GATE SCAN"}
+                  </span>
+                </div>
+
+                <div className="pt-2 space-y-2">
+                  <Link
+                    href="/my-badge"
+                    className="btn-editorial-primary w-full py-2.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>View Official Pass</span>
+                  </Link>
+                </div>
+              </div>
+            </Panel>
+          ) : (
+            <Panel title="Operative Enlistment">
+              <p className="text-xs text-[#949e93] leading-relaxed mb-4">
+                Not enlisted yet? Register to receive your cryptographic agent
+                pass and join the alternate reality game.
+              </p>
+              <div className="space-y-2">
+                <Link
+                  href="/register"
+                  className="btn-editorial-primary w-full py-2.5 px-4 text-xs font-bold uppercase flex items-center justify-center gap-2 text-center"
+                >
+                  <span>Register as Operative</span>
+                </Link>
+                <Link
+                  href="/login"
+                  className="btn-editorial-outline w-full py-2 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular"
+                >
+                  <span>Sign in with private pass</span>
                 </Link>
               </div>
-            )}
-          </div>
-
-          {/* Right: Actions */}
-          <div className="space-y-2">
-            <Link
-              href="/my-badge"
-              className="w-full py-3 px-4 btn-editorial-outline text-xs block text-center uppercase tracking-wider font-bold"
-            >
-              View My Personal QR Pass →
-            </Link>
-
-            {waGroupLink && (
-              <a
-                href={waGroupLink}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full py-2.5 px-4 bg-[#1b1d1b] hover:bg-[#212421] border border-[#2d312c] text-xs text-[#949e93] hover:text-[#f4f1ea] block text-center transition-colors"
-              >
-                Official WhatsApp Channel →
-              </a>
-            )}
-          </div>
-
-        </div>
-
-        {/* Subordinate Links */}
-        <div className="flex items-center justify-between text-xs text-[#949e93] font-display-grotesk pt-2 rule-hairline pb-2">
-          <span>Auto-sync active (2s interval)</span>
-          {agent && (
-            <button
-              onClick={handleLogout}
-              className="text-[#c93b2b] hover:underline underline-offset-4 cursor-pointer"
-            >
-              Sign Out
-            </button>
+            </Panel>
           )}
+
+          {/* Official Communications */}
+          <Panel title="Official Transmission Line">
+            <div className="space-y-3 text-xs text-[#949e93] leading-relaxed">
+              <p>
+                All official clues, campus announcements, and event updates are
+                dispatched via the IEEE Protocol WhatsApp community.
+              </p>
+
+              {publicState?.whatsappUrl ? (
+                <a
+                  href={publicState.whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-editorial-outline w-full py-2.5 px-4 text-xs uppercase flex items-center justify-center gap-2 text-center font-mono-tabular text-[#2fa596] hover:text-[#f4f1ea]"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Join WhatsApp Field Channel</span>
+                </a>
+              ) : (
+                <div className="p-2.5 border border-[#2d312c] bg-[#141514] text-[11px] font-mono-tabular">
+                  The operations desk will publish the link shortly.
+                </div>
+              )}
+            </div>
+          </Panel>
         </div>
-
-      </main>
-
-      {/* Editorial Footer */}
-      <footer className="max-w-2xl w-full mx-auto rule-hairline pt-2 flex items-center justify-between text-[10px] text-[#949e93] font-mono-tabular">
-        <span>NIT WARANGAL • THE PROTOCOL 2026</span>
-        <span>AUTONOMOUS DISPATCH SYSTEM</span>
-      </footer>
-    </div>
+      </div>
+    </Frame>
   );
 }

@@ -1,29 +1,40 @@
 import type { Metadata, Viewport } from "next";
-import { Newsreader, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const newsreader = Newsreader({
+const newsreader = localFont({
+  src: [
+    {
+      path: "../../node_modules/@fontsource-variable/newsreader/files/newsreader-latin-wght-normal.woff2",
+      style: "normal",
+      weight: "200 800",
+    },
+    {
+      path: "../../node_modules/@fontsource-variable/newsreader/files/newsreader-latin-wght-italic.woff2",
+      style: "italic",
+      weight: "200 800",
+    },
+  ],
   variable: "--font-newsreader",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
   display: "swap",
 });
-
-const spaceGrotesk = Space_Grotesk({
+const spaceGrotesk = localFont({
+  src: "../../node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2",
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
+  weight: "300 700",
   display: "swap",
 });
-
-const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
+  src: "../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2",
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
+  weight: "100 800",
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "The Protocol // NIT Warangal IEEE",
-  description: "An interactive mystery investigation by NIT Warangal IEEE Student Branch.",
+  description:
+    "An interactive mystery investigation by NIT Warangal IEEE Student Branch.",
   applicationName: "The Protocol",
   appleWebApp: {
     capable: true,
@@ -39,8 +50,6 @@ export const viewport: Viewport = {
   themeColor: "#141514",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({

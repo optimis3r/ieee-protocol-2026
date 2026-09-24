@@ -45,3 +45,7 @@ next-env.d.ts
 .baileys_auth/
 whatsapp_session/
 .data/
+
+# Browser test output
+/test-results/
+/playwright-report/

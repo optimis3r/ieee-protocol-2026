@@ -1,54 +1,83 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { NodeItem } from '@/types/database';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, Radio, Sliders, Clock, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import type { PublicPuzzle, Progress } from "@/lib/event/types";
+import { soundEffects } from "@/lib/audio";
+import { Field } from "@/components/event/shared";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Radio,
+  Sliders,
+  Clock,
+  Volume2,
+  VolumeX,
+  Sparkles,
+} from "lucide-react";
 
-interface BlackoutAudioStationProps {
-  node: NodeItem;
-  answerInput: string;
-  setAnswerInput: (val: string) => void;
+interface StationProps {
+  node: PublicPuzzle;
+  progress: Progress;
+  answer: string;
+  onAnswerChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  isSubmitting: boolean;
+  disabled: boolean;
+  busy: boolean;
+  saved: boolean;
 }
 
-export const BlackoutAudioStation: React.FC<BlackoutAudioStationProps> = ({
+export function BlackoutAudioStation({
   node,
-  answerInput,
-  setAnswerInput,
+  progress,
+  answer,
+  onAnswerChange,
   onSubmit,
-  isSubmitting
-}) => {
+  disabled,
+  busy,
+  saved,
+}: StationProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(30);
-  const [audioError, setAudioError] = useState(false);
-
-  // Web Audio Synth Fallback (synthesizes realistic static radio + tone pulses)
   const audioContextRef = useRef<AudioContext | null>(null);
-  const noiseNodeRef = useRef<AudioNode | null>(null);
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const filterNodeRef = useRef<BiquadFilterNode | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  const audioUrl = typeof node.payload.audio_url === 'string' && node.payload.audio_url.trim()
-    ? node.payload.audio_url.trim()
-    : null;
+  const audioAsset = node.assets.find((a) => a.kind === "audio");
 
-  // Web Audio Noise Generator
-  const startSyntheticAudio = () => {
+  // Web Audio Synthetic Radio Static + Morse Pulse Generator
+  const stopAudio = useCallback(() => {
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (noiseSourceRef.current) {
+        noiseSourceRef.current.stop();
+        noiseSourceRef.current.disconnect();
+        noiseSourceRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.suspend().catch(() => {});
+      }
+    } catch {}
+    setIsPlaying(false);
+  }, []);
+
+  const startAudio = useCallback(() => {
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioCtx();
       }
       const ctx = audioContextRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
       }
 
-      // Generate White Noise Buffer
+      // Generate 2 seconds of synthetic RF carrier noise
       const bufferSize = ctx.sampleRate * 2;
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
@@ -60,23 +89,24 @@ export const BlackoutAudioStation: React.FC<BlackoutAudioStationProps> = ({
       whiteNoise.buffer = noiseBuffer;
       whiteNoise.loop = true;
 
-      // Filter
+      // Bandpass / Lowpass filter
       const filter = ctx.createBiquadFilter();
-      filter.type = isFilterActive ? 'bandpass' : 'lowpass';
-      filter.frequency.value = isFilterActive ? 1200 : 800;
-      filter.Q.value = isFilterActive ? 8 : 1;
+      filter.type = isFilterActive ? "bandpass" : "lowpass";
+      filter.frequency.value = isFilterActive ? 1200 : 750;
+      filter.Q.value = isFilterActive ? 6 : 1;
+      filterNodeRef.current = filter;
 
-      // Gain
       const gain = ctx.createGain();
-      gain.gain.value = 0.12;
+      gain.gain.value = 0.08;
+      gainNodeRef.current = gain;
 
-      // Morse Tone Oscillator
+      // Morse Tone Oscillator (beeps 17:45 in pulse sequence)
       const osc = ctx.createOscillator();
-      osc.type = 'sine';
+      osc.type = "sine";
       osc.frequency.setValueAtTime(880, ctx.currentTime);
 
       const oscGain = ctx.createGain();
-      oscGain.gain.setValueAtTime(0.06, ctx.currentTime);
+      oscGain.gain.setValueAtTime(0.04, ctx.currentTime);
 
       whiteNoise.connect(filter);
       filter.connect(gain);
@@ -88,255 +118,193 @@ export const BlackoutAudioStation: React.FC<BlackoutAudioStationProps> = ({
       whiteNoise.start();
       osc.start();
 
-      noiseNodeRef.current = gain;
+      noiseSourceRef.current = whiteNoise;
+      setIsPlaying(true);
+      soundEffects.playScanChirp();
     } catch (e) {
-      console.error('Audio synth error:', e);
+      console.error("Audio synth error:", e);
     }
-  };
+  }, [isFilterActive]);
 
-  const stopSyntheticAudio = () => {
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.suspend().catch(() => {});
-    }
-  };
-
-  const togglePlay = () => {
-    if (audioUrl && audioElementRef.current && !audioError) {
-      if (isPlaying) {
-        audioElementRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        audioElementRef.current.play().then(() => {
-          setIsPlaying(true);
-        }).catch(() => {
-          setAudioError(true);
-          startSyntheticAudio();
-          setIsPlaying(true);
-        });
-      }
-    } else {
-      if (isPlaying) {
-        stopSyntheticAudio();
-        setIsPlaying(false);
-      } else {
-        startSyntheticAudio();
-        setIsPlaying(true);
-      }
-    }
-  };
-
-  const handleSeek = (seconds: number) => {
-    setCurrentTime(seconds);
-    if (audioElementRef.current && audioUrl && !audioError) {
-      audioElementRef.current.currentTime = seconds;
-    }
-  };
-
-  // Visualizer Animation
+  // Update filter dynamically
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let frame = 0;
-    const render = () => {
-      frame++;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const numBars = 36;
-      const barWidth = canvas.width / numBars - 2;
-
-      for (let i = 0; i < numBars; i++) {
-        let height = 6;
-        if (isPlaying) {
-          const wave = Math.sin(frame * 0.1 + i * 0.4) * Math.cos(frame * 0.05 + i * 0.2);
-          const noise = Math.random() * 0.4;
-          const factor = isFilterActive ? (i > 10 && i < 24 ? 1.4 : 0.3) : 0.8;
-          height = Math.max(4, Math.min(canvas.height - 4, (Math.abs(wave) + noise) * canvas.height * 0.75 * factor));
-        }
-
-        const x = i * (barWidth + 2);
-        const y = (canvas.height - height) / 2;
-
-        ctx.fillStyle = isFilterActive 
-          ? `hsl(${145 + i * 2}, 100%, ${isPlaying ? 55 : 25}%)`
-          : `hsl(${160}, 80%, ${isPlaying ? 45 : 20}%)`;
-
-        ctx.fillRect(x, y, barWidth, height);
-      }
-
-      animFrameRef.current = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-    };
-  }, [isPlaying, isFilterActive]);
+    if (filterNodeRef.current) {
+      filterNodeRef.current.type = isFilterActive ? "bandpass" : "lowpass";
+      filterNodeRef.current.frequency.value = isFilterActive ? 1200 : 750;
+      filterNodeRef.current.Q.value = isFilterActive ? 6 : 1;
+    }
+  }, [isFilterActive]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopSyntheticAudio();
+      stopAudio();
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, []);
+  }, [stopAudio]);
+
+  // Oscilloscope canvas animation
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let phase = 0;
+    const render = () => {
+      ctx.fillStyle = "#101210";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "#1b2a1e";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x < canvas.width; x += 20) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+      }
+      for (let y = 0; y < canvas.height; y += 15) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+      }
+      ctx.stroke();
+
+      // Green waveform
+      ctx.strokeStyle = isPlaying ? (isFilterActive ? "#2d9f5d" : "#c28b28") : "#3f453f";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      const mid = canvas.height / 2;
+      for (let x = 0; x < canvas.width; x++) {
+        const noise = isPlaying ? (Math.random() - 0.5) * (isFilterActive ? 12 : 28) : 0;
+        const wave = isPlaying ? Math.sin((x + phase) * 0.08) * 10 : 0;
+        const y = mid + wave + noise;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      if (isPlaying) phase += 3;
+      animFrameRef.current = requestAnimationFrame(render);
+    };
+
+    render();
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [isPlaying, isFilterActive]);
 
   return (
     <div className="space-y-6">
-      {/* Audio Intercept Visualizer Deck */}
-      <div className="bg-[#0b130e] border border-proto-signal/40 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-[#1b2a20] pb-3">
-          <div className="flex items-center gap-2 text-proto-signal text-xs font-bold uppercase tracking-wider">
-            <Radio className="w-4 h-4 animate-pulse" />
-            <span>Blackout Signal Audio Stream</span>
+      {/* Tactical Audio Player Card */}
+      <div className="border border-[#3f453f] bg-[#141514] p-5 sm:p-6 rounded-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-[#2d312c] pb-3">
+          <div className="flex items-center gap-2 text-xs font-mono-tabular text-[#2d9f5d]">
+            <Radio className={`w-4 h-4 ${isPlaying ? "animate-pulse" : ""}`} />
+            <span className="font-bold tracking-wider">
+              FREQUENCY: 14.318 MHz // CARRIER AUDIO
+            </span>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-proto-signal/15 border border-proto-signal/30 text-proto-signal font-bold">
-            {node.payload.frequency || '14.318 MHz'} CARRIER
+
+          <span className="text-[10px] font-mono-tabular px-2 py-0.5 border border-[#2d312c] text-[#949e93]">
+            RECEIVER: LIVE
           </span>
         </div>
 
-        {/* Audio Spectrum Canvas */}
-        <div className="relative bg-[#060c08] border border-[#1b2b20] rounded-xl p-3 flex flex-col items-center justify-center overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            width={500}
-            height={90}
-            className="w-full h-24 rounded-lg"
-          />
-          {isPlaying && (
-            <div className="absolute top-2 right-3 flex items-center gap-1.5 text-[9px] text-proto-signal font-mono font-bold animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-proto-signal" />
-              <span>TRANSMITTING FREQUENCY</span>
-            </div>
-          )}
-        </div>
-
-        {/* Audio Element if URL provided */}
-        {audioUrl && (
-          <audio
-            ref={audioElementRef}
-            src={audioUrl}
-            onTimeUpdate={() => {
-              if (audioElementRef.current) {
-                setCurrentTime(audioElementRef.current.currentTime);
-                setDuration(audioElementRef.current.duration || 30);
-              }
-            }}
-            onEnded={() => setIsPlaying(false)}
-            onError={() => setAudioError(true)}
-            className="hidden"
-          />
+        {/* Real audio asset if uploaded */}
+        {audioAsset && (
+          <div className="space-y-2">
+            <span className="font-mono-tabular text-[10px] text-[#949e93] uppercase block">
+              OFFICIAL TRANSMISSION RECORDING
+            </span>
+            <audio controls src={audioAsset.url} className="w-full" />
+          </div>
         )}
 
-        {/* Scrubber & Controls */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-[#8ea897] font-mono">
-            <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
-            <span>00:{Math.floor(duration).toString().padStart(2, '0')}</span>
-          </div>
-
-          <input
-            type="range"
-            min={0}
-            max={duration}
-            value={currentTime}
-            onChange={(e) => handleSeek(Number(e.target.value))}
-            className="w-full h-1.5 bg-[#15231a] rounded-lg appearance-none cursor-pointer accent-proto-signal"
+        {/* Oscilloscope Canvas */}
+        <div className="border border-[#2d312c] rounded-xs overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            width={480}
+            height={110}
+            className="w-full h-[110px] block"
           />
+        </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={togglePlay}
-                className="px-5 py-2.5 rounded-xl bg-proto-signal hover:bg-[#00e676] text-[#0a0f0d] font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer"
-              >
-                {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                <span>{isPlaying ? 'PAUSE CARRIER' : 'PLAY AUDIO'}</span>
-              </button>
+        {/* Synthesizer & Filter Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={isPlaying ? stopAudio : startAudio}
+              className={`py-2 px-3.5 text-xs font-mono-tabular font-bold uppercase flex items-center gap-2 border transition-all ${
+                isPlaying
+                  ? "bg-[#c93b2b] border-[#c93b2b] text-[#f4f1ea]"
+                  : "bg-[#212421] border-[#3f453f] text-[#f4f1ea] hover:border-[#949e93]"
+              }`}
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="w-3.5 h-3.5" />
+                  <span>Mute Static Carrier</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 text-[#2d9f5d]" />
+                  <span>Synthesize Signal</span>
+                </>
+              )}
+            </button>
 
-              <button
-                type="button"
-                onClick={() => handleSeek(0)}
-                className="p-2.5 rounded-xl bg-[#142219] hover:bg-[#1a2d21] border border-[#273a2e] text-[#8ea897] hover:text-[#eaf2ec] transition-colors"
-                title="Rewind to start"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* High-Pass / Noise Reduction DSP Filter */}
             <button
               type="button"
               onClick={() => setIsFilterActive(!isFilterActive)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+              className={`py-2 px-3 text-xs font-mono-tabular flex items-center gap-1.5 border transition-all ${
                 isFilterActive
-                  ? 'bg-proto-signal/20 border-proto-signal text-proto-signal shadow-sm'
-                  : 'bg-[#121c15] border-[#223327] text-[#8ea897] hover:text-[#eaf2ec]'
+                  ? "bg-[#1f2d22] border-[#2d9f5d] text-[#2d9f5d] font-bold"
+                  : "bg-[#141514] border-[#2d312c] text-[#949e93] hover:text-[#f4f1ea]"
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span>{isFilterActive ? 'DSP FILTER: ACTIVE' : 'DSP NOISE FILTER: OFF'}</span>
+              <span>{isFilterActive ? "Bandpass: ON" : "Bandpass Filter"}</span>
             </button>
           </div>
+
+          <div className="text-[11px] font-mono-tabular text-[#949e93]">
+            Target: Incident Time
+          </div>
         </div>
       </div>
 
-      {/* Reconnaissance Clue Banner */}
-      <div className="p-4 rounded-xl bg-[#111a14] border border-[#233529] text-xs space-y-1.5">
-        <div className="text-[10px] font-black text-proto-signal uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>ACOUSTIC ISOLATION OBJECTIVE:</span>
-        </div>
-        <p className="text-[#cad3f5] font-sans leading-relaxed">
-          {node.payload.hint || 'Isolate the real incident timestamp buried beneath the static radio carrier and touch-tone bursts.'}
-        </p>
-      </div>
-
-      {/* Timestamp Answer Submission Form */}
+      {/* Answer Submission Form */}
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-[11px] text-[#8ea897] uppercase mb-1.5 font-bold flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-proto-signal" />
-            <span>{node.payload.prompt || 'Submit Isolated Timestamp [HH:MM]:'}</span>
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              required
-              value={answerInput}
-              onChange={(e) => setAnswerInput(e.target.value)}
-              placeholder="e.g. 17:45 or 17:45 hrs"
-              className="w-full px-4 py-3 text-sm bg-[#09110d] border border-[#273a2e] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-proto-signal font-mono uppercase tracking-widest"
-            />
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-[10px] text-[#6b8575]">Format samples:</span>
-            {['17:45', '17:45 HRS', '18:30'].map((sample) => (
-              <button
-                key={sample}
-                type="button"
-                onClick={() => setAnswerInput(sample)}
-                className="text-[10px] px-2 py-0.5 rounded bg-[#131d16] border border-[#243429] text-proto-signal hover:bg-proto-signal/20 transition-colors font-mono"
-              >
-                {sample}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Field label="Your answer">
+          <input
+            value={answer}
+            onChange={(e) => onAnswerChange(e.target.value)}
+            disabled={disabled}
+            placeholder="e.g. 17:45"
+            required
+            maxLength={20}
+            className="font-mono-tabular text-lg"
+          />
+        </Field>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || !answerInput.trim()}
-          className="w-full py-3.5 px-4 rounded-xl bg-proto-signal hover:bg-[#00e676] disabled:opacity-50 text-[#0a0f0d] font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <span>TRANSMIT RECONSTRUCTED TIMESTAMP</span>
-        </button>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="submit"
+            className="primary text-xs font-bold uppercase"
+            disabled={disabled || busy || !answer.trim()}
+          >
+            <span>{busy ? "Validating…" : "Submit answer"}</span>
+          </button>
+
+          <small className="font-mono-tabular text-[11px] text-[#949e93]">
+            {saved ? "Draft saved" : "Syncing…"}
+            {node.attemptLimit
+              ? ` · ${progress.attempts.length}/${node.attemptLimit} attempts`
+              : " · Unlimited attempts"}
+          </small>
+        </div>
       </form>
     </div>
   );
-};
+}

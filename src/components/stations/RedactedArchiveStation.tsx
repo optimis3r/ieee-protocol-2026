@@ -1,218 +1,155 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { NodeItem } from '@/types/database';
-import { Terminal, FileText, Sun, Sparkles, Search, UserCheck } from 'lucide-react';
+import React, { useState } from "react";
+import type { PublicPuzzle, Progress } from "@/lib/event/types";
+import { soundEffects } from "@/lib/audio";
+import { Field } from "@/components/event/shared";
+import { Flashlight, Shield, User, FileText } from "lucide-react";
 
-interface RedactedArchiveStationProps {
-  node: NodeItem;
-  answerInput: string;
-  setAnswerInput: (val: string) => void;
+interface StationProps {
+  node: PublicPuzzle;
+  progress: Progress;
+  answer: string;
+  onAnswerChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  isSubmitting: boolean;
+  disabled: boolean;
+  busy: boolean;
+  saved: boolean;
 }
 
-export const RedactedArchiveStation: React.FC<RedactedArchiveStationProps> = ({
+export function RedactedArchiveStation({
   node,
-  answerInput,
-  setAnswerInput,
+  progress,
+  answer,
+  onAnswerChange,
   onSubmit,
-  isSubmitting
-}) => {
-  const [isBacklightActive, setIsBacklightActive] = useState(false);
-  const [terminalInput, setTerminalInput] = useState('');
-  const [terminalLogs, setTerminalLogs] = useState<string[]>([
-    'ARCHIVE OS v4.2 [CLASSIFIED CLEARANCE DETECTED]',
-    'Type "help" for available commands, or "cat memo.txt" to read intercepted incident memo.'
-  ]);
-
-  const memoTitle = (typeof node.payload.memo_title === 'string' && node.payload.memo_title) || 'DEPT MEMORANDUM 1994 // DECLASSIFIED';
-  const redactedSubject = (typeof node.payload.redacted_subject === 'string' && node.payload.redacted_subject) || 'AGENT K';
-  const redactedRoll = (typeof node.payload.redacted_roll === 'string' && node.payload.redacted_roll) || '248721';
-
-  const handleTerminalSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cmd = terminalInput.trim().toLowerCase();
-    if (!cmd) return;
-
-    const newLogs = [...terminalLogs, `$ ${terminalInput}`];
-
-    if (cmd === 'help') {
-      newLogs.push(
-        'AVAILABLE COMMANDS:',
-        '  cat memo.txt        - Read raw intercepted memorandum text',
-        '  grep -i "operative" - Search records for suspect mentions',
-        '  inspect --backlight - Unmask redacted characters under light',
-        '  roll_index          - Query suspect student roll index',
-        '  clear               - Clear terminal log buffer'
-      );
-    } else if (cmd.includes('memo')) {
-      newLogs.push(
-        'READING /archive/1994/memo.txt...',
-        'INCIDENT 94-B: Subsea Fiber 4 cluster unauthorized access logged.',
-        `Suspect Operative: ${isBacklightActive ? redactedSubject : '[REDACTED]'} (Roll: ${isBacklightActive ? redactedRoll : '[REDACTED]'})`
-      );
-    } else if (cmd.includes('grep') || cmd.includes('operative') || cmd.includes('search')) {
-      newLogs.push(
-        `MATCH FOUND [LINE 42]: "...operative identified as ${isBacklightActive ? redactedSubject : '████████'} under classified oversight..."`
-      );
-    } else if (cmd.includes('backlight') || cmd.includes('inspect')) {
-      setIsBacklightActive(true);
-      newLogs.push(
-        'BACKLIGHT ENGAGED. Illuminating redacted paper fiber...',
-        `REVEALED SUBJECT: ${redactedSubject} // ROLL NO: ${redactedRoll}`
-      );
-    } else if (cmd.includes('roll')) {
-      newLogs.push(`CAMPUS ARCHIVE QUERY: Roll #${redactedRoll} maps to Operative Codename "${redactedSubject}".`);
-    } else if (cmd === 'clear') {
-      setTerminalLogs([]);
-      setTerminalInput('');
-      return;
-    } else {
-      newLogs.push(`Command not recognized: "${terminalInput}". Type "help" for syntax.`);
-    }
-
-    setTerminalLogs(newLogs.slice(-14));
-    setTerminalInput('');
-  };
+  disabled,
+  busy,
+  saved,
+}: StationProps) {
+  const [isIlluminated, setIsIlluminated] = useState(false);
 
   return (
     <div className="space-y-6">
-      {/* Physical Binder / Declassified Memo Document */}
-      <div className={`p-5 sm:p-6 rounded-2xl border transition-all duration-300 shadow-2xl ${
-        isBacklightActive
-          ? 'bg-[#181d11] border-yellow-500/60 shadow-[0_0_25px_rgba(234,179,8,0.2)]'
-          : 'bg-[#0b130e] border-[#1b2b20]'
-      }`}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-            <FileText className="w-4 h-4" />
-            <span>{memoTitle}</span>
+      {/* Redacted Dossier Terminal */}
+      <div className="border border-[#3f453f] bg-[#141514] p-5 sm:p-6 rounded-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-[#2d312c] pb-3">
+          <div className="flex items-center gap-2 text-xs font-mono-tabular text-[#d96b27]">
+            <FileText className="w-4 h-4 text-[#d96b27]" />
+            <span className="font-bold tracking-wider">
+              ARCHIVE DOSSIER // DECLASSIFIED PERSONNEL LOG
+            </span>
           </div>
 
           <button
             type="button"
-            onClick={() => setIsBacklightActive(!isBacklightActive)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
-              isBacklightActive
-                ? 'bg-amber-500 text-black shadow-lg font-black'
-                : 'bg-[#142219] border border-[#273a2e] text-[#8ea897] hover:text-[#eaf2ec]'
+            onClick={() => {
+              setIsIlluminated(!isIlluminated);
+              soundEffects.playKeystrokeBeep();
+            }}
+            className={`text-xs font-mono-tabular font-bold uppercase px-3 py-1.5 border transition-all ${
+              isIlluminated
+                ? "bg-[#331c11] border-[#d96b27] text-[#f4f1ea] shadow-lg shadow-orange-950/40"
+                : "bg-[#212421] border-[#3f453f] text-[#949e93] hover:text-[#f4f1ea]"
             }`}
           >
-            <Sun className="w-4 h-4" />
-            <span>{isBacklightActive ? 'BACKLIGHT: ILLUMINATED' : 'HOLD TO BACKLIGHT'}</span>
+            <span className="flex items-center gap-1.5">
+              <Flashlight className="w-3.5 h-3.5" />
+              <span>{isIlluminated ? "BACKLIGHT: ACTIVE" : "SHINE FLASHLIGHT"}</span>
+            </span>
           </button>
         </div>
 
-        {/* Redacted Memo Content */}
-        <div className="mt-4 p-5 rounded-xl bg-[#070d09] border border-[#1b2b20] font-mono text-xs leading-relaxed space-y-3">
-          <div className="text-[10px] text-[#7d9787] uppercase border-b border-[#1b2b20] pb-2 flex justify-between">
-            <span>DEPARTMENT OF ELECTRICAL & COMPUTING</span>
-            <span>RESTRICTED CLASSIFICATION</span>
-          </div>
-
-          <p className="text-[#cad3f5]">
-            INCIDENT REPORT 1994-09: During subsea fiber routing maintenance, an unauthorized terminal handshake bypassed root memory integrity checks.
-          </p>
-
-          <p className="text-[#cad3f5]">
-            Eyewitness statements and physical logs cross-referenced with attendance records identify operative{' '}
-            {isBacklightActive ? (
-              <span className="px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-300 font-bold border border-yellow-500/40 animate-in fade-in">
-                {redactedSubject} (Roll #{redactedRoll})
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded bg-black text-black select-none font-bold border border-[#2b3e32]">
-                ██████████████
-              </span>
-            )}{' '}
-            originating from the Central Computer Bay. All operatives must maintain total radio silence.
-          </p>
-        </div>
-
-        <p className="text-[11px] text-[#7d9787] mt-3">
-          {isBacklightActive
-            ? 'Strong backlight shines through carbon ink layers, revealing the unmasked suspect.'
-            : 'Black permanent marker conceals key names. Use backlight inspection or execute terminal queries below.'}
-        </p>
-      </div>
-
-      {/* Mini-Terminal CLI */}
-      <div className="p-4 rounded-2xl bg-[#060b08] border border-proto-system/40 space-y-3 font-mono text-xs shadow-2xl">
-        <div className="flex items-center justify-between text-proto-system border-b border-[#1b2b20] pb-2">
-          <div className="flex items-center gap-1.5 font-bold uppercase">
-            <Terminal className="w-4 h-4" />
-            <span>Archive Terminal CLI (Search & Forensics)</span>
-          </div>
-          <span className="text-[10px] text-[#7d9787]">bash - NITW ARCHIVES</span>
-        </div>
-
-        {/* Terminal Logs Output */}
-        <div className="h-32 overflow-y-auto space-y-1 text-[11px] text-[#8ea897] p-2 bg-[#040705] rounded-xl border border-[#142017]">
-          {terminalLogs.map((log, i) => (
-            <div key={i} className={log.startsWith('$') ? 'text-proto-signal font-bold' : ''}>
-              {log}
+        {/* Paper Document Surface */}
+        <div
+          onClick={() => {
+            setIsIlluminated(!isIlluminated);
+            soundEffects.playKeystrokeBeep();
+          }}
+          className={`p-6 rounded-xs border transition-all duration-300 select-none cursor-pointer relative overflow-hidden ${
+            isIlluminated
+              ? "bg-[#241d14] border-[#d96b27]/60 shadow-[inset_0_0_40px_rgba(217,107,39,0.25)]"
+              : "bg-[#181a18] border-[#2d312c]"
+          }`}
+        >
+          {/* Official Document Masthead */}
+          <div className="flex items-start justify-between border-b border-[#3f453f] pb-3 mb-4 text-[10px] font-mono-tabular text-[#949e93]">
+            <div>
+              <div className="font-bold text-[#f4f1ea]">
+                DEPARTMENT OF ECE // ARCHIVE FILE 2026-X
+              </div>
+              <div>SUBJECT: INTERNAL CLEARANCE ANOMALY</div>
             </div>
-          ))}
-        </div>
-
-        {/* Terminal Input Form */}
-        <form onSubmit={handleTerminalSubmit} className="flex gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-2.5 text-proto-signal font-bold">$</span>
-            <input
-              type="text"
-              value={terminalInput}
-              onChange={(e) => setTerminalInput(e.target.value)}
-              placeholder="e.g. cat memo.txt, grep operative, or inspect --backlight"
-              className="w-full pl-7 pr-3 py-2 bg-[#09110d] border border-[#233529] rounded-xl text-xs text-[#eaf2ec] focus:outline-none focus:border-proto-system font-mono"
-            />
+            <span className="editorial-stamp border-[#c93b2b] text-[#c93b2b]">
+              CONFIDENTIAL
+            </span>
           </div>
-          <button
-            type="submit"
-            className="px-3 py-2 rounded-xl bg-proto-system text-black font-bold text-xs uppercase hover:opacity-90 transition-opacity"
-          >
-            <Search className="w-3.5 h-3.5" />
-          </button>
-        </form>
-      </div>
 
-      {/* Reconnaissance Clue Banner */}
-      <div className="p-4 rounded-xl bg-[#111a14] border border-[#233529] text-xs space-y-1.5">
-        <div className="text-[10px] font-black text-proto-system uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>REDACTED ARCHIVE OBJECTIVE:</span>
+          <div className="space-y-3 text-xs font-display-grotesk text-[#949e93] leading-relaxed">
+            <p>
+              Operative audit conducted on 22 September 2026 logged suspicious
+              packet relay activities originating from an unauthorized identity.
+              The primary operative profile has been stricken from standard
+              registers:
+            </p>
+
+            {/* The Redacted Marker Block */}
+            <div className="py-2">
+              <span className="text-[10px] font-mono-tabular uppercase tracking-wider text-[#949e93] block mb-1">
+                PRIMARY ASSET IDENTITY:
+              </span>
+
+              <div
+                className={`p-3.5 border transition-all duration-300 rounded-xs font-mono-tabular text-base sm:text-lg font-bold tracking-widest text-center ${
+                  isIlluminated
+                    ? "bg-[#352516] border-[#d96b27] text-[#eed49f] drop-shadow-[0_0_8px_rgba(238,212,159,0.8)]"
+                    : "bg-[#0a0b0a] border-black text-black select-none"
+                }`}
+              >
+                {isIlluminated ? "K. Sharma (K-24)" : "████████████████████"}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-[#949e93] pt-1 border-t border-[#2d312c] font-mono-tabular">
+              {isIlluminated
+                ? "Backlit phone flashlight reveals underlying printed ink beneath marker layer."
+                : "Heavily obscured with black permanent marker. Click or press button to simulate flashlight backlighting."}
+            </p>
+          </div>
         </div>
-        <p className="text-[#cad3f5] font-sans leading-relaxed">
-          {node.payload.hint || 'Hold the physical memo sheets against backlight or execute terminal reconnaissance queries to unveil the redacted subject.'}
-        </p>
       </div>
 
       {/* Answer Submission Form */}
       <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <label className="block text-[11px] text-[#8ea897] uppercase mb-1.5 font-bold flex items-center gap-1.5">
-            <UserCheck className="w-3.5 h-3.5 text-proto-system" />
-            <span>{node.payload.prompt || 'Submit Redacted Operative Name or Student Roll Number:'}</span>
-          </label>
+        <Field label="Your answer">
           <input
-            type="text"
+            value={answer}
+            onChange={(e) => onAnswerChange(e.target.value)}
+            disabled={disabled}
+            placeholder="e.g. K-24 or K. Sharma"
             required
-            value={answerInput}
-            onChange={(e) => setAnswerInput(e.target.value)}
-            placeholder="e.g. AGENT K or 248721"
-            className="w-full px-4 py-3 text-sm bg-[#09110d] border border-[#273a2e] rounded-xl text-[#f3f7f4] focus:outline-none focus:border-proto-system font-mono uppercase tracking-wider"
+            maxLength={60}
+            className="font-mono-tabular text-sm"
           />
-        </div>
+        </Field>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || !answerInput.trim()}
-          className="w-full py-3.5 px-4 rounded-xl bg-proto-system hover:bg-[#ff8c1a] disabled:opacity-50 text-[#0a0f0d] font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <span>TRANSMIT UNMASKED OPERATIVE IDENTIFIER</span>
-        </button>
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="submit"
+            className="primary text-xs font-bold uppercase"
+            disabled={disabled || busy || !answer.trim()}
+          >
+            <span>{busy ? "Validating…" : "Submit answer"}</span>
+          </button>
+
+          <small className="font-mono-tabular text-[11px] text-[#949e93]">
+            {saved ? "Draft saved" : "Syncing…"}
+            {node.attemptLimit
+              ? ` · ${progress.attempts.length}/${node.attemptLimit} attempts`
+              : " · Unlimited attempts"}
+          </small>
+        </div>
       </form>
     </div>
   );
-};
+}
